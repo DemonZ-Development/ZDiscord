@@ -1,0 +1,6 @@
+jdk: 17
+install:
+  - sdk install java 17.0.8-tem
+  - sdk use java 17.0.8-tem
+before_install:
+  - sdk install maven

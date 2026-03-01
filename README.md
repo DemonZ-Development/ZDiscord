@@ -11,7 +11,6 @@
 [![Version](https://img.shields.io/badge/version-1.0.0--beta-blue?style=for-the-badge)](https://github.com/DemonZDevelopment/ZDiscord/releases)
 [![Minecraft](https://img.shields.io/badge/Minecraft-1.21+-green?style=for-the-badge&logo=minecraft)](https://papermc.io)
 [![Platform](https://img.shields.io/badge/Paper%20%7C%20Folia%20%7C%20Spigot-Compatible-orange?style=for-the-badge)](https://papermc.io)
-[![License](https://img.shields.io/badge/license-MIT-purple?style=for-the-badge)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-17+-red?style=for-the-badge&logo=openjdk)](https://adoptium.net)
 [![bStats](https://img.shields.io/bstats/servers/29652?style=for-the-badge&label=Servers&color=cyan)](https://bstats.org/plugin/bukkit/MyZDiscord/29652)
 
@@ -198,7 +197,7 @@ Contributions are welcome! Please open an issue first to discuss what you'd like
 
 ## 📜 License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License — see the [LICENSE](LICENSE) file for details.
 
 ---
 

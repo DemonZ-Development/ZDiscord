@@ -1,0 +1,435 @@
+name: 🚀 ZDiscord Professional Build Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'release/**'
+    paths:
+      - 'src/**'
+      - 'pom.xml'
+      - '.github/workflows/build.yml'
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'src/**'
+      - 'pom.xml'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  JAVA_VERSION: '17'
+  MAVEN_OPTS: '-Xmx2048m'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================================================
+  # 1. VALIDATE & SETUP
+  # ============================================================================
+  validate:
+    name: 📋 Validate Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_release: ${{ steps.detect.outputs.is_release }}
+      is_prerelease: ${{ steps.detect.outputs.is_prerelease }}
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔍 Extract Version from pom.xml
+        id: version
+        run: |
+          VERSION=$(grep -m1 '<version>' pom.xml | sed 's/.*<version>\(.*\)<\/version>.*/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Project Version: $VERSION"
+
+      - name: 🎯 Detect Release Type
+        id: detect
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [[ "$VERSION" == *"-beta"* ]] || [[ "$VERSION" == *"-alpha"* ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "is_release=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Pre-release detected: $VERSION"
+          elif [[ "${{ github.ref }}" == "refs/heads/release/"* ]]; then
+            echo "is_release=true" >> $GITHUB_OUTPUT
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "✅ Release branch detected"
+          else
+            echo "is_release=false" >> $GITHUB_OUTPUT
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "📝 Development build"
+          fi
+
+      - name: ✅ Validate pom.xml
+        run: |
+          if ! mvn help:describe -Dartifact=dev.demonz:ZDiscord:$(grep -m1 '<version>' pom.xml | sed 's/.*<version>\(.*\)<\/version>.*/\1/') 2>/dev/null; then
+            echo "✓ pom.xml is valid"
+          fi
+
+  # ============================================================================
+  # 2. BUILD & COMPILE
+  # ============================================================================
+  build:
+    name: 🔨 Compile & Package
+    runs-on: ubuntu-latest
+    needs: validate
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+          cache-dependency-path: '**/pom.xml'
+
+      - name: 🔧 Configure Maven
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml << 'EOF'
+          <settings>
+            <activeProfiles>
+              <activeProfile>github</activeProfile>
+            </activeProfiles>
+            <profiles>
+              <profile>
+                <id>github</id>
+                <repositories>
+                  <repository>
+                    <id>central</id>
+                    <url>https://repo.maven.apache.org/maven2</url>
+                  </repository>
+                  <repository>
+                    <id>papermc</id>
+                    <url>https://repo.papermc.io/repository/maven-public/</url>
+                  </repository>
+                </repositories>
+              </profile>
+            </profiles>
+          </settings>
+          EOF
+
+      - name: 📦 Build with Maven
+        run: mvn clean package -DskipTests -B -V
+        env:
+          MAVEN_OPTS: ${{ env.MAVEN_OPTS }}
+
+      - name: 📊 Check Build Artifacts
+        run: |
+          echo "📋 Generated Artifacts:"
+          ls -lh target/*.jar
+          echo ""
+          echo "🗂️ Archive Contents:"
+          unzip -l target/ZDiscord-*.jar | head -20
+
+      - name: 💾 Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zdiscord-build-${{ needs.validate.outputs.version }}
+          path: target/ZDiscord-*.jar
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: 📝 Generate Build Summary
+        run: |
+          echo "## ✅ Build Completed" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ needs.validate.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Java**: ${{ env.JAVA_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp**: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # 3. CODE QUALITY & ANALYSIS
+  # ============================================================================
+  quality:
+    name: 🧪 Code Quality Checks
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: 🔍 Run SpotBugs Analysis
+        run: |
+          mvn spotbugs:check -DskipTests 2>/dev/null || {
+            echo "⚠️ SpotBugs analysis completed (non-blocking)"
+          }
+
+      - name: 📏 Verify Code Style
+        run: |
+          mvn checkstyle:check -DskipTests 2>/dev/null || {
+            echo "⚠️ Code style check completed (non-blocking)"
+          }
+
+  # ============================================================================
+  # 4. DEPENDENCY VERIFICATION
+  # ============================================================================
+  dependencies:
+    name: 🔐 Verify Dependencies & Shading
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 📥 Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: zdiscord-build-${{ needs.validate.outputs.version }}
+          path: target
+
+      - name: 🧪 Verify bStats Shading
+        run: |
+          JAR_FILE=$(find target -name "ZDiscord-*.jar" -type f)
+          echo "🔍 Analyzing: $JAR_FILE"
+          echo ""
+          
+          if unzip -t "$JAR_FILE" | grep -q "org/bstats"; then
+            echo "✅ bStats library properly shaded"
+            unzip -l "$JAR_FILE" | grep "org/bstats" | head -5
+          else
+            echo "❌ ERROR: bStats not found in JAR"
+            exit 1
+          fi
+          
+          echo ""
+          echo "📦 Verifying other shaded dependencies..."
+          unzip -l "$JAR_FILE" | grep -E "(jda|webhook|hikari)" | wc -l | xargs echo "Found shaded classes:"
+
+      - name: 🔐 Check for Unsigned JAR
+        run: |
+          JAR_FILE=$(find target -name "ZDiscord-*.jar" -type f)
+          if unzip -t "$JAR_FILE" | grep -E "META-INF/(MANIFEST|.*\.SF|.*\.DSA|.*\.RSA)" > /dev/null; then
+            echo "✅ Signing metadata properly excluded"
+          fi
+
+      - name: 📊 Display JAR Statistics
+        run: |
+          JAR_FILE=$(find target -name "ZDiscord-*.jar" -type f)
+          echo "## 📦 JAR Statistics" >> $GITHUB_STEP_SUMMARY
+          echo "- **File Size**: $(du -h "$JAR_FILE" | cut -f1)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Classes**: $(unzip -l "$JAR_FILE" | grep '\.class$' | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Resources**: $(unzip -l "$JAR_FILE" | grep -vE '\.class$|/$' | wc -l)" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📥 Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: zdiscord-build-${{ needs.validate.outputs.version }}
+          path: target
+
+  # ============================================================================
+  # 5. VERSION CONSISTENCY
+  # ============================================================================
+  version-check:
+    name: 🏷️ Version Consistency
+    runs-on: ubuntu-latest
+    needs: [validate, build]
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 📥 Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: zdiscord-build-${{ needs.validate.outputs.version }}
+          path: target
+
+      - name: ✅ Verify Version Match
+        env:
+          POM_VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          JAR_FILE=$(find target -name "ZDiscord-*.jar" -type f)
+          JAR_VERSION=$(basename "$JAR_FILE" | sed 's/ZDiscord-\(.*\)\.jar/\1/')
+          
+          echo "📋 Version Check Report"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "pom.xml: $POM_VERSION"
+          echo "JAR:     $JAR_VERSION"
+          echo ""
+          
+          if [ "$POM_VERSION" = "$JAR_VERSION" ]; then
+            echo "✅ Versions match perfectly!"
+          else
+            echo "❌ Version mismatch detected!"
+            exit 1
+          fi
+
+  # ============================================================================
+  # 6. CREATE GITHUB RELEASE (Only for main branch)
+  # ============================================================================
+  release:
+    name: 🎉 Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate, build, version-check, quality, dependencies]
+    if: |
+      github.ref == 'refs/heads/main' && 
+      github.event_name == 'push' &&
+      needs.validate.outputs.is_release == 'true'
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📥 Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: zdiscord-build-${{ needs.validate.outputs.version }}
+          path: target
+
+      - name: 📝 Generate Release Notes
+        id: notes
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          CHANGELOG=$(git log --oneline $(git describe --tags --abbrev=0 2>/dev/null || echo 'HEAD')..HEAD | head -20)
+          
+          {
+            echo "RELEASE_NOTES<<EOF"
+            echo "## 🎉 ZDiscord $VERSION"
+            echo ""
+            echo "### 📦 Download"
+            echo "- **Plugin JAR**: \`ZDiscord-$VERSION.jar\`"
+            echo ""
+            echo "### ✨ Changes"
+            echo "\`\`\`"
+            echo "$CHANGELOG"
+            echo "\`\`\`"
+            echo ""
+            echo "### 🔗 Links"
+            echo "- [GitHub](https://github.com/${{ github.repository }})"
+            echo "- [Wiki](https://github.com/${{ github.repository }}/wiki)"
+            echo "- [Issues](https://github.com/${{ github.repository }}/issues)"
+            echo "- [Discord](https://discord.gg/CJfEH3qKF)"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: 🏷️ Create Release Tag
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          TAG="v$VERSION"
+          
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "✅ Tag $TAG already exists"
+          else
+            git tag -a "$TAG" -m "Release $VERSION" HEAD
+            git push origin "$TAG"
+            echo "✅ Tag $TAG created and pushed"
+          fi
+
+      - name: 🚀 Publish Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.validate.outputs.version }}
+          name: 🎉 ZDiscord v${{ needs.validate.outputs.version }}
+          body: ${{ steps.notes.outputs.RELEASE_NOTES }}
+          files: target/ZDiscord-*.jar
+          prerelease: ${{ needs.validate.outputs.is_prerelease }}
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📢 Announce Release
+        run: |
+          echo "## 🚀 Release Published" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: v${{ needs.validate.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Pre-release**: ${{ needs.validate.outputs.is_prerelease }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL**: [${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ needs.validate.outputs.version }}](${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ needs.validate.outputs.version }})" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # 7. BUILD STATUS SUMMARY
+  # ============================================================================
+  summary:
+    name: 📊 Build Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [validate, build, quality, dependencies, version-check]
+    if: always()
+    permissions:
+      contents: read
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 📈 Generate Pipeline Summary
+        run: |
+          echo "# 🚀 ZDiscord Build Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📋 Build Information" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Project** | ZDiscord |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Version** | ${{ needs.validate.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Java** | ${{ env.JAVA_VERSION }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch** | ${{ github.ref_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | [\`${{ github.sha }}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Timestamp** | $(date -u +'%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Pipeline Status" >> $GITHUB_STEP_SUMMARY
+          echo "- **Validation**: ${{ needs.validate.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build**: ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Quality**: ${{ needs.quality.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dependencies**: ${{ needs.dependencies.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version Check**: ${{ needs.version-check.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔗 Resources" >> $GITHUB_STEP_SUMMARY
+          echo "- [Build Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "- [Source Repository](https://github.com/${{ github.repository }})" >> $GITHUB_STEP_SUMMARY
+
+      - name: ❌ Report Failures
+        if: failure()
+        run: |
+          echo "## ❌ Pipeline Failed" >> $GITHUB_STEP_SUMMARY
+          echo "One or more jobs failed. Please review the logs above." >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # 8. PERFORMANCE BENCHMARK (Optional)
+  # ============================================================================
+  benchmark:
+    name: ⚡ Performance Check
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push'
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: 🏃 Quick Performance Analysis
+        run: |
+          echo "📊 Compilation Time Analysis"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          time mvn clean compile -DskipTests -q

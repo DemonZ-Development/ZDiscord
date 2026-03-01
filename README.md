@@ -18,7 +18,7 @@
 **The most feature-rich Discord bridge for Minecraft servers.**  
 One plugin. Zero compromises. Built by [DemonZ Development](https://github.com/DemonZDevelopment).
 
-[📥 Download](#installation) · [📖 Wiki](#configuration) · [🐛 Issues](https://github.com/DemonZDevelopment/ZDiscord/issues) · [💬 Discord](https://discord.gg/yourserver)
+[📥 Download](#installation) · [📖 Wiki](#configuration) · [🐛 Issues](https://github.com/DemonZDevelopment/ZDiscord/issues) · [💬 Discord](https://discord.gg/CJfEH3qKF)
 
 </div>
 

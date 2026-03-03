@@ -1,6 +1,13 @@
-jdk: 17
-install:
-  - sdk install java 17.0.8-tem
-  - sdk use java 17.0.8-tem
+jdk:
+  - openjdk17
+
+env:
+  MAVEN_OPTS: "-Xmx1024m -Xms512m"
+
 before_install:
-  - sdk install maven
+  # Upgrade to a modern Maven version to support your pom.xml plugins
+  - sdk install maven 3.9.6
+  - mvn dependency:go-offline -B --no-transfer-progress
+
+install:
+  - mvn clean install -DskipTests -B --no-transfer-progress -T 1C -Dmaven.javadoc.skip=false -Dmaven.source.skip=false

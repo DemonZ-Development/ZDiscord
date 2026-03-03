@@ -58,24 +58,15 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          if [[ "$VERSION" == *"-beta"* ]] || [[ "$VERSION" == *"-alpha"* ]]; then
+          if [[ "$VERSION" == *"-beta"* ]] || [[ "$VERSION" == *"-alpha"* ]] || [[ "$VERSION" == *"-SNAPSHOT"* ]];
+          then
             echo "is_prerelease=true" >> $GITHUB_OUTPUT
-            echo "is_release=false" >> $GITHUB_OUTPUT
-            echo "⚠️ Pre-release detected: $VERSION"
-          elif [[ "${{ github.ref }}" == "refs/heads/release/"* ]]; then
             echo "is_release=true" >> $GITHUB_OUTPUT
-            echo "is_prerelease=false" >> $GITHUB_OUTPUT
-            echo "✅ Release branch detected"
+            echo "⚠️ Pre-release detected: $VERSION"
           else
-            echo "is_release=false" >> $GITHUB_OUTPUT
             echo "is_prerelease=false" >> $GITHUB_OUTPUT
-            echo "📝 Development build"
-          fi
-
-      - name: ✅ Validate pom.xml
-        run: |
-          if ! mvn help:describe -Dartifact=dev.demonz:ZDiscord:$(grep -m1 '<version>' pom.xml | sed 's/.*<version>\(.*\)<\/version>.*/\1/') 2>/dev/null; then
-            echo "✓ pom.xml is valid"
+            echo "is_release=true" >> $GITHUB_OUTPUT
+            echo "✅ Regular release detected"
           fi
 
   # ============================================================================
@@ -100,34 +91,8 @@ jobs:
           cache: maven
           cache-dependency-path: '**/pom.xml'
 
-      - name: 🔧 Configure Maven
-        run: |
-          mkdir -p ~/.m2
-          cat > ~/.m2/settings.xml << 'EOF'
-          <settings>
-            <activeProfiles>
-              <activeProfile>github</activeProfile>
-            </activeProfiles>
-            <profiles>
-              <profile>
-                <id>github</id>
-                <repositories>
-                  <repository>
-                    <id>central</id>
-                    <url>https://repo.maven.apache.org/maven2</url>
-                  </repository>
-                  <repository>
-                    <id>papermc</id>
-                    <url>https://repo.papermc.io/repository/maven-public/</url>
-                  </repository>
-                </repositories>
-              </profile>
-            </profiles>
-          </settings>
-          EOF
-
       - name: 📦 Build with Maven
-        run: mvn clean package -DskipTests -B -V
+        run: mvn clean package -DskipTests -B -V --no-transfer-progress
         env:
           MAVEN_OPTS: ${{ env.MAVEN_OPTS }}
 
@@ -177,13 +142,13 @@ jobs:
 
       - name: 🔍 Run SpotBugs Analysis
         run: |
-          mvn spotbugs:check -DskipTests 2>/dev/null || {
+          mvn spotbugs:check -DskipTests --no-transfer-progress 2>/dev/null || {
             echo "⚠️ SpotBugs analysis completed (non-blocking)"
           }
 
       - name: 📏 Verify Code Style
         run: |
-          mvn checkstyle:check -DskipTests 2>/dev/null || {
+          mvn checkstyle:check -DskipTests --no-transfer-progress 2>/dev/null || {
             echo "⚠️ Code style check completed (non-blocking)"
           }
 
@@ -193,7 +158,7 @@ jobs:
   dependencies:
     name: 🔐 Verify Dependencies & Shading
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, validate]
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
@@ -210,9 +175,9 @@ jobs:
           echo "🔍 Analyzing: $JAR_FILE"
           echo ""
           
-          if unzip -t "$JAR_FILE" | grep -q "org/bstats"; then
+          if unzip -l "$JAR_FILE" | grep -q "dev/demonz/zdiscord/libs/bstats"; then
             echo "✅ bStats library properly shaded"
-            unzip -l "$JAR_FILE" | grep "org/bstats" | head -5
+            unzip -l "$JAR_FILE" | grep "dev/demonz/zdiscord/libs/bstats" | head -5
           else
             echo "❌ ERROR: bStats not found in JAR"
             exit 1
@@ -236,12 +201,6 @@ jobs:
           echo "- **File Size**: $(du -h "$JAR_FILE" | cut -f1)" >> $GITHUB_STEP_SUMMARY
           echo "- **Classes**: $(unzip -l "$JAR_FILE" | grep '\.class$' | wc -l)" >> $GITHUB_STEP_SUMMARY
           echo "- **Resources**: $(unzip -l "$JAR_FILE" | grep -vE '\.class$|/$' | wc -l)" >> $GITHUB_STEP_SUMMARY
-
-      - name: 📥 Download Build Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: zdiscord-build-${{ needs.validate.outputs.version }}
-          path: target
 
   # ============================================================================
   # 5. VERSION CONSISTENCY
@@ -273,7 +232,8 @@ jobs:
           echo "JAR:     $JAR_VERSION"
           echo ""
           
-          if [ "$POM_VERSION" = "$JAR_VERSION" ]; then
+          if [ "$POM_VERSION" = "$JAR_VERSION" ];
+          then
             echo "✅ Versions match perfectly!"
           else
             echo "❌ Version mismatch detected!"
@@ -337,7 +297,12 @@ jobs:
           VERSION="${{ needs.validate.outputs.version }}"
           TAG="v$VERSION"
           
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
+          # Configure custom Git identity for DemonZ Development
+          git config user.name "DemonZ Deployer bot"
+          git config user.email "deployer@demonz.dev"
+          
+          if git rev-parse "$TAG" >/dev/null 2>&1;
+          then
             echo "✅ Tag $TAG already exists"
           else
             git tag -a "$TAG" -m "Release $VERSION" HEAD
@@ -432,4 +397,4 @@ jobs:
         run: |
           echo "📊 Compilation Time Analysis"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          time mvn clean compile -DskipTests -q
+          time mvn clean compile -DskipTests -q --no-transfer-progress

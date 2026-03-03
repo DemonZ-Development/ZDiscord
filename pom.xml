@@ -6,7 +6,7 @@
 
     <groupId>dev.demonz</groupId>
     <artifactId>ZDiscord</artifactId>
-    <version>1.0.1-beta</version>
+    <version>1.0.0</version>
     <packaging>jar</packaging>
 
     <name>ZDiscord</name>

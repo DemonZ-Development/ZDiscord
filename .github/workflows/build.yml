@@ -97,7 +97,7 @@ jobs:
           cache-dependency-path: '**/pom.xml'
 
       - name: 📦 Build with Maven
-        run: mvn clean package -DskipTests -B -V
+        run: mvn clean package -DskipTests -B -V --no-transfer-progress
         env:
           MAVEN_OPTS: ${{ env.MAVEN_OPTS }}
 
@@ -147,13 +147,13 @@ jobs:
 
       - name: 🔍 Run SpotBugs Analysis
         run: |
-          mvn spotbugs:check -DskipTests 2>/dev/null || {
+          mvn spotbugs:check -DskipTests --no-transfer-progress 2>/dev/null || {
             echo "⚠️ SpotBugs analysis completed (non-blocking)"
           }
 
       - name: 📏 Verify Code Style
         run: |
-          mvn checkstyle:check -DskipTests 2>/dev/null || {
+          mvn checkstyle:check -DskipTests --no-transfer-progress 2>/dev/null || {
             echo "⚠️ Code style check completed (non-blocking)"
           }
 
@@ -180,9 +180,9 @@ jobs:
           echo "🔍 Analyzing: $JAR_FILE"
           echo ""
           
-          if unzip -t "$JAR_FILE" | grep -q "org/bstats"; then
+          if unzip -l "$JAR_FILE" | grep -q "dev/demonz/zdiscord/libs/bstats"; then
             echo "✅ bStats library properly shaded"
-            unzip -l "$JAR_FILE" | grep "org/bstats" | head -5
+            unzip -l "$JAR_FILE" | grep "dev/demonz/zdiscord/libs/bstats" | head -5
           else
             echo "❌ ERROR: bStats not found in JAR"
             exit 1
@@ -398,4 +398,5 @@ jobs:
         run: |
           echo "📊 Compilation Time Analysis"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          time mvn clean compile -DskipTests -q
+          time mvn clean compile -DskipTests -q --no-transfer-progress
+

@@ -1,6 +1,14 @@
-jdk: 17
-install:
-  - sdk install java 17.0.8-tem
-  - sdk use java 17.0.8-tem
+jdk:
+  - openjdk17
+
+env:
+  # Give Maven extra memory to handle shading JDA and HikariCP smoothly
+  MAVEN_OPTS: "-Xmx1024m -Xms512m"
+
 before_install:
-  - sdk install maven
+  # Pre-download all dependencies so the actual build step is lightning fast
+  - mvn dependency:go-offline -B --no-transfer-progress
+
+install:
+  # Build the project using parallel threads, and force Javadoc/Sources generation for IDE support
+  - mvn clean install -DskipTests -B --no-transfer-progress -T 1C -Dmaven.javadoc.skip=false -Dmaven.source.skip=false

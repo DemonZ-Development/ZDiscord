@@ -11,7 +11,7 @@
 
     <name>ZDiscord</name>
     <description>Premium Discord ↔ Minecraft Integration Plugin</description>
-    <url>https://github.com/DemonZ-Development/ZDiscord</url>
+    <url>https://github.com/DemonZDevelopment/ZDiscord</url>
 
     <properties>
         <java.version>17</java.version>

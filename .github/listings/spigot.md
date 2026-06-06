@@ -1,71 +1,47 @@
-# ZDiscord
+# SpigotMC listing
 
-## Resource title
+## Banner / icon
 
-ZDiscord
+Upload `images/banner.png` (1280×720) as the resource banner. For the square icon shown in the resource list, crop the centre of the banner to a square using `scripts/crop-banner.js` to produce `banner-square.png`.
+
+## Title
+
+ZDiscord — Discord integration for Paper / Folia / Spigot
 
 ## Tag line (max 64 chars)
 
-Discord bridge for Paper, Folia, and Spigot servers.
+Chat bridge, tickets, status, account linking, anti-raid.
 
-## Categories
+## Description
 
-- Chat
-- Admin Tools
-- General
-
-## Minecraft versions
-
-1.20.4, 1.20.5, 1.20.6, 1.21, 1.21.1, 1.21.2, 1.21.3, 1.21.4
-
-## Server software
-
-Paper, Spigot, Folia, Purpur
-
-## License
-
-Apache License 2.0
-
-## Source / Links
-
-- GitHub: https://github.com/DemonZ-Development/ZDiscord
-- Wiki: https://github.com/DemonZ-Development/ZDiscord/wiki
-- Issues: https://github.com/DemonZ-Development/ZDiscord/issues
-
-## Donation link
-
-(Not configured)
-
-## Description (Markdown — paste into Spigot resource body)
-
-ZDiscord is a self-contained Minecraft plugin that bridges your server with Discord. The Discord library (JDA) is shaded into the JAR, so you do not need to install any extra dependencies on the server.
+ZDiscord is a Minecraft plugin that bridges your Minecraft server and Discord guild. It provides chat synchronisation, server status, account linking, tickets, leaderboards, anti-raid, and a small set of utility modules.
 
 ### Features
 
-- Two-way chat bridge with player head avatars via Discord webhooks
-- Auto-updating server status message (player count, TPS, memory)
-- Console log streaming to a Discord channel
-- Account linking with one-time codes and optional link-to-join enforcement
-- Staff chat bridge (`/sc`) with Discord channel sync
-- Ticket system with Discord button and `/ticket` command
-- Leaderboards for kills, deaths, and playtime
-- Event messages for joins, quits, deaths, and advancements
-- TPS and memory performance monitor with configurable alerts
-- Anti-raid with mass-join detection and optional automatic lockdown
-- Command logger for watched and critical commands
-- Voice status indicator on the tab list
-- Reaction role mapping between Discord reactions and in-game permissions
-- Interactive `/setup` wizard for channel configuration
+- **Chat bridge** — Two-way synchronisation between Minecraft and Discord. Webhooks are used to display player heads as avatars.
+- **Server status** — A single message in a Discord channel that auto-edits with player count, TPS, and memory.
+- **Console streaming** — Server log lines forwarded to a Discord channel.
+- **Account linking** — One-time codes link Discord and Minecraft accounts. Optionally enforced as link-to-join.
+- **Staff chat** — `/sc` toggles a staff-only chat that is also bridged to a Discord channel.
+- **Tickets** — Players open private support channels via a Discord button or `/ticket`.
+- **Leaderboards** — Kills, deaths, and playtime ranked via `/leaderboard`.
+- **Event messages** — Joins, quits, deaths, and advancements posted to a Discord channel.
+- **Performance monitor** — TPS and memory usage tracked over time with configurable alerts.
+- **Anti-raid** — Mass-join detection with optional automatic lockdown.
+- **Command logger** — Watched and critical commands posted to a staff channel.
+- **Voice status** — Linked players get a tab-list indicator while in a tracked Discord voice channel.
+- **Reaction roles** — Map message reactions to Discord roles and in-game permissions.
+- **Setup wizard** — `/setup` configures channels from Discord with dropdowns and buttons.
 
 ### Requirements
 
 - Java 17 or newer
 - Paper 1.20.4 or newer, Folia, or Spigot 1.20.4 or newer
-- A Discord bot token with **Server Members** and **Message Content** intents enabled
+- A Discord application with a bot token. Enable the **Server Members** and **Message Content** intents on the bot.
 
 ### Installation
 
-1. Download `ZDiscord-1.1.0.jar` from the **Download** button above.
+1. Download `ZDiscord-1.1.0.jar` from the downloads section.
 2. Place the JAR in your server's `plugins/` directory.
 3. Start the server to generate the default `config.yml` and `messages.yml`.
 4. Open `plugins/ZDiscord/config.yml` and set:
@@ -75,6 +51,31 @@ ZDiscord is a self-contained Minecraft plugin that bridges your server with Disc
 5. Restart the server.
 6. Run `/setup` in Discord to configure the remaining channels interactively.
 
-### Support
+### License
 
-Bug reports and feature requests belong on the GitHub issue tracker. The full documentation is in the project wiki.
+Apache License 2.0
+
+## Categories
+
+- Admin Tools
+- Chat
+- General
+
+## Permissions
+
+- `zdiscord.admin` (op) — reload, status, lockdown, dump
+- `zdiscord.discord` (true) — view the Discord invite link
+- `zdiscord.link` (true) — generate a link code
+- `zdiscord.chat` (true) — have chat forwarded to Discord
+- `zdiscord.ticket` (true) — open a support ticket
+- `zdiscord.embed` (op) — send a custom embed
+- `zdiscord.staffchat` (op) — use the staff chat
+- `zdiscord.bypass.antiraid` (op) — bypass anti-raid checks
+- `zdiscord.bypass.link` (op) — bypass link-to-join enforcement
+- `zdiscord.bypass.console` (op) — reserved (currently unused)
+
+## External links
+
+- Source: https://github.com/DemonZ-Development/ZDiscord
+- Wiki: https://github.com/DemonZ-Development/ZDiscord/wiki
+- Issues: https://github.com/DemonZ-Development/ZDiscord/issues

@@ -1,69 +1,44 @@
-# ZDiscord
+# Modrinth listing
 
-Discord integration for Minecraft servers.
+## Banner / cover image
+
+Upload `images/banner.png` (1280×720) as the project cover. For a square icon, crop the centre using `scripts/crop-banner.js` to produce `banner-square.png`.
+
+## Project slug
+
+`zdiscord`
+
+## Project type
+
+Plugin
+
+## Client / server
+
+Server-side
 
 ## Short description (max 100 chars)
 
-Discord integration for Paper, Folia, and Spigot servers. Chat bridge, tickets, status, account linking.
+Discord integration for Paper, Folia, and Spigot servers. Chat bridge, tickets, leaderboards, anti-raid.
 
-## Categories
+## Long description
 
-`paper` `spigot` `folia` `utility` `chat` `admin-tools` `discord`
-
-## Client/Server side
-
-Server-side only.
-
-## License
-
-Apache 2.0
-
-## Versions
-
-- Game versions: 1.20.4, 1.20.5, 1.20.6, 1.21, 1.21.1, 1.21.2, 1.21.3, 1.21.4
-- Loader: Paper / Folia / Spigot
-- Software: `paper` `spigot` `purpur` `folia`
-- Environment: Server
-
-## Dependencies (server-side only)
-
-- JDA 5.2.1 (Discord API for Java — shaded into the JAR)
-- discord-webhooks 0.8.4 (shaded)
-- Java 17+
-
-## Optional integrations
-
-- PlaceholderAPI
-- LuckPerms
-- Vault
-- Essentials
-
-## Links
-
-- Source: https://github.com/DemonZ-Development/ZDiscord
-- Wiki: https://github.com/DemonZ-Development/ZDiscord/wiki
-- Issues: https://github.com/DemonZ-Development/ZDiscord/issues
-- Releases: https://github.com/DemonZ-Development/ZDiscord/releases
-
-## Long description (Markdown — paste into Modrinth body)
-
-ZDiscord is a self-contained Minecraft plugin that bridges your server and a Discord guild. It ships with the Discord library (JDA) shaded into the JAR, so there is no separate dependency to install.
+ZDiscord is a Minecraft plugin that bridges your Minecraft server and Discord guild. It provides chat synchronisation, server status, account linking, tickets, leaderboards, anti-raid, and a small set of utility modules.
 
 ### Features
 
-- **Chat bridge** — two-way synchronisation between Minecraft and Discord. Player heads are shown as avatars through Discord webhooks.
-- **Server status** — a single message in a chosen channel that auto-edits with player count, TPS, and memory.
-- **Console streaming** — server log lines forwarded to a Discord channel.
-- **Account linking** — one-time codes link Discord and Minecraft accounts. Optionally enforced as link-to-join.
-- **Staff chat** — `/sc` toggles a staff-only chat that also bridges to a Discord channel.
-- **Tickets** — players open private support channels via a Discord button or `/ticket`.
-- **Leaderboards** — kills, deaths, and playtime ranked via `/leaderboard`.
-- **Event messages** — joins, quits, deaths, and advancements posted to a Discord channel.
-- **Performance monitor** — TPS and memory tracked over time with configurable alerts.
-- **Anti-raid** — mass-join detection with optional automatic lockdown.
-- **Command logger** — watched and critical commands posted to a staff channel.
-- **Voice status** — linked players get a tab-list indicator while they are in a tracked Discord voice channel.
-- **Reaction roles** — map message reactions to Discord roles and in-game permissions.
+- **Chat bridge** — Two-way synchronisation between Minecraft and Discord. Webhooks are used to display player heads as avatars.
+- **Server status** — A single message in a Discord channel that auto-edits with player count, TPS, and memory.
+- **Console streaming** — Server log lines forwarded to a Discord channel.
+- **Account linking** — One-time codes link Discord and Minecraft accounts. Optionally enforced as link-to-join.
+- **Staff chat** — `/sc` toggles a staff-only chat that is also bridged to a Discord channel.
+- **Tickets** — Players open private support channels via a Discord button or `/ticket`.
+- **Leaderboards** — Kills, deaths, and playtime ranked via `/leaderboard`.
+- **Event messages** — Joins, quits, deaths, and advancements posted to a Discord channel.
+- **Performance monitor** — TPS and memory usage tracked over time with configurable alerts.
+- **Anti-raid** — Mass-join detection with optional automatic lockdown.
+- **Command logger** — Watched and critical commands posted to a staff channel.
+- **Voice status** — Linked players get a tab-list indicator while in a tracked Discord voice channel.
+- **Reaction roles** — Map message reactions to Discord roles and in-game permissions.
 - **Setup wizard** — `/setup` configures channels from Discord with dropdowns and buttons.
 
 ### Requirements
@@ -72,12 +47,36 @@ ZDiscord is a self-contained Minecraft plugin that bridges your server and a Dis
 - Paper 1.20.4 or newer, Folia, or Spigot 1.20.4 or newer
 - A Discord application with a bot token. Enable the **Server Members** and **Message Content** intents on the bot.
 
-### Quick start
+### Installation
 
-1. Drop `ZDiscord-1.1.0.jar` into your server's `plugins/` directory.
-2. Start the server to generate `config.yml` and `messages.yml`.
-3. Open `plugins/ZDiscord/config.yml` and set `bot.token`, `bot.guild-id`, and at least `channels.chat`.
-4. Restart the server.
-5. Run `/setup` in Discord to configure the remaining channels interactively.
+1. Download `ZDiscord-1.1.0.jar` from the releases page.
+2. Place the JAR in your server's `plugins/` directory.
+3. Start the server to generate the default `config.yml` and `messages.yml`.
+4. Open `plugins/ZDiscord/config.yml` and set:
+   - `bot.token` — your bot token
+   - `bot.guild-id` — your Discord server ID
+   - `channels.chat` — the channel ID for chat bridge
+5. Restart the server.
+6. Run `/setup` in Discord to configure the remaining channels interactively.
 
-Full documentation is in the [wiki](https://github.com/DemonZ-Development/ZDiscord/wiki).
+### Configuration
+
+All configuration lives in `plugins/ZDiscord/config.yml`. User-facing strings are in `messages.yml`. See the wiki for a full reference.
+
+### License
+
+Apache License 2.0
+
+## Project links
+
+- Source: https://github.com/DemonZ-Development/ZDiscord
+- Issues: https://github.com/DemonZ-Development/ZDiscord/issues
+- Wiki: https://github.com/DemonZ-Development/ZDiscord/wiki
+
+## Tags
+
+`paper` `folia` `spigot` `discord` `chat` `tickets` `linking` `anti-cheat` `utility`
+
+## Donation / sponsor links
+
+(Optional — list your Ko-fi, GitHub Sponsors, etc. here.)

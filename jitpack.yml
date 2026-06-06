@@ -4,10 +4,5 @@ jdk:
 env:
   MAVEN_OPTS: "-Xmx1024m -Xms512m"
 
-before_install:
-  # Upgrade to a modern Maven version to support your pom.xml plugins
-  - sdk install maven 3.9.6
-  - mvn dependency:go-offline -B --no-transfer-progress
-
 install:
-  - mvn clean install -DskipTests -B --no-transfer-progress -T 1C -Dmaven.javadoc.skip=false -Dmaven.source.skip=false
+  - mvn clean install -DskipTests -B --no-transfer-progress

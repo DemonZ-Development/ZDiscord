@@ -1,17 +1,37 @@
+/*
+ * Copyright 2024 DemonZ Development
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package dev.demonz.zdiscord.modules;
 
 import dev.demonz.zdiscord.ZDiscord;
+import dev.demonz.zdiscord.util.ColorUtil;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import org.bukkit.command.CommandSender;
 
-import java.awt.*;
 import java.time.Instant;
+import java.util.List;
 
 /**
- * Custom embed builder module.
- * Allows admins to build and send custom embeds to Discord channels via in-game
- * commands.
+ * Sends custom embeds to Discord channels from in-game.
+ *
+ * <p>The {@code /zdiscord embed} admin command supports a basic
+ * title/description form. The richer {@link #createRichEmbed} overload
+ * is exposed for the developer API but is not yet bound to a user
+ * command.</p>
  */
 public class EmbedBuilderModule {
 
@@ -21,97 +41,66 @@ public class EmbedBuilderModule {
         this.plugin = plugin;
     }
 
-    /**
-     * Create and send a custom embed to the chat channel.
-     */
     public void createAndSend(CommandSender sender, String title, String description) {
-        createAndSend(sender, title, description, "#5865F2", null);
+        createAndSend(sender, title, description, null, null);
     }
 
-    /**
-     * Create and send a custom embed with color.
-     */
-    public void createAndSend(CommandSender sender, String title, String description, String colorHex,
-            String channelId) {
-        TextChannel channel;
-        if (channelId != null && !channelId.isEmpty()) {
-            channel = plugin.getBotManager().getJda().getTextChannelById(channelId);
-        } else {
-            channel = plugin.getBotManager().getTextChannel("channels.chat");
-        }
-
+    public void createAndSend(CommandSender sender, String title, String description,
+                              String colorHex, String channelId) {
+        TextChannel channel = resolveChannel(channelId);
         if (channel == null) {
-            sender.sendMessage("§cCould not find the target channel.");
+            sender.sendMessage("Could not find the target channel.");
             return;
         }
-
-        Color color;
-        try {
-            color = Color.decode(colorHex);
-        } catch (Exception e) {
-            color = Color.decode("#5865F2");
-        }
-
-        EmbedBuilder embed = new EmbedBuilder()
-                .setTitle(title)
-                .setDescription(description)
-                .setColor(color)
-                .setFooter("ZDiscord • Custom Embed")
-                .setTimestamp(Instant.now());
-
-        channel.sendMessageEmbeds(embed.build()).queue(
-                success -> sender.sendMessage(plugin.getMessageManager().get("embed-created",
-                        "%channel%", channel.getName())),
-                error -> sender.sendMessage("§cFailed to send embed: " + error.getMessage()));
+        send(sender, channel, build(title, description, colorHex, null, null, "ZDiscord - Custom Embed"));
     }
 
-    /**
-     * Create and send a rich embed with all fields.
-     */
     public void createRichEmbed(CommandSender sender, String title, String description,
-            String colorHex, String thumbnail, String image,
-            String footer, String channelId) {
-        TextChannel channel;
-        if (channelId != null && !channelId.isEmpty()) {
-            channel = plugin.getBotManager().getJda().getTextChannelById(channelId);
-        } else {
-            channel = plugin.getBotManager().getTextChannel("channels.chat");
-        }
-
+                                String colorHex, String thumbnail, String image,
+                                String footer, String channelId) {
+        TextChannel channel = resolveChannel(channelId);
         if (channel == null) {
-            sender.sendMessage("§cCould not find the target channel.");
+            sender.sendMessage("Could not find the target channel.");
             return;
         }
+        send(sender, channel,
+                build(title, description, colorHex, thumbnail, image,
+                        footer != null && !footer.isEmpty() ? footer : "ZDiscord - Custom Embed"));
+    }
 
-        Color color;
-        try {
-            color = Color.decode(colorHex);
-        } catch (Exception e) {
-            color = Color.decode("#5865F2");
-        }
-
+    private EmbedBuilder build(String title, String description, String colorHex,
+                               String thumbnail, String image, String footer) {
         EmbedBuilder embed = new EmbedBuilder()
                 .setTitle(title)
                 .setDescription(description)
-                .setColor(color)
+                .setColor(ColorUtil.parseHex(colorHex))
+                .setFooter(footer)
                 .setTimestamp(Instant.now());
-
-        if (thumbnail != null && !thumbnail.isEmpty())
+        if (thumbnail != null && !thumbnail.isEmpty()) {
             embed.setThumbnail(thumbnail);
-        if (image != null && !image.isEmpty())
+        }
+        if (image != null && !image.isEmpty()) {
             embed.setImage(image);
-        if (footer != null && !footer.isEmpty())
-            embed.setFooter(footer);
-        else
-            embed.setFooter("ZDiscord • Custom Embed");
+        }
+        return embed;
+    }
 
+    private void send(CommandSender sender, TextChannel channel, EmbedBuilder embed) {
         channel.sendMessageEmbeds(embed.build()).queue(
-                success -> sender.sendMessage(plugin.getMessageManager().get("embed-created",
-                        "%channel%", channel.getName())),
-                error -> sender.sendMessage("§cFailed to send embed: " + error.getMessage()));
+                success -> sender.sendMessage(plugin.getMessageManager().get(
+                        "embed-created", "%channel%", channel.getName())),
+                error -> sender.sendMessage("Failed to send embed: " + error.getMessage()));
+    }
+
+    private TextChannel resolveChannel(String channelId) {
+        if (channelId != null && !channelId.isEmpty()) {
+            return plugin.getBotManager().getJda() != null
+                    ? plugin.getBotManager().getJda().getTextChannelById(channelId)
+                    : null;
+        }
+        return plugin.getBotManager().getTextChannel("channels.chat");
     }
 
     public void reload() {
-        // No config to re-read — exists for consistency with other modules
     }
 }

@@ -1,49 +1,67 @@
+/*
+ * Copyright 2024 DemonZ Development
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package dev.demonz.zdiscord.util;
 
 import org.bukkit.Bukkit;
 
 /**
- * Utility for safely retrieving server TPS.
- * Bukkit.getTPS() is a Paper-only API and will throw NoSuchMethodError on
- * Spigot.
- * This wrapper returns a safe fallback value (20.0) when the method is
- * unavailable.
+ * Wrapper around {@code Bukkit.getTPS()} that returns 20.0 on platforms
+ * where the API is not available (Spigot, generic Bukkit).
  */
-public class TPSUtil {
+public final class TPSUtil {
 
-    private static Boolean tpsAvailable = null;
+    private static final double[] FALLBACK = { 20.0, 20.0, 20.0 };
+    private static volatile Boolean tpsAvailable;
 
-    /**
-     * Get server TPS safely. Returns {20.0, 20.0, 20.0} on Spigot where the API is
-     * unavailable.
-     */
-    public static double[] getTPS() {
-        if (tpsAvailable == null) {
-            try {
-                Bukkit.getTPS();
-                tpsAvailable = true;
-            } catch (NoSuchMethodError e) {
-                tpsAvailable = false;
-            }
-        }
-
-        if (tpsAvailable) {
-            try {
-                return Bukkit.getTPS();
-            } catch (Exception e) {
-                return new double[] { 20.0, 20.0, 20.0 };
-            }
-        }
-        return new double[] { 20.0, 20.0, 20.0 };
+    private TPSUtil() {
     }
 
-    /**
-     * Check if TPS API is available (Paper/Folia only).
-     */
-    public static boolean isAvailable() {
-        if (tpsAvailable == null) {
-            getTPS(); // trigger check
+    public static double[] getTPS() {
+        Boolean available = tpsAvailable;
+        if (available == null) {
+            available = probe();
+            tpsAvailable = available;
         }
-        return tpsAvailable;
+        if (!available) {
+            return FALLBACK.clone();
+        }
+        try {
+            return Bukkit.getTPS();
+        } catch (NoSuchMethodError | Exception e) {
+            tpsAvailable = false;
+            return FALLBACK.clone();
+        }
+    }
+
+    public static boolean isAvailable() {
+        Boolean available = tpsAvailable;
+        if (available == null) {
+            available = probe();
+            tpsAvailable = available;
+        }
+        return available;
+    }
+
+    private static boolean probe() {
+        try {
+            Bukkit.getTPS();
+            return true;
+        } catch (NoSuchMethodError e) {
+            return false;
+        }
     }
 }

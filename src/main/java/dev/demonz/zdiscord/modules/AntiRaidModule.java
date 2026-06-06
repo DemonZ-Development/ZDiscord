@@ -1,26 +1,40 @@
+/*
+ * Copyright 2024 DemonZ Development
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package dev.demonz.zdiscord.modules;
 
 import dev.demonz.zdiscord.ZDiscord;
-import net.dv8tion.jda.api.EmbedBuilder;
+import dev.demonz.zdiscord.util.ColorUtil;
+import dev.demonz.zdiscord.util.EmbedUtil;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-import java.awt.*;
-import java.time.Instant;
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Anti-raid module.
- * Detects mass-join events and auto-enables server lockdown.
+ * Detects mass-join events and toggles a server lockdown.
  */
 public class AntiRaidModule {
 
     private final ZDiscord plugin;
-    private final Queue<Long> recentJoins = new LinkedList<>();
+    private final Deque<Long> recentJoins = new ArrayDeque<>();
     private final AtomicBoolean lockdownActive = new AtomicBoolean(false);
 
     public AntiRaidModule(ZDiscord plugin) {
@@ -28,123 +42,98 @@ public class AntiRaidModule {
     }
 
     public void init() {
-        // Cleanup old join timestamps periodically
         plugin.getPlatformAdapter().runAsyncTimer(() -> {
-            long timeWindow = plugin.getConfigManager().getInt("anti-raid.time-window", 30) * 1000L;
-            long cutoff = System.currentTimeMillis() - timeWindow;
+            long windowMs = plugin.getConfigManager().getInt("anti-raid.time-window", 30) * 1000L;
+            long cutoff = System.currentTimeMillis() - windowMs;
             synchronized (recentJoins) {
-                while (!recentJoins.isEmpty() && recentJoins.peek() < cutoff) {
-                    recentJoins.poll();
+                while (!recentJoins.isEmpty() && recentJoins.peekFirst() < cutoff) {
+                    recentJoins.pollFirst();
                 }
             }
         }, 200L, 200L);
     }
 
-    /**
-     * Called when a player joins the server.
-     */
     public void onPlayerJoin(Player player) {
-        if (player.hasPermission("zdiscord.bypass.antiraid"))
+        if (player.hasPermission("zdiscord.bypass.antiraid")) {
             return;
-
-        // Check lockdown
-        if (lockdownActive.get()) {
-            if (plugin.getConfigManager().getBoolean("anti-raid.lockdown.kick-new-joins", true)) {
-                String kickMsg = plugin.getMessageManager().getRaw("lockdown-kick");
-                plugin.getPlatformAdapter().runForEntity(player, () -> player.kickPlayer(kickMsg));
-                return;
-            }
         }
 
-        // Track join
+        if (lockdownActive.get()
+                && plugin.getConfigManager().getBoolean("anti-raid.lockdown.kick-new-joins", true)) {
+            String kickMsg = plugin.getMessageManager().get("lockdown-kick");
+            plugin.getPlatformAdapter().runForEntity(player, () -> player.kickPlayer(kickMsg));
+            return;
+        }
+
         long now = System.currentTimeMillis();
         synchronized (recentJoins) {
-            recentJoins.add(now);
+            recentJoins.addLast(now);
         }
 
         int maxJoins = plugin.getConfigManager().getInt("anti-raid.max-joins", 10);
         int timeWindow = plugin.getConfigManager().getInt("anti-raid.time-window", 30);
 
-        // Check if threshold exceeded
         synchronized (recentJoins) {
             long cutoff = now - (timeWindow * 1000L);
-            long recentCount = recentJoins.stream().filter(t -> t >= cutoff).count();
-            if (recentCount >= maxJoins) {
+            long recent = recentJoins.stream().filter(t -> t >= cutoff).count();
+            if (recent >= maxJoins) {
                 enableLockdown();
             }
         }
     }
 
-    /**
-     * Enable server lockdown.
-     */
     private void enableLockdown() {
-        if (lockdownActive.getAndSet(true))
-            return; // Already in lockdown
+        if (!lockdownActive.compareAndSet(false, true)) {
+            return;
+        }
+        plugin.getLogger().warning("Anti-raid lockdown enabled; possible raid detected.");
 
-        plugin.getLogger().warning("⚠ ANTI-RAID: Lockdown enabled! Possible raid detected.");
+        plugin.getPlatformAdapter().runSync(
+                () -> Bukkit.broadcastMessage(plugin.getMessageManager().get("lockdown-enabled")));
 
-        // Notify in-game
-        plugin.getPlatformAdapter()
-                .runSync(() -> Bukkit.broadcastMessage(plugin.getMessageManager().get("lockdown-enabled")));
-
-        // Notify on Discord
         if (plugin.getConfigManager().getBoolean("anti-raid.lockdown.notify-staff", true)) {
-            TextChannel channel = plugin.getBotManager().getTextChannel("channels.events");
-            if (channel == null)
-                channel = plugin.getBotManager().getTextChannel("channels.chat");
+            TextChannel channel = resolveEventChannel();
             if (channel != null) {
-                EmbedBuilder embed = new EmbedBuilder()
-                        .setTitle("🚨 RAID DETECTED — SERVER LOCKDOWN")
-                        .setDescription("A possible raid has been detected. The server is now in lockdown mode.\n" +
-                                "New player joins will be kicked automatically.")
-                        .setColor(Color.decode("#E74C3C"))
-                        .addField("Recent Joins", String.valueOf(recentJoins.size()), true)
-                        .setTimestamp(Instant.now());
-                channel.sendMessageEmbeds(embed.build()).queue();
+                int recent = recentJoins.size();
+                channel.sendMessageEmbeds(EmbedUtil.simple(
+                        "Raid detected - server lockdown",
+                        "A possible raid has been detected. The server is now in lockdown. "
+                                + "New joins will be kicked until the lockdown is lifted.",
+                        new java.awt.Color(0xE74C3C))
+                        .addField("Recent joins", String.valueOf(recent), true)
+                        .build())
+                        .queue();
             }
         }
 
-        // Auto-lift lockdown
         int autoLift = plugin.getConfigManager().getInt("anti-raid.lockdown.auto-lift", 300);
         if (autoLift > 0) {
-            plugin.getPlatformAdapter().runLater(() -> disableLockdown(), autoLift * 20L);
+            plugin.getPlatformAdapter().runLater(this::disableLockdown, autoLift * 20L);
         }
     }
 
-    /**
-     * Disable server lockdown.
-     */
     private void disableLockdown() {
-        if (!lockdownActive.getAndSet(false))
+        if (!lockdownActive.compareAndSet(true, false)) {
             return;
+        }
+        plugin.getLogger().info("Anti-raid lockdown lifted.");
 
-        plugin.getLogger().info("✓ Anti-raid lockdown lifted.");
+        plugin.getPlatformAdapter().runSync(
+                () -> Bukkit.broadcastMessage(plugin.getMessageManager().get("lockdown-disabled")));
 
-        plugin.getPlatformAdapter()
-                .runSync(() -> Bukkit.broadcastMessage(plugin.getMessageManager().get("lockdown-disabled")));
-
-        TextChannel channel = plugin.getBotManager().getTextChannel("channels.events");
-        if (channel == null)
-            channel = plugin.getBotManager().getTextChannel("channels.chat");
+        TextChannel channel = resolveEventChannel();
         if (channel != null) {
-            EmbedBuilder embed = new EmbedBuilder()
-                    .setTitle("✅ Lockdown Lifted")
-                    .setDescription("The server lockdown has been lifted. Normal operations resumed.")
-                    .setColor(Color.decode("#2ECC71"))
-                    .setTimestamp(Instant.now());
-            channel.sendMessageEmbeds(embed.build()).queue();
+            channel.sendMessageEmbeds(EmbedUtil.simple(
+                    "Lockdown lifted",
+                    "The server lockdown has been lifted. Normal operations resumed.",
+                    new java.awt.Color(0x2ECC71)).build()).queue();
         }
 
-        // Clear join history
         synchronized (recentJoins) {
             recentJoins.clear();
         }
     }
 
-    /**
-     * Toggle lockdown manually.
-     */
     public void toggleLockdown(CommandSender sender) {
         if (lockdownActive.get()) {
             disableLockdown();
@@ -160,11 +149,16 @@ public class AntiRaidModule {
     }
 
     public void reload() {
-        // Config values (max-joins, time-window, etc.) are read on each check
-        // so no specific re-read needed — method exists for consistency
     }
 
     public void shutdown() {
-        // Nothing to clean up
+    }
+
+    private TextChannel resolveEventChannel() {
+        TextChannel channel = plugin.getBotManager().getTextChannel("channels.events");
+        if (channel == null) {
+            channel = plugin.getBotManager().getTextChannel("channels.chat");
+        }
+        return channel;
     }
 }

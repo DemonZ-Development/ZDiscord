@@ -1,8 +1,8 @@
 name: ZDiscord
 version: '${project.version}'
 main: dev.demonz.zdiscord.ZDiscord
-api-version: '1.21'
-description: Premium Discord ↔ Minecraft Integration | DemonZ Development
+api-version: '1.20'
+description: Discord integration for Minecraft servers
 author: DemonZ Development
 website: https://github.com/DemonZDevelopment/ZDiscord
 
@@ -16,12 +16,12 @@ softdepend:
 
 commands:
   zdiscord:
-    description: Main ZDiscord admin command
-    usage: /<command> [reload|status|link|embed|ticket]
+    description: ZDiscord admin command
+    usage: /<command> [reload|status|link|embed|ticket|lockdown|dump]
     permission: zdiscord.admin
     aliases: [zd]
   discord:
-    description: Get the Discord server invite link
+    description: Shows the Discord server invite link
     usage: /<command>
     permission: zdiscord.discord
   sc:
@@ -32,28 +32,31 @@ commands:
 
 permissions:
   zdiscord.admin:
-    description: Access to all ZDiscord admin commands
+    description: Access to ZDiscord admin commands
     default: op
   zdiscord.discord:
-    description: Access to the /discord command
+    description: Allows viewing the Discord invite link
     default: true
   zdiscord.link:
     description: Allows players to link their accounts
     default: true
   zdiscord.chat:
-    description: Messages are forwarded to Discord
+    description: Player chat is forwarded to Discord
     default: true
   zdiscord.ticket:
     description: Allows creating support tickets
     default: true
   zdiscord.embed:
-    description: Allows building custom embeds
+    description: Allows sending custom Discord embeds
     default: op
   zdiscord.bypass.antiraid:
     description: Bypass anti-raid checks
     default: op
   zdiscord.bypass.link:
     description: Bypass link-to-join enforcement
+    default: op
+  zdiscord.bypass.console:
+    description: Bypass console command role requirement (admin only)
     default: op
   zdiscord.staffchat:
     description: Access to staff chat

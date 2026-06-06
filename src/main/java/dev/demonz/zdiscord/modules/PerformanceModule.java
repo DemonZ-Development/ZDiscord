@@ -1,24 +1,43 @@
+/*
+ * Copyright 2024 DemonZ Development
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package dev.demonz.zdiscord.modules;
 
 import dev.demonz.zdiscord.ZDiscord;
+import dev.demonz.zdiscord.util.TPSUtil;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import org.bukkit.Bukkit;
 
-import java.awt.*;
 import java.time.Instant;
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.ArrayDeque;
+import java.util.Arrays;
+import java.util.Deque;
 
 /**
- * Performance monitoring module.
- * Posts TPS, MSPT, and memory usage metrics to a Discord channel.
+ * Periodically edits a single Discord message with the server's
+ * current TPS, memory usage, and a small history graph.
  */
 public class PerformanceModule {
 
+    private static final int HISTORY_SIZE = 30;
+
     private final ZDiscord plugin;
-    private final Queue<Double> tpsHistory = new LinkedList<>();
-    private final Queue<Long> memoryHistory = new LinkedList<>();
+    private final Deque<Double> tpsHistory = new ArrayDeque<>(HISTORY_SIZE);
+    private final Deque<Long> memoryHistory = new ArrayDeque<>(HISTORY_SIZE);
     private String perfMessageId;
 
     public PerformanceModule(ZDiscord plugin) {
@@ -27,135 +46,131 @@ public class PerformanceModule {
 
     public void init() {
         int interval = plugin.getConfigManager().getInt("performance.update-interval", 60);
-        long ticks = interval * 20L;
-
-        plugin.getPlatformAdapter().runAsyncTimer(this::updatePerformance, 200L, ticks);
+        plugin.getPlatformAdapter().runAsyncTimer(this::updatePerformance, 200L, interval * 20L);
     }
 
     private void updatePerformance() {
         TextChannel channel = plugin.getBotManager().getTextChannel("channels.performance");
-        if (channel == null)
+        if (channel == null) {
             return;
+        }
 
-        double[] tps = dev.demonz.zdiscord.util.TPSUtil.getTPS();
+        double[] tps = TPSUtil.getTPS();
         Runtime runtime = Runtime.getRuntime();
         long usedMb = (runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024;
         long maxMb = runtime.maxMemory() / 1024 / 1024;
-        int memPercent = (int) ((usedMb * 100.0) / maxMb);
+        int memPercent = maxMb > 0 ? (int) ((usedMb * 100.0) / maxMb) : 0;
 
-        // Track history
-        tpsHistory.add(tps[0]);
-        memoryHistory.add(usedMb);
-        if (tpsHistory.size() > 30)
-            tpsHistory.poll();
-        if (memoryHistory.size() > 30)
-            memoryHistory.poll();
+        tpsHistory.addLast(tps[0]);
+        memoryHistory.addLast((long) memPercent);
+        if (tpsHistory.size() > HISTORY_SIZE) tpsHistory.pollFirst();
+        if (memoryHistory.size() > HISTORY_SIZE) memoryHistory.pollFirst();
 
-        // Determine thresholds
         double tpsWarning = plugin.getConfigManager().getDouble("performance.tps-warning", 18.0);
         double tpsCritical = plugin.getConfigManager().getDouble("performance.tps-critical", 15.0);
         int memWarning = plugin.getConfigManager().getInt("performance.memory-warning", 80);
 
-        String tpsEmoji = tps[0] >= tpsWarning ? "🟢" : (tps[0] >= tpsCritical ? "🟡" : "🔴");
-        String memEmoji = memPercent < memWarning ? "🟢" : (memPercent < 90 ? "🟡" : "🔴");
-        String overallStatus = (tps[0] >= tpsWarning && memPercent < memWarning) ? "🟢 Healthy"
-                : (tps[0] >= tpsCritical && memPercent < 90) ? "🟡 Warning" : "🔴 Critical";
+        String overall;
+        int color;
+        if (tps[0] >= tpsWarning && memPercent < memWarning) {
+            overall = "Healthy";
+            color = 0x2ECC71;
+        } else if (tps[0] >= tpsCritical && memPercent < 90) {
+            overall = "Warning";
+            color = 0xF1C40F;
+        } else {
+            overall = "Critical";
+            color = 0xE74C3C;
+        }
 
-        // Build TPS graph
-        String tpsGraph = buildGraph(tpsHistory.stream().mapToDouble(Double::doubleValue).toArray(), 20.0);
-        String memGraph = buildMemGraph(memoryHistory.stream().mapToLong(Long::longValue).toArray(), maxMb);
+        String tpsGraph = buildGraph(toArray(tpsHistory), 20.0);
+        String memGraph = buildGraph(memoryHistory.stream().mapToDouble(Long::doubleValue).toArray(), 100.0);
 
         EmbedBuilder embed = new EmbedBuilder()
-                .setTitle("📊 Server Performance Monitor")
-                .setColor(tps[0] >= tpsWarning ? Color.decode("#2ECC71")
-                        : (tps[0] >= tpsCritical ? Color.decode("#F1C40F") : Color.decode("#E74C3C")))
-                .addField("Overall Status", overallStatus, true)
-                .addField("👥 Online", String.valueOf(Bukkit.getOnlinePlayers().size()), true)
-                .addField("🧵 Threads", String.valueOf(Thread.activeCount()), true)
-                .addField(tpsEmoji + " TPS (1m / 5m / 15m)",
+                .setTitle("Server Performance")
+                .setColor(color)
+                .addField("Overall", overall, true)
+                .addField("Players", String.valueOf(Bukkit.getOnlinePlayers().size()), true)
+                .addField("Threads", String.valueOf(Thread.activeCount()), true)
+                .addField("TPS (1m / 5m / 15m)",
                         String.format("`%.2f` / `%.2f` / `%.2f`", tps[0], tps[1], tps[2]), false)
-                .addField("📈 TPS History", "```\n" + tpsGraph + "\n```", false)
-                .addField(memEmoji + " Memory",
+                .addField("TPS history", "```\n" + tpsGraph + "\n```", false)
+                .addField("Memory",
                         usedMb + "MB / " + maxMb + "MB (" + memPercent + "%)", false)
-                .addField("📈 Memory History", "```\n" + memGraph + "\n```", false)
-                .setFooter("ZDiscord • Performance Monitor")
+                .addField("Memory history", "```\n" + memGraph + "\n```", false)
                 .setTimestamp(Instant.now());
 
-        // Check for critical alerts
         if (tps[0] < tpsCritical) {
-            embed.addField("⚠️ ALERT", "TPS is critically low! Server may be lagging.", false);
+            embed.addField("Alert", "TPS is critically low. Server may be lagging.", false);
         }
         if (memPercent >= 90) {
-            embed.addField("⚠️ ALERT", "Memory usage is critically high!", false);
+            embed.addField("Alert", "Memory usage is critically high.", false);
         }
 
         if (perfMessageId != null) {
             channel.editMessageEmbedsById(perfMessageId, embed.build()).queue(
-                    success -> {
-                    },
+                    success -> { },
                     error -> {
                         perfMessageId = null;
                         channel.sendMessageEmbeds(embed.build()).queue(
                                 msg -> perfMessageId = msg.getId());
                     });
         } else {
-            channel.sendMessageEmbeds(embed.build()).queue(
-                    msg -> perfMessageId = msg.getId());
+            channel.sendMessageEmbeds(embed.build()).queue(msg -> perfMessageId = msg.getId());
         }
     }
 
-    /**
-     * Build a simple ASCII graph from TPS values.
-     */
+    private static double[] toArray(Deque<Double> deque) {
+        double[] out = new double[deque.size()];
+        int i = 0;
+        for (Double d : deque) {
+            out[i++] = d;
+        }
+        return out;
+    }
+
     private String buildGraph(double[] values, double max) {
-        if (values.length == 0)
+        if (values.length == 0) {
             return "No data";
-
+        }
         int height = 5;
-        int width = Math.min(values.length, 30);
+        int width = Math.min(values.length, HISTORY_SIZE);
         char[][] grid = new char[height][width];
-        for (char[] row : grid)
-            java.util.Arrays.fill(row, ' ');
-
+        for (char[] row : grid) {
+            Arrays.fill(row, ' ');
+        }
         for (int i = 0; i < width; i++) {
             int idx = values.length - width + i;
-            if (idx < 0)
+            if (idx < 0) {
                 continue;
+            }
             int bar = (int) ((values[idx] / max) * height);
-            bar = Math.min(bar, height);
+            if (bar > height) {
+                bar = height;
+            }
             for (int j = height - bar; j < height; j++) {
-                grid[j][i] = '█';
+                grid[j][i] = '#';
             }
         }
-
         StringBuilder sb = new StringBuilder();
         for (int j = 0; j < height; j++) {
-            String label = j == 0 ? String.format("%4.0f│", max) : j == height - 1 ? "   0│" : "    │";
-            sb.append(label);
-            sb.append(new String(grid[j]));
-            sb.append('\n');
+            String label;
+            if (j == 0) {
+                label = String.format("%4.0f|", max);
+            } else if (j == height - 1) {
+                label = "   0|";
+            } else {
+                label = "    |";
+            }
+            sb.append(label).append(new String(grid[j])).append('\n');
         }
-        sb.append("    └").append("─".repeat(width));
+        sb.append("    +").append("-".repeat(width));
         return sb.toString();
     }
 
-    private String buildMemGraph(long[] values, long max) {
-        if (values.length == 0)
-            return "No data";
-
-        double[] normalized = new double[values.length];
-        for (int i = 0; i < values.length; i++) {
-            normalized[i] = (values[i] / (double) max) * 100;
-        }
-        return buildGraph(normalized, 100);
-    }
-
     public void reload() {
-        // Config values (thresholds) are read on each update cycle — no specific reload
-        // needed
     }
 
     public void shutdown() {
-        // Nothing to clean up
     }
 }

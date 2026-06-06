@@ -1,3 +1,19 @@
+/*
+ * Copyright 2024 DemonZ Development
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package dev.demonz.zdiscord.modules;
 
 import dev.demonz.zdiscord.ZDiscord;
@@ -17,16 +33,14 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Reaction role module.
- * Maps Discord emoji reactions to Discord roles and in-game permissions.
+ * Maps Discord reactions to Discord roles and (optionally) to
+ * in-game permissions granted through LuckPerms.
  */
 public class ReactionRoleModule {
 
     private final ZDiscord plugin;
     private final File dataFile;
     private FileConfiguration data;
-
-    // messageId → (emoji → RoleMapping)
     private final Map<String, Map<String, RoleMapping>> mappings = new HashMap<>();
 
     public ReactionRoleModule(ZDiscord plugin) {
@@ -43,22 +57,99 @@ public class ReactionRoleModule {
             try {
                 dataFile.createNewFile();
             } catch (IOException e) {
-                plugin.getLogger().warning("Failed to create reaction roles file: " + e.getMessage());
+                plugin.getLogger().warning("Failed to create reaction roles file: "
+                        + e.getMessage());
+                return;
             }
         }
         data = YamlConfiguration.loadConfiguration(dataFile);
+        mappings.clear();
 
-        if (data.getConfigurationSection("messages") != null) {
-            for (String messageId : data.getConfigurationSection("messages").getKeys(false)) {
-                Map<String, RoleMapping> emojiMap = new HashMap<>();
-                for (String emoji : data.getConfigurationSection("messages." + messageId).getKeys(false)) {
-                    String roleId = data.getString("messages." + messageId + "." + emoji + ".role-id");
-                    String permission = data.getString("messages." + messageId + "." + emoji + ".permission", "");
-                    emojiMap.put(emoji, new RoleMapping(roleId, permission));
-                }
-                mappings.put(messageId, emojiMap);
-            }
+        if (data.getConfigurationSection("messages") == null) {
+            return;
         }
+        for (String messageId : data.getConfigurationSection("messages").getKeys(false)) {
+            Map<String, RoleMapping> emojiMap = new HashMap<>();
+            for (String emoji : data.getConfigurationSection("messages." + messageId).getKeys(false)) {
+                String roleId = data.getString("messages." + messageId + "." + emoji + ".role-id");
+                String permission = data.getString(
+                        "messages." + messageId + "." + emoji + ".permission", "");
+                emojiMap.put(emoji, new RoleMapping(roleId, permission));
+            }
+            mappings.put(messageId, emojiMap);
+        }
+    }
+
+    public void addMapping(String messageId, String emoji, String roleId, String permission) {
+        mappings.computeIfAbsent(messageId, k -> new HashMap<>())
+                .put(emoji, new RoleMapping(roleId, permission));
+        saveData();
+    }
+
+    public void onReactionAdd(MessageReactionAddEvent event) {
+        RoleMapping mapping = lookup(event.getMessageId(), event.getReaction().getEmoji().getAsReactionCode());
+        if (mapping == null) {
+            return;
+        }
+        Guild guild = event.getGuild();
+        Member member = event.getMember();
+        if (guild == null || member == null) {
+            return;
+        }
+        applyRole(guild, member, mapping.roleId, true);
+        applyPermission(event.getUserId(), mapping.permission, true);
+    }
+
+    public void onReactionRemove(MessageReactionRemoveEvent event) {
+        RoleMapping mapping = lookup(event.getMessageId(), event.getReaction().getEmoji().getAsReactionCode());
+        if (mapping == null) {
+            return;
+        }
+        Guild guild = event.getGuild();
+        Member member = guild != null ? guild.getMemberById(event.getUserId()) : null;
+        if (guild == null || member == null) {
+            return;
+        }
+        applyRole(guild, member, mapping.roleId, false);
+        applyPermission(event.getUserId(), mapping.permission, false);
+    }
+
+    private RoleMapping lookup(String messageId, String emoji) {
+        Map<String, RoleMapping> emojiMap = mappings.get(messageId);
+        return emojiMap != null ? emojiMap.get(emoji) : null;
+    }
+
+    private void applyRole(Guild guild, Member member, String roleId, boolean add) {
+        if (roleId == null || roleId.isEmpty()) {
+            return;
+        }
+        Role role = guild.getRoleById(roleId);
+        if (role == null) {
+            return;
+        }
+        if (add) {
+            guild.addRoleToMember(member, role).queue(
+                    success -> plugin.debug("Added role " + role.getName()
+                            + " to " + member.getEffectiveName()),
+                    error -> plugin.debug("Failed to add role: " + error.getMessage()));
+        } else {
+            guild.removeRoleFromMember(member, role).queue();
+        }
+    }
+
+    private void applyPermission(String discordId, String permission, boolean grant) {
+        if (permission == null || permission.isEmpty() || plugin.getLinkModule() == null) {
+            return;
+        }
+        UUID playerUUID = plugin.getLinkModule().getPlayerUUID(discordId);
+        if (playerUUID == null) {
+            return;
+        }
+        String action = grant ? "set" : "unset";
+        String value = grant ? " true" : "";
+        String command = "lp user " + playerUUID + " permission " + action + " " + permission + value;
+        plugin.getPlatformAdapter().runSync(
+                () -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command));
     }
 
     private void saveData() {
@@ -76,98 +167,11 @@ public class ReactionRoleModule {
         }
     }
 
-    /**
-     * Add a reaction role mapping.
-     */
-    public void addMapping(String messageId, String emoji, String roleId, String permission) {
-        mappings.computeIfAbsent(messageId, k -> new HashMap<>())
-                .put(emoji, new RoleMapping(roleId, permission));
-        saveData();
-    }
-
-    /**
-     * Handle reaction add event.
-     */
-    public void onReactionAdd(MessageReactionAddEvent event) {
-        String messageId = event.getMessageId();
-        if (!mappings.containsKey(messageId))
-            return;
-
-        String emoji = event.getReaction().getEmoji().getAsReactionCode();
-        RoleMapping mapping = mappings.get(messageId).get(emoji);
-        if (mapping == null)
-            return;
-
-        Guild guild = event.getGuild();
-        Member member = event.getMember();
-        if (member == null)
-            return;
-
-        // Add Discord role
-        Role role = guild.getRoleById(mapping.roleId);
-        if (role != null) {
-            guild.addRoleToMember(member, role).queue(
-                    success -> plugin.debug("Added role " + role.getName() + " to " + member.getEffectiveName()),
-                    error -> plugin.debug("Failed to add role: " + error.getMessage()));
-        }
-
-        // Apply in-game permission if linked
-        if (!mapping.permission.isEmpty() && plugin.getLinkModule() != null) {
-            UUID playerUUID = plugin.getLinkModule().getPlayerUUID(event.getUserId());
-            if (playerUUID != null) {
-                plugin.getPlatformAdapter().runSync(() -> {
-                    // Execute permission command (works with LuckPerms, etc.)
-                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(),
-                            "lp user " + playerUUID + " permission set " + mapping.permission + " true");
-                });
-            }
-        }
-    }
-
-    /**
-     * Handle reaction remove event.
-     */
-    public void onReactionRemove(MessageReactionRemoveEvent event) {
-        String messageId = event.getMessageId();
-        if (!mappings.containsKey(messageId))
-            return;
-
-        String emoji = event.getReaction().getEmoji().getAsReactionCode();
-        RoleMapping mapping = mappings.get(messageId).get(emoji);
-        if (mapping == null)
-            return;
-
-        Guild guild = event.getGuild();
-        Member member = guild.getMemberById(event.getUserId());
-        if (member == null)
-            return;
-
-        // Remove Discord role
-        Role role = guild.getRoleById(mapping.roleId);
-        if (role != null) {
-            guild.removeRoleFromMember(member, role).queue();
-        }
-
-        // Remove in-game permission if linked
-        if (!mapping.permission.isEmpty() && plugin.getLinkModule() != null) {
-            UUID playerUUID = plugin.getLinkModule().getPlayerUUID(event.getUserId());
-            if (playerUUID != null) {
-                plugin.getPlatformAdapter().runSync(() -> {
-                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(),
-                            "lp user " + playerUUID + " permission unset " + mapping.permission);
-                });
-            }
-        }
-    }
-
     public void shutdown() {
         saveData();
     }
 
-    /**
-     * Simple data class for role mappings.
-     */
-    private static class RoleMapping {
+    private static final class RoleMapping {
         final String roleId;
         final String permission;
 

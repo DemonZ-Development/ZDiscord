@@ -1,6 +1,24 @@
+/*
+ * Copyright 2024 DemonZ Development
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package dev.demonz.zdiscord.minecraft.listeners;
 
 import dev.demonz.zdiscord.ZDiscord;
+import dev.demonz.zdiscord.util.ColorUtil;
+import dev.demonz.zdiscord.util.PlaceholderUtil;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import org.bukkit.entity.Player;
@@ -9,11 +27,11 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 
-import java.awt.*;
 import java.time.Instant;
 
 /**
- * Listens for player death events and sends them to Discord.
+ * Forwards player death messages to Discord and increments kill/death
+ * statistics for the leaderboard.
  */
 public class DeathListener implements Listener {
 
@@ -25,40 +43,51 @@ public class DeathListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onDeath(PlayerDeathEvent event) {
-        if (!plugin.getBotManager().isConnected())
+        if (!plugin.getBotManager().isConnected()) {
             return;
-        if (!plugin.getConfigManager().getBoolean("events.death.enabled", true))
+        }
+        if (!plugin.getConfigManager().getBoolean("events.death.enabled", true)) {
             return;
+        }
 
         Player player = event.getEntity();
         String deathMessage = event.getDeathMessage();
-        if (deathMessage == null)
+        if (deathMessage == null) {
             deathMessage = player.getName() + " died";
+        }
 
-        TextChannel channel = plugin.getBotManager().getTextChannel("channels.events");
-        if (channel == null)
-            channel = plugin.getBotManager().getTextChannel("channels.chat");
-        if (channel == null)
+        TextChannel channel = resolveEventChannel();
+        if (channel == null) {
             return;
+        }
 
-        String message = plugin.getConfigManager().getString("events.death.message", "💀 %death_message%")
-                .replace("%death_message%", deathMessage)
-                .replace("%player%", player.getName());
+        String template = plugin.getConfigManager()
+                .getString("events.death.message", "%death_message%");
+        String message = PlaceholderUtil.resolve(template, player)
+                .replace("%death_message%", deathMessage);
         String colorHex = plugin.getConfigManager().getString("events.death.color", "#95A5A6");
 
         EmbedBuilder embed = new EmbedBuilder()
                 .setDescription(message)
-                .setColor(Color.decode(colorHex))
+                .setColor(ColorUtil.parseHex(colorHex))
                 .setTimestamp(Instant.now());
 
         channel.sendMessageEmbeds(embed.build()).queue();
 
-        // Update leaderboard stats
         if (plugin.getLeaderboardModule() != null) {
             plugin.getLeaderboardModule().incrementStat(player.getUniqueId(), "deaths");
             if (player.getKiller() != null) {
-                plugin.getLeaderboardModule().incrementStat(player.getKiller().getUniqueId(), "kills");
+                plugin.getLeaderboardModule().incrementStat(
+                        player.getKiller().getUniqueId(), "kills");
             }
         }
+    }
+
+    private TextChannel resolveEventChannel() {
+        TextChannel channel = plugin.getBotManager().getTextChannel("channels.events");
+        if (channel == null) {
+            channel = plugin.getBotManager().getTextChannel("channels.chat");
+        }
+        return channel;
     }
 }

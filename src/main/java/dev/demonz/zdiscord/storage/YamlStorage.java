@@ -1,3 +1,19 @@
+/*
+ * Copyright 2024 DemonZ Development
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package dev.demonz.zdiscord.storage;
 
 import dev.demonz.zdiscord.ZDiscord;
@@ -6,17 +22,24 @@ import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 /**
- * Default YAML-based storage implementation.
- * Stores data across three files: linked_accounts.yml, leaderboard_data.yml,
- * plugin_data.yml.
- * All file writes are synchronized via read-write locks to prevent data
- * corruption.
+ * File-based implementation of {@link StorageManager}.
+ *
+ * <p>All reads take the read lock briefly; all writes take the write
+ * lock and then synchronously persist to disk so that a write
+ * followed immediately by a shutdown cannot lose data. Callers that
+ * want a deferred write should still take the write lock, perform the
+ * mutation, release, and then schedule the actual file save on the
+ * async executor without holding the lock — see
+ * {@link #scheduleFlush}.</p>
  */
 public class YamlStorage implements StorageManager {
 
@@ -30,7 +53,6 @@ public class YamlStorage implements StorageManager {
     private FileConfiguration statsConfig;
     private FileConfiguration dataConfig;
 
-    // Write locks to prevent concurrent YAML corruption
     private final ReentrantReadWriteLock linksLock = new ReentrantReadWriteLock();
     private final ReentrantReadWriteLock statsLock = new ReentrantReadWriteLock();
     private final ReentrantReadWriteLock dataLock = new ReentrantReadWriteLock();
@@ -53,11 +75,13 @@ public class YamlStorage implements StorageManager {
         statsConfig = YamlConfiguration.loadConfiguration(statsFile);
         dataConfig = YamlConfiguration.loadConfiguration(dataFile);
 
-        plugin.getLogger().info("Storage: Using YAML file storage (default)");
+        plugin.getLogger().info("Storage: YAML file storage");
     }
 
     @Override
     public void shutdown() {
+        // Synchronous flushes — these run on the calling thread, which
+        // is the main thread during plugin disable, so the lock is safe.
         saveFileLocked(linksConfig, linksFile, linksLock, "linked accounts");
         saveFileLocked(statsConfig, statsFile, statsLock, "leaderboard data");
         saveFileLocked(dataConfig, dataFile, dataLock, "plugin data");
@@ -68,24 +92,23 @@ public class YamlStorage implements StorageManager {
         return "YAML";
     }
 
-    // ─── Links ──────────────────────────────────────
-
     @Override
     public Map<UUID, String> loadLinks() {
         Map<UUID, String> links = new ConcurrentHashMap<>();
         linksLock.readLock().lock();
         try {
-            if (linksConfig.getConfigurationSection("links") != null) {
-                for (String uuidStr : linksConfig.getConfigurationSection("links").getKeys(false)) {
-                    try {
-                        UUID uuid = UUID.fromString(uuidStr);
-                        String discordId = linksConfig.getString("links." + uuidStr);
-                        if (discordId != null && !discordId.isEmpty()) {
-                            links.put(uuid, discordId);
-                        }
-                    } catch (IllegalArgumentException e) {
-                        plugin.getLogger().warning("Invalid UUID in linked_accounts.yml: " + uuidStr);
+            if (linksConfig.getConfigurationSection("links") == null) {
+                return links;
+            }
+            for (String uuidStr : linksConfig.getConfigurationSection("links").getKeys(false)) {
+                try {
+                    UUID uuid = UUID.fromString(uuidStr);
+                    String discordId = linksConfig.getString("links." + uuidStr);
+                    if (discordId != null && !discordId.isEmpty()) {
+                        links.put(uuid, discordId);
                     }
+                } catch (IllegalArgumentException e) {
+                    plugin.getLogger().warning("Invalid UUID in linked_accounts.yml: " + uuidStr);
                 }
             }
         } finally {
@@ -102,7 +125,7 @@ public class YamlStorage implements StorageManager {
         } finally {
             linksLock.writeLock().unlock();
         }
-        saveFileAsync(linksConfig, linksFile, linksLock, "linked accounts");
+        scheduleFlush(linksConfig, linksFile, linksLock, "linked accounts");
     }
 
     @Override
@@ -113,31 +136,31 @@ public class YamlStorage implements StorageManager {
         } finally {
             linksLock.writeLock().unlock();
         }
-        saveFileAsync(linksConfig, linksFile, linksLock, "linked accounts");
+        scheduleFlush(linksConfig, linksFile, linksLock, "linked accounts");
     }
-
-    // ─── Stats ──────────────────────────────────────
 
     @Override
     public Map<UUID, Map<String, Long>> loadStats() {
         Map<UUID, Map<String, Long>> stats = new ConcurrentHashMap<>();
         statsLock.readLock().lock();
         try {
-            if (statsConfig.getConfigurationSection("stats") != null) {
-                for (String uuidStr : statsConfig.getConfigurationSection("stats").getKeys(false)) {
-                    try {
-                        UUID uuid = UUID.fromString(uuidStr);
-                        Map<String, Long> playerStats = new ConcurrentHashMap<>();
-                        var section = statsConfig.getConfigurationSection("stats." + uuidStr);
-                        if (section != null) {
-                            for (String stat : section.getKeys(false)) {
-                                playerStats.put(stat, statsConfig.getLong("stats." + uuidStr + "." + stat));
-                            }
+            if (statsConfig.getConfigurationSection("stats") == null) {
+                return stats;
+            }
+            for (String uuidStr : statsConfig.getConfigurationSection("stats").getKeys(false)) {
+                try {
+                    UUID uuid = UUID.fromString(uuidStr);
+                    Map<String, Long> playerStats = new ConcurrentHashMap<>();
+                    var section = statsConfig.getConfigurationSection("stats." + uuidStr);
+                    if (section != null) {
+                        for (String stat : section.getKeys(false)) {
+                            playerStats.put(stat, statsConfig.getLong(
+                                    "stats." + uuidStr + "." + stat));
                         }
-                        stats.put(uuid, playerStats);
-                    } catch (IllegalArgumentException e) {
-                        plugin.getLogger().warning("Invalid UUID in leaderboard_data.yml: " + uuidStr);
                     }
+                    stats.put(uuid, playerStats);
+                } catch (IllegalArgumentException e) {
+                    plugin.getLogger().warning("Invalid UUID in leaderboard_data.yml: " + uuidStr);
                 }
             }
         } finally {
@@ -154,7 +177,7 @@ public class YamlStorage implements StorageManager {
         } finally {
             statsLock.writeLock().unlock();
         }
-        saveFileAsync(statsConfig, statsFile, statsLock, "leaderboard data");
+        scheduleFlush(statsConfig, statsFile, statsLock, "leaderboard data");
     }
 
     @Override
@@ -168,16 +191,9 @@ public class YamlStorage implements StorageManager {
                 .collect(Collectors.toList());
     }
 
-    // ─── Key-Value Data ─────────────────────────────
-
     @Override
     public String getData(String key) {
-        dataLock.readLock().lock();
-        try {
-            return dataConfig.getString("data." + key);
-        } finally {
-            dataLock.readLock().unlock();
-        }
+        return getData(key, null);
     }
 
     @Override
@@ -208,21 +224,13 @@ public class YamlStorage implements StorageManager {
         } finally {
             dataLock.writeLock().unlock();
         }
-        saveFileAsync(dataConfig, dataFile, dataLock, "plugin data");
+        scheduleFlush(dataConfig, dataFile, dataLock, "plugin data");
     }
 
     @Override
     public void setData(String key, int value) {
-        dataLock.writeLock().lock();
-        try {
-            dataConfig.set("data." + key, value);
-        } finally {
-            dataLock.writeLock().unlock();
-        }
-        saveFileAsync(dataConfig, dataFile, dataLock, "plugin data");
+        setData(key, String.valueOf(value));
     }
-
-    // ─── Helpers ────────────────────────────────────
 
     private void createIfMissing(File file) {
         if (!file.exists()) {
@@ -230,12 +238,18 @@ public class YamlStorage implements StorageManager {
                 file.getParentFile().mkdirs();
                 file.createNewFile();
             } catch (IOException e) {
-                plugin.getLogger().severe("Failed to create storage file " + file.getName() + ": " + e.getMessage());
+                plugin.getLogger().severe("Failed to create storage file "
+                        + file.getName() + ": " + e.getMessage());
             }
         }
     }
 
-    private void saveFileLocked(FileConfiguration config, File file, ReentrantReadWriteLock lock, String label) {
+    /**
+     * Save the config under the write lock. Used for synchronous
+     * flushes (e.g. on shutdown).
+     */
+    private void saveFileLocked(FileConfiguration config, File file,
+                                ReentrantReadWriteLock lock, String label) {
         lock.writeLock().lock();
         try {
             config.save(file);
@@ -246,7 +260,13 @@ public class YamlStorage implements StorageManager {
         }
     }
 
-    private void saveFileAsync(FileConfiguration config, File file, ReentrantReadWriteLock lock, String label) {
+    /**
+     * Schedule an asynchronous file write. The lock is taken inside the
+     * scheduled task so that the in-memory config and the on-disk file
+     * cannot diverge.
+     */
+    private void scheduleFlush(FileConfiguration config, File file,
+                               ReentrantReadWriteLock lock, String label) {
         plugin.getPlatformAdapter().runAsync(() -> saveFileLocked(config, file, lock, label));
     }
 }

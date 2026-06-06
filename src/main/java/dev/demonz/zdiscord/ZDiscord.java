@@ -1,8 +1,25 @@
+/*
+ * Copyright 2024 DemonZ Development
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package dev.demonz.zdiscord;
 
 import dev.demonz.zdiscord.config.ConfigManager;
 import dev.demonz.zdiscord.config.MessageManager;
 import dev.demonz.zdiscord.discord.BotManager;
+import dev.demonz.zdiscord.discord.SetupCommand;
 import dev.demonz.zdiscord.discord.SlashCommandManager;
 import dev.demonz.zdiscord.discord.WebhookManager;
 import dev.demonz.zdiscord.minecraft.commands.DiscordCommand;
@@ -13,7 +30,18 @@ import dev.demonz.zdiscord.minecraft.listeners.ChatListener;
 import dev.demonz.zdiscord.minecraft.listeners.DeathListener;
 import dev.demonz.zdiscord.minecraft.listeners.JoinQuitListener;
 import dev.demonz.zdiscord.minecraft.listeners.LinkEnforcementListener;
-import dev.demonz.zdiscord.modules.*;
+import dev.demonz.zdiscord.modules.AntiRaidModule;
+import dev.demonz.zdiscord.modules.CommandLoggerModule;
+import dev.demonz.zdiscord.modules.ConsoleModule;
+import dev.demonz.zdiscord.modules.EmbedBuilderModule;
+import dev.demonz.zdiscord.modules.LeaderboardModule;
+import dev.demonz.zdiscord.modules.LinkModule;
+import dev.demonz.zdiscord.modules.PerformanceModule;
+import dev.demonz.zdiscord.modules.ReactionRoleModule;
+import dev.demonz.zdiscord.modules.StaffChatModule;
+import dev.demonz.zdiscord.modules.StatusModule;
+import dev.demonz.zdiscord.modules.TicketModule;
+import dev.demonz.zdiscord.modules.VoiceStatusModule;
 import dev.demonz.zdiscord.platform.FoliaAdapter;
 import dev.demonz.zdiscord.platform.PaperAdapter;
 import dev.demonz.zdiscord.platform.PlatformAdapter;
@@ -21,15 +49,16 @@ import dev.demonz.zdiscord.platform.SpigotAdapter;
 import dev.demonz.zdiscord.storage.MySQLStorage;
 import dev.demonz.zdiscord.storage.StorageManager;
 import dev.demonz.zdiscord.storage.YamlStorage;
+import dev.demonz.zdiscord.util.UpdateChecker;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.logging.Level;
 
 /**
- * ZDiscord - Premium Discord ↔ Minecraft Integration
- * Supports Paper, Folia, and Spigot
+ * ZDiscord entry point.
  *
- * @author DemonZ Development
+ * <p>Supports Paper, Folia, and Spigot via the {@link PlatformAdapter}
+ * abstraction. Module behaviour is opt-in via {@code config.yml} flags.</p>
  */
 public class ZDiscord extends JavaPlugin {
 
@@ -41,9 +70,9 @@ public class ZDiscord extends JavaPlugin {
     private BotManager botManager;
     private WebhookManager webhookManager;
     private SlashCommandManager slashCommandManager;
+    private SetupCommand setupCommand;
     private StorageManager storageManager;
 
-    // Modules
     private StatusModule statusModule;
     private LeaderboardModule leaderboardModule;
     private TicketModule ticketModule;
@@ -62,139 +91,61 @@ public class ZDiscord extends JavaPlugin {
         instance = this;
         long start = System.currentTimeMillis();
 
-        getLogger().info("");
-        getLogger().info("");
-        getServer().getConsoleSender().sendMessage("§b╔══════════════════════════════════════════════════╗");
-        getServer().getConsoleSender().sendMessage("§b║                                                  ║");
-        getServer().getConsoleSender()
-                .sendMessage("§b║   §3███████╗§b██████╗ §3██╗§b███████╗ §3██████╗§b ██████╗ §3██████╗  §b║");
-        getServer().getConsoleSender()
-                .sendMessage("§b║   §3╚══███╔╝§b██╔══██╗§3██║§b██╔════╝§3██╔════╝§b██╔═══██╗§3██╔══██╗ §b║");
-        getServer().getConsoleSender()
-                .sendMessage("§b║     §3███╔╝ §b██║  ██║§3██║§b███████╗§3██║     §b██║   ██║§3██████╔╝ §b║");
-        getServer().getConsoleSender()
-                .sendMessage("§b║    §3███╔╝  §b██║  ██║§3██║§b╚════██║§3██║     §b██║   ██║§3██╔══██╗ §b║");
-        getServer().getConsoleSender()
-                .sendMessage("§b║   §3███████╗§b██████╔╝§3██║§b███████║§3╚██████╗§b╚██████╔╝§3██║  ██║ §b║");
-        getServer().getConsoleSender()
-                .sendMessage("§b║   §3╚══════╝§b╚═════╝ §3╚═╝§b╚══════╝ §3╚═════╝ §b╚═════╝ §3╚═╝  ╚═╝ §b║");
-        getServer().getConsoleSender().sendMessage("§b║                                                  ║");
-        getServer().getConsoleSender().sendMessage(
-                "§b║  §fv" + getDescription().getVersion() + " §8│ §7Premium Discord Integration            §b║");
-        getServer().getConsoleSender().sendMessage("§b║  §fDeveloped by §b§lDemonZ Development              §b║");
-        getServer().getConsoleSender().sendMessage("§b║                                                  ║");
-        getServer().getConsoleSender().sendMessage("§b╚══════════════════════════════════════════════════╝");
-        getLogger().info("");
-
-        // Detect platform
         detectPlatform();
 
-        // Load configuration
+        getLogger().info("Starting ZDiscord v" + getDescription().getVersion()
+                + " on " + platformAdapter.getPlatformName());
+
         configManager = new ConfigManager(this);
         messageManager = new MessageManager(this);
 
-        // Initialize bStats metrics
-        new org.bstats.bukkit.Metrics(this, 29652);
-
-        // Initialize storage
         initStorage();
 
-        // Initialize Discord bot
+        new org.bstats.bukkit.Metrics(this, 29652);
+
         botManager = new BotManager(this);
+        slashCommandManager = new SlashCommandManager(this);
+        setupCommand = new SetupCommand(this);
         if (!botManager.connect()) {
-            getLogger().severe("Failed to connect to Discord! Check your bot token in config.yml");
-            getLogger().severe("Plugin will continue running but Discord features will be disabled.");
+            getLogger().severe("Failed to connect to Discord. Check bot.token and bot.guild-id in config.yml.");
+            getLogger().severe("The plugin will continue to load, but Discord features are disabled.");
         } else {
-            // Initialize webhook manager
             webhookManager = new WebhookManager(this);
-
-            // Initialize slash commands
-            slashCommandManager = new SlashCommandManager(this);
             slashCommandManager.registerCommands();
-
-            // Initialize modules
             initModules();
-
-            // Register JDA listeners for reconnection and ticket buttons
-            botManager.getJda().addEventListener(new dev.demonz.zdiscord.discord.listeners.ReconnectListener(this));
-            botManager.getJda().addEventListener(new dev.demonz.zdiscord.discord.listeners.TicketButtonListener(this));
         }
 
-        // Schedule auto-save every 5 minutes
-        platformAdapter.runAsyncTimer(() -> {
-            if (storageManager != null) {
-                storageManager.shutdown(); // flush all pending writes
-                debug("Auto-save completed.");
-            }
-        }, 6000L, 6000L); // 300 seconds = 6000 ticks
-
-        // Register Minecraft listeners
         registerListeners();
-
-        // Register commands
         registerCommands();
 
-        // Check for updates
-        new dev.demonz.zdiscord.util.UpdateChecker(this);
+        if (configManager.getBoolean("misc.update-checker", true)) {
+            new UpdateChecker(this);
+        }
 
         long elapsed = System.currentTimeMillis() - start;
-        getLogger().info("");
-        getServer().getConsoleSender().sendMessage("§8§m─────────────────────────────────────────");
-        getServer().getConsoleSender().sendMessage("§a ✓ §fZDiscord §7enabled in §b" + elapsed + "ms");
-        getServer().getConsoleSender().sendMessage("§a ✓ §fPlatform: §b" + platformAdapter.getPlatformName());
-        getServer().getConsoleSender().sendMessage("§a ✓ §fVersion: §b" + getDescription().getVersion());
-        getServer().getConsoleSender().sendMessage("§a ✓ §fAuthor: §b§lDemonZ Development");
-        getServer().getConsoleSender().sendMessage("§8§m─────────────────────────────────────────");
-        getLogger().info("");
+        getLogger().info("ZDiscord v" + getDescription().getVersion()
+                + " enabled in " + elapsed + "ms on " + platformAdapter.getPlatformName());
     }
 
     @Override
     public void onDisable() {
-        getLogger().info("");
-        getServer().getConsoleSender().sendMessage("§c§m─────────────────────────────────────────");
-        getServer().getConsoleSender().sendMessage("§c ✗ §fShutting down §bZDiscord§f...");
+        getLogger().info("Shutting down ZDiscord...");
 
-        // Shutdown modules
-        if (statusModule != null)
-            statusModule.shutdown();
-        if (leaderboardModule != null)
-            leaderboardModule.shutdown();
-        if (ticketModule != null)
-            ticketModule.shutdown();
-        if (linkModule != null)
-            linkModule.shutdown();
-        if (antiRaidModule != null)
-            antiRaidModule.shutdown();
-        if (performanceModule != null)
-            performanceModule.shutdown();
-        if (reactionRoleModule != null)
-            reactionRoleModule.shutdown();
-        if (commandLoggerModule != null)
-            commandLoggerModule.shutdown();
-        if (staffChatModule != null)
-            staffChatModule.shutdown();
-        if (voiceStatusModule != null)
-            voiceStatusModule.shutdown();
-        if (consoleModule != null)
-            consoleModule.shutdown();
+        if (statusModule != null) statusModule.shutdown();
+        if (leaderboardModule != null) leaderboardModule.shutdown();
+        if (ticketModule != null) ticketModule.shutdown();
+        if (linkModule != null) linkModule.shutdown();
+        if (antiRaidModule != null) antiRaidModule.shutdown();
+        if (performanceModule != null) performanceModule.shutdown();
+        if (reactionRoleModule != null) reactionRoleModule.shutdown();
+        if (commandLoggerModule != null) commandLoggerModule.shutdown();
+        if (staffChatModule != null) staffChatModule.shutdown();
+        if (voiceStatusModule != null) voiceStatusModule.shutdown();
+        if (consoleModule != null) consoleModule.shutdown();
 
-        // Shutdown storage
-        if (storageManager != null)
-            storageManager.shutdown();
-
-        // Shutdown webhook manager
-        if (webhookManager != null)
-            webhookManager.shutdown();
-
-        // Shutdown Discord bot
-        if (botManager != null)
-            botManager.shutdown();
-
-        getServer().getConsoleSender().sendMessage("§c ✗ §fAll modules shut down.");
-        getServer().getConsoleSender()
-                .sendMessage("§7 Thank you for using §b§lZDiscord §7by §b§lDemonZ Development§7!");
-        getServer().getConsoleSender().sendMessage("§c§m─────────────────────────────────────────");
-        getLogger().info("");
+        if (storageManager != null) storageManager.shutdown();
+        if (webhookManager != null) webhookManager.shutdown();
+        if (botManager != null) botManager.shutdown();
 
         instance = null;
     }
@@ -203,29 +154,25 @@ public class ZDiscord extends JavaPlugin {
         try {
             Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
             platformAdapter = new FoliaAdapter(this);
-            getLogger().info("Detected Folia! Using region-aware scheduling.");
         } catch (ClassNotFoundException e) {
             try {
                 Class.forName("io.papermc.paper.event.player.AsyncChatEvent");
                 platformAdapter = new PaperAdapter(this);
-                getLogger().info("Detected Paper! Using Paper-optimized features.");
             } catch (ClassNotFoundException e2) {
                 platformAdapter = new SpigotAdapter(this);
-                getLogger().info("Detected Spigot! Using Bukkit scheduler.");
             }
         }
     }
 
     private void initStorage() {
         String type = configManager.getString("storage.type", "yaml").toLowerCase();
-
         if ("mysql".equals(type)) {
             try {
                 storageManager = new MySQLStorage(this);
                 storageManager.init();
             } catch (Exception e) {
-                getLogger().warning("MySQL connection failed: " + e.getMessage());
-                getLogger().warning("Falling back to YAML storage.");
+                getLogger().warning("MySQL connection failed (" + e.getMessage()
+                        + "). Falling back to YAML storage.");
                 storageManager = new YamlStorage(this);
                 storageManager.init();
             }
@@ -236,76 +183,65 @@ public class ZDiscord extends JavaPlugin {
     }
 
     private void initModules() {
-        if (configManager.getConfig().getBoolean("status.enabled", true)) {
+        if (configManager.getBoolean("status.enabled", true)) {
             statusModule = new StatusModule(this);
             statusModule.init();
-            getLogger().info("✓ Status Module enabled");
         }
 
-        if (configManager.getConfig().getBoolean("leaderboard.enabled", true)) {
+        if (configManager.getBoolean("leaderboard.enabled", true)) {
             leaderboardModule = new LeaderboardModule(this);
             leaderboardModule.init();
-            getLogger().info("✓ Leaderboard Module enabled");
         }
 
-        if (configManager.getConfig().getBoolean("tickets.enabled", true)) {
+        if (configManager.getBoolean("tickets.enabled", true)) {
             ticketModule = new TicketModule(this);
             ticketModule.init();
-            getLogger().info("✓ Ticket Module enabled");
         }
 
-        if (configManager.getConfig().getBoolean("linking.enabled", true)) {
+        if (configManager.getBoolean("linking.enabled", true)) {
             linkModule = new LinkModule(this);
             linkModule.init();
-            getLogger().info("✓ Account Linking Module enabled");
         }
 
-        if (configManager.getConfig().getBoolean("anti-raid.enabled", true)) {
+        if (configManager.getBoolean("anti-raid.enabled", true)) {
             antiRaidModule = new AntiRaidModule(this);
             antiRaidModule.init();
-            getLogger().info("✓ Anti-Raid Module enabled");
         }
 
-        if (configManager.getConfig().getBoolean("performance.enabled", true)) {
+        if (configManager.getBoolean("performance.enabled", true)) {
             performanceModule = new PerformanceModule(this);
             performanceModule.init();
-            getLogger().info("✓ Performance Monitor enabled");
         }
 
-        if (configManager.getConfig().getBoolean("reaction-roles.enabled", true)) {
+        if (configManager.getBoolean("reaction-roles.enabled", true)) {
             reactionRoleModule = new ReactionRoleModule(this);
             reactionRoleModule.init();
-            getLogger().info("✓ Reaction Roles Module enabled");
         }
 
         embedBuilderModule = new EmbedBuilderModule(this);
-        getLogger().info("✓ Embed Builder Module enabled");
 
-        if (configManager.getConfig().getBoolean("command-logger.enabled", true)) {
+        if (configManager.getBoolean("command-logger.enabled", true)) {
             commandLoggerModule = new CommandLoggerModule(this);
             commandLoggerModule.init();
-            getLogger().info("✓ Command Logger Module enabled");
         }
 
-        // Console output streaming
         String consoleChannelId = configManager.getString("channels.console", "");
-        if (consoleChannelId != null && !consoleChannelId.isEmpty() && !consoleChannelId.startsWith("YOUR_")) {
+        if (!consoleChannelId.isEmpty() && !consoleChannelId.startsWith("YOUR_")) {
             consoleModule = new ConsoleModule(this);
             consoleModule.init();
-            getLogger().info("✓ Console Module enabled");
         }
 
-        if (configManager.getConfig().getBoolean("staff-chat.enabled", true)) {
+        if (configManager.getBoolean("staff-chat.enabled", true)) {
             staffChatModule = new StaffChatModule(this);
             staffChatModule.init();
-            getLogger().info("✓ Staff Chat Module enabled");
         }
 
-        if (configManager.getConfig().getBoolean("voice-status.enabled", true)) {
+        if (configManager.getBoolean("voice-status.enabled", true)) {
             voiceStatusModule = new VoiceStatusModule(this);
             voiceStatusModule.init();
-            getLogger().info("✓ Voice Status Module enabled");
         }
+
+        getLogger().info("Modules initialised.");
     }
 
     private void registerListeners() {
@@ -314,17 +250,26 @@ public class ZDiscord extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new DeathListener(this), this);
         getServer().getPluginManager().registerEvents(new AdvancementListener(this), this);
 
-        if (configManager.getBoolean("linking.required", false)) {
+        if (configManager.getBoolean("linking.required", false) && linkModule != null) {
             getServer().getPluginManager().registerEvents(new LinkEnforcementListener(this), this);
-            getLogger().info("✓ Link-to-Join enforcement enabled");
         }
     }
 
     private void registerCommands() {
-        getCommand("zdiscord").setExecutor(new ZDiscordCommand(this));
-        getCommand("discord").setExecutor(new DiscordCommand(this));
-        if (getCommand("sc") != null) {
-            getCommand("sc").setExecutor(new StaffChatCommand(this));
+        org.bukkit.command.PluginCommand zd = getCommand("zdiscord");
+        if (zd != null) {
+            ZDiscordCommand executor = new ZDiscordCommand(this);
+            zd.setExecutor(executor);
+            zd.setTabCompleter(executor);
+        }
+        org.bukkit.command.PluginCommand discord = getCommand("discord");
+        if (discord != null) {
+            discord.setExecutor(new DiscordCommand(this));
+        }
+        org.bukkit.command.PluginCommand sc = getCommand("sc");
+        if (sc != null) {
+            StaffChatCommand executor = new StaffChatCommand(this);
+            sc.setExecutor(executor);
         }
     }
 
@@ -332,35 +277,21 @@ public class ZDiscord extends JavaPlugin {
         configManager.reload();
         messageManager.reload();
 
-        // Reload all active modules so they re-read config values
-        if (statusModule != null)
-            statusModule.reload();
-        if (leaderboardModule != null)
-            leaderboardModule.reload();
-        if (ticketModule != null)
-            ticketModule.reload();
-        if (linkModule != null)
-            linkModule.reload();
-        if (antiRaidModule != null)
-            antiRaidModule.reload();
-        if (performanceModule != null)
-            performanceModule.reload();
-        if (commandLoggerModule != null)
-            commandLoggerModule.reload();
-        if (staffChatModule != null)
-            staffChatModule.reload();
-        if (voiceStatusModule != null)
-            voiceStatusModule.reload();
+        if (statusModule != null) statusModule.reload();
+        if (leaderboardModule != null) leaderboardModule.reload();
+        if (ticketModule != null) ticketModule.reload();
+        if (linkModule != null) linkModule.reload();
+        if (antiRaidModule != null) antiRaidModule.reload();
+        if (performanceModule != null) performanceModule.reload();
+        if (commandLoggerModule != null) commandLoggerModule.reload();
+        if (staffChatModule != null) staffChatModule.reload();
+        if (voiceStatusModule != null) voiceStatusModule.reload();
 
-        // Update bot activity
         if (botManager != null && botManager.isConnected()) {
             botManager.updateActivity();
         }
-
-        getLogger().info("ZDiscord configuration reloaded!");
+        getLogger().info("Configuration reloaded.");
     }
-
-    // ─── Getters ─────────────────────────────────────
 
     public static ZDiscord getInstance() {
         return instance;
@@ -392,6 +323,10 @@ public class ZDiscord extends JavaPlugin {
 
     public SlashCommandManager getSlashCommandManager() {
         return slashCommandManager;
+    }
+
+    public SetupCommand getSetupCommand() {
+        return setupCommand;
     }
 
     public StatusModule getStatusModule() {
@@ -443,8 +378,8 @@ public class ZDiscord extends JavaPlugin {
     }
 
     public void debug(String message) {
-        if (configManager.getConfig().getBoolean("misc.debug", false)) {
-            getLogger().log(Level.INFO, "[DEBUG] " + message);
+        if (configManager.getBoolean("misc.debug", false)) {
+            getLogger().log(Level.INFO, "[debug] " + message);
         }
     }
 }

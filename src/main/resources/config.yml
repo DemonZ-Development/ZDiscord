@@ -1,31 +1,12 @@
-# ╔══════════════════════════════════════════════════════════╗
-# ║                                                        ║
-# ║   ███████╗██████╗ ██╗███████╗ ██████╗ ██████╗ ██████╗  ║
-# ║   ╚══███╔╝██╔══██╗██║██╔════╝██╔════╝██╔═══██╗██╔══██╗ ║
-# ║     ███╔╝ ██║  ██║██║███████╗██║     ██║   ██║██████╔╝ ║
-# ║    ███╔╝  ██║  ██║██║╚════██║██║     ██║   ██║██╔══██╗ ║
-# ║   ███████╗██████╔╝██║███████║╚██████╗╚██████╔╝██║  ██║ ║
-# ║   ╚══════╝╚═════╝ ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝ ║
-# ║                                                        ║
-# ║        Premium Discord ↔ Minecraft Integration         ║
-# ║             Developed by DemonZ Development             ║
-# ║                     Version 1.0.0-beta                   ║
-# ║                                                        ║
-# ╚══════════════════════════════════════════════════════════╝
-#
-# Thank you for choosing ZDiscord by DemonZ Development!
-# Need help? Visit: https://github.com/DemonZ-Development/ZDiscord
-#
+# ZDiscord configuration
+# Documentation: https://github.com/DemonZDevelopment/ZDiscord/wiki
 
 config-version: 2
 
-# ┌──────────────────────────────────────┐
-# │          💾 Storage Settings          │
-# └──────────────────────────────────────┘
+# ── Storage ───────────────────────────────────────────────
 storage:
-  # Storage type: "yaml" (default) or "mysql"
+  # "yaml" (default, file-based) or "mysql"
   type: "yaml"
-  # MySQL settings (only used when type is "mysql")
   mysql:
     host: "localhost"
     port: 3306
@@ -33,58 +14,38 @@ storage:
     username: "root"
     password: ""
 
-# ┌──────────────────────────────────────┐
-# │          🤖 Bot Settings             │
-# └──────────────────────────────────────┘
+# ── Bot ───────────────────────────────────────────────────
 bot:
-  # Your Discord Bot Token (https://discord.com/developers/applications)
+  # Discord bot token from https://discord.com/developers/applications
   token: "YOUR_BOT_TOKEN_HERE"
-  # Bot activity status
   activity:
-    type: "WATCHING" # PLAYING, WATCHING, LISTENING, COMPETING
-    text: "%online% players on the server"
-  # Guild (server) ID for slash commands
+    # PLAYING, WATCHING, LISTENING, COMPETING
+    type: "WATCHING"
+    text: "%online% players online"
+  # Guild (server) ID for slash command registration
   guild-id: "YOUR_GUILD_ID_HERE"
 
-# ┌──────────────────────────────────────┐
-# │          📺 Channel Settings         │
-# └──────────────────────────────────────┘
+# ── Channels ──────────────────────────────────────────────
 channels:
-  # Channel for Minecraft ↔ Discord chat sync
   chat: "YOUR_CHAT_CHANNEL_ID"
-  # Channel for server console output
   console: ""
-  # Channel for join/quit/death events
   events: ""
-  # Channel for the auto-updating status embed
   status: ""
-  # Channel for performance monitoring
   performance: ""
-  # Channel for achievement announcements
   achievements: ""
-  # Category for support tickets
   ticket-category: ""
 
-# ┌──────────────────────────────────────┐
-# │          💬 Chat Sync                │
-# └──────────────────────────────────────┘
+# ── Chat bridge ───────────────────────────────────────────
 chat:
-  # Use webhooks for player messages (shows player head as avatar)
   use-webhooks: true
-  # Webhook name format (placeholders: %player%, %displayname%)
   webhook-name: "%displayname%"
-  # Avatar URL format (uses Crafatar API for player heads)
+  # %uuid% is replaced with the player's UUID (no dashes)
   avatar-url: "https://crafatar.com/avatars/%uuid%?overlay=true"
-  # Format for Discord → Minecraft messages
-  minecraft-format: "&9&l⟨Discord⟩ &b%name% &8» &f%message%"
-  # Show attachments from Discord in MC chat
+  minecraft-format: "&9[Discord] &b%name% &8> &f%message%"
   show-attachments: true
-  # Attachment hover text
-  attachment-text: "&e[📎 Attachment] &7(Click to open)"
+  attachment-text: "&e[Attachment] &7(Click to open)"
 
-# ┌──────────────────────────────────────┐
-# │          📢 Event Messages           │
-# └──────────────────────────────────────┘
+# ── Event messages ────────────────────────────────────────
 events:
   join:
     enabled: true
@@ -96,42 +57,34 @@ events:
     color: "#E74C3C"
   death:
     enabled: true
-    message: "💀 %death_message%"
+    message: "%death_message%"
     color: "#95A5A6"
   advancement:
     enabled: true
     color: "#F1C40F"
 
-# ┌──────────────────────────────────────┐
-# │    📊 Server Status Module           │
-# └──────────────────────────────────────┘
+# ── Status module ─────────────────────────────────────────
 status:
   enabled: true
-  # Update interval in seconds
   update-interval: 30
   embed:
-    title: "🎮 Server Status"
+    title: "Server Status"
     color: "#5865F2"
     show-players: true
     show-tps: true
     show-memory: true
     server-ip: "play.yourserver.com"
 
-# ┌──────────────────────────────────────┐
-# │    🏆 Leaderboard Module             │
-# └──────────────────────────────────────┘
+# ── Leaderboard module ────────────────────────────────────
 leaderboard:
   enabled: true
-  # Tracked stats: KILLS, DEATHS, PLAYTIME
   tracked-stats:
     - KILLS
     - DEATHS
     - PLAYTIME
   top-count: 10
 
-# ┌──────────────────────────────────────┐
-# │    🎫 Ticket Module                  │
-# └──────────────────────────────────────┘
+# ── Ticket module ─────────────────────────────────────────
 tickets:
   enabled: true
   support-roles:
@@ -139,20 +92,17 @@ tickets:
   max-per-user: 3
   auto-close-hours: 48
 
-# ┌──────────────────────────────────────┐
-# │    🔗 Account Linking                │
-# └──────────────────────────────────────┘
+# ── Account linking ───────────────────────────────────────
 linking:
   enabled: true
   required: false
   linked-role: ""
-  rewards:
-    - "give %player% diamond 5"
-    - "xp add %player% 500 points"
+  # Commands run as console on the server when a player links.
+  # Use %player% to substitute the player's name.
+  rewards: []
+  # Example: rewards: ["give %player% diamond 5"]
 
-# ┌──────────────────────────────────────┐
-# │    🛡️ Anti-Raid Module               │
-# └──────────────────────────────────────┘
+# ── Anti-raid module ──────────────────────────────────────
 anti-raid:
   enabled: true
   max-joins: 10
@@ -163,9 +113,7 @@ anti-raid:
     notify-staff: true
     auto-lift: 300
 
-# ┌──────────────────────────────────────┐
-# │    📈 Performance Monitor            │
-# └──────────────────────────────────────┘
+# ── Performance monitor ───────────────────────────────────
 performance:
   enabled: true
   update-interval: 60
@@ -173,61 +121,46 @@ performance:
   tps-critical: 15.0
   memory-warning: 80
 
-# ┌──────────────────────────────────────┐
-# │    🎭 Reaction Roles                 │
-# └──────────────────────────────────────┘
+# ── Reaction roles ────────────────────────────────────────
 reaction-roles:
   enabled: true
+  # Mappings are stored in reaction_roles.yml — see wiki for setup.
   mappings: []
 
-# ┌──────────────────────────────────────┐
-# │    ⚙️ Miscellaneous                  │
-# └──────────────────────────────────────┘
+# ── Miscellaneous ─────────────────────────────────────────
 misc:
   invite-link: "https://discord.gg/yourserver"
   console-prefix: "!"
-  # Discord Role ID required to run console commands (leave empty to allow all)
+  # Discord role ID required to run console commands from Discord.
+  # Leave empty to disable Discord console commands entirely.
   console-role: ""
   debug: false
 
-# ┌──────────────────────────────────────┐
-# │    🔒 Command Logger                 │
-# └──────────────────────────────────────┘
+# ── Command logger ────────────────────────────────────────
 command-logger:
   enabled: true
-  # Discord channel ID to send command logs
   channel: ""
-  # Commands that trigger a log (yellow severity)
+  # Commands that trigger a WATCHED log (yellow)
   watched-commands:
     - "ban"
     - "kick"
     - "mute"
     - "whitelist"
     - "gamemode"
-  # Commands that trigger a CRITICAL log (red severity)
+  # Commands that trigger a CRITICAL log (red)
   critical-commands:
     - "op"
     - "deop"
     - "stop"
     - "restart"
 
-# ┌──────────────────────────────────────┐
-# │    💬 Staff Chat                      │
-# └──────────────────────────────────────┘
+# ── Staff chat ────────────────────────────────────────────
 staff-chat:
   enabled: true
-  # Discord channel ID for staff chat bridge
   channel: "YOUR_STAFF_CHAT_CHANNEL_ID"
 
-# ┌──────────────────────────────────────┐
-# │    🎙️ Voice Status                    │
-# └──────────────────────────────────────┘
+# ── Voice status ──────────────────────────────────────────
 voice-status:
   enabled: true
   # Discord voice channel ID to track
   channel: ""
-
-# ──────────────────────────────────────────
-#  ZDiscord v1.0.0-beta - DemonZ Development
-#  Premium Discord ↔ Minecraft Integration
-# ──────────────────────────────────────────

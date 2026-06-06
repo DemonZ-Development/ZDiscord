@@ -1,53 +1,98 @@
+/*
+ * Copyright 2024 DemonZ Development
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package dev.demonz.zdiscord.util;
 
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 
 /**
- * Utility for resolving placeholders in messages.
+ * Resolves placeholder tokens in user-facing messages.
+ *
+ * <p>Supported tokens:</p>
+ * <ul>
+ *   <li>{@code %player%}, {@code %name%} — player username</li>
+ *   <li>{@code %displayname%} — player display name (with colour codes stripped)</li>
+ *   <li>{@code %uuid%} — player UUID</li>
+ *   <li>{@code %world%} — current world name</li>
+ *   <li>{@code %online%}, {@code %max%} — server player counts</li>
+ *   <li>{@code %x%}, {@code %y%}, {@code %z%} — player coordinates</li>
+ *   <li>{@code %health%}, {@code %food%} — vitals</li>
+ *   <li>{@code %tps%} — current TPS, one decimal</li>
+ * </ul>
  */
-public class PlaceholderUtil {
+public final class PlaceholderUtil {
 
-    /**
-     * Replace common placeholders in a string.
-     */
+    private PlaceholderUtil() {
+    }
+
     public static String resolve(String text, Player player) {
-        if (text == null)
+        if (text == null) {
             return "";
-
-        text = text.replace("%player%", player.getName());
-        text = text.replace("%displayname%", player.getDisplayName());
-        text = text.replace("%uuid%", player.getUniqueId().toString());
-        text = text.replace("%world%", player.getWorld().getName());
-        text = text.replace("%online%", String.valueOf(Bukkit.getOnlinePlayers().size()));
-        text = text.replace("%max%", String.valueOf(Bukkit.getMaxPlayers()));
-
-        // Location
-        text = text.replace("%x%", String.valueOf(player.getLocation().getBlockX()));
-        text = text.replace("%y%", String.valueOf(player.getLocation().getBlockY()));
-        text = text.replace("%z%", String.valueOf(player.getLocation().getBlockZ()));
-
-        // Health & food
-        text = text.replace("%health%", String.valueOf((int) player.getHealth()));
-        text = text.replace("%food%", String.valueOf(player.getFoodLevel()));
-
-        // Server
-        text = text.replace("%tps%", String.format("%.1f", dev.demonz.zdiscord.util.TPSUtil.getTPS()[0]));
-
+        }
+        text = replaceCommon(text);
+        if (player == null) {
+            return text;
+        }
+        text = text.replace("%player%", player.getName())
+                .replace("%name%", player.getName())
+                .replace("%displayname%", stripColor(player.getDisplayName()))
+                .replace("%uuid%", player.getUniqueId().toString())
+                .replace("%world%", player.getWorld().getName())
+                .replace("%x%", String.valueOf(player.getLocation().getBlockX()))
+                .replace("%y%", String.valueOf(player.getLocation().getBlockY()))
+                .replace("%z%", String.valueOf(player.getLocation().getBlockZ()))
+                .replace("%health%", String.valueOf((int) player.getHealth()))
+                .replace("%food%", String.valueOf(player.getFoodLevel()));
         return text;
     }
 
-    /**
-     * Replace common placeholders without a player context.
-     */
-    public static String resolveServer(String text) {
-        if (text == null)
+    public static String resolveOffline(String text, OfflinePlayer player) {
+        if (text == null) {
             return "";
+        }
+        text = replaceCommon(text);
+        if (player == null) {
+            return text;
+        }
+        String name = player.getName() != null ? player.getName() : "Unknown";
+        return text.replace("%player%", name)
+                .replace("%name%", name)
+                .replace("%uuid%", player.getUniqueId().toString());
+    }
 
-        text = text.replace("%online%", String.valueOf(Bukkit.getOnlinePlayers().size()));
-        text = text.replace("%max%", String.valueOf(Bukkit.getMaxPlayers()));
-        text = text.replace("%tps%", String.format("%.1f", dev.demonz.zdiscord.util.TPSUtil.getTPS()[0]));
+    public static String resolveServer(String text) {
+        if (text == null) {
+            return "";
+        }
+        return replaceCommon(text);
+    }
 
-        return text;
+    private static String replaceCommon(String text) {
+        return text
+                .replace("%online%", String.valueOf(Bukkit.getOnlinePlayers().size()))
+                .replace("%max%", String.valueOf(Bukkit.getMaxPlayers()))
+                .replace("%tps%", String.format("%.1f", TPSUtil.getTPS()[0]));
+    }
+
+    private static String stripColor(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.replaceAll("§[0-9a-fk-or]", "").replaceAll("&[0-9a-fk-or]", "");
     }
 }

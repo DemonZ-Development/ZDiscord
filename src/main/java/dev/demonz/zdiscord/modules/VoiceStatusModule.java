@@ -1,7 +1,22 @@
+/*
+ * Copyright 2024 DemonZ Development
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package dev.demonz.zdiscord.modules;
 
 import dev.demonz.zdiscord.ZDiscord;
-import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.events.guild.voice.GuildVoiceUpdateEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -13,8 +28,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Shows a 🎙️ indicator on players who are in a Discord voice channel.
- * Uses JDA voice events for real-time tracking — no polling.
+ * Tracks which linked Minecraft players are currently in a configured
+ * Discord voice channel and adds a small indicator to their tab-list name.
  */
 public class VoiceStatusModule extends ListenerAdapter {
 
@@ -28,19 +43,19 @@ public class VoiceStatusModule extends ListenerAdapter {
 
     public void init() {
         voiceChannelId = plugin.getConfigManager().getString("voice-status.channel", "");
+        if (voiceChannelId.isEmpty() || !plugin.getBotManager().isConnected()) {
+            return;
+        }
+        plugin.getBotManager().getJda().addEventListener(this);
 
-        if (!voiceChannelId.isEmpty() && plugin.getBotManager().isConnected()) {
-            plugin.getBotManager().getJda().addEventListener(this);
-
-            // Scan current voice state on init
-            var guild = plugin.getBotManager().getGuild();
-            if (guild != null) {
-                var vc = guild.getVoiceChannelById(voiceChannelId);
-                if (vc != null) {
-                    for (Member member : vc.getMembers()) {
-                        resolveAndMark(member, true);
-                    }
-                }
+        var guild = plugin.getBotManager().getGuild();
+        if (guild == null) {
+            return;
+        }
+        var vc = guild.getVoiceChannelById(voiceChannelId);
+        if (vc != null) {
+            for (Member member : vc.getMembers()) {
+                markPlayer(member, true);
             }
         }
     }
@@ -49,40 +64,35 @@ public class VoiceStatusModule extends ListenerAdapter {
     public void onGuildVoiceUpdate(GuildVoiceUpdateEvent event) {
         String joinedId = event.getChannelJoined() != null ? event.getChannelJoined().getId() : null;
         String leftId = event.getChannelLeft() != null ? event.getChannelLeft().getId() : null;
-
-        // Player joined our tracked channel
         if (voiceChannelId.equals(joinedId)) {
-            resolveAndMark(event.getMember(), true);
-        }
-
-        // Player left our tracked channel
-        if (voiceChannelId.equals(leftId)) {
-            resolveAndMark(event.getMember(), false);
+            markPlayer(event.getMember(), true);
+        } else if (voiceChannelId.equals(leftId)) {
+            markPlayer(event.getMember(), false);
         }
     }
 
-    private void resolveAndMark(Member member, boolean joined) {
-        if (plugin.getLinkModule() == null)
+    private void markPlayer(Member member, boolean joined) {
+        if (plugin.getLinkModule() == null || member == null) {
             return;
-
-        String discordId = member.getId();
-        UUID playerUUID = plugin.getLinkModule().getPlayerUUID(discordId);
-        if (playerUUID == null)
+        }
+        UUID playerUUID = plugin.getLinkModule().getPlayerUUID(member.getId());
+        if (playerUUID == null) {
             return;
-
+        }
         if (joined) {
             inVoice.add(playerUUID);
         } else {
             inVoice.remove(playerUUID);
         }
-
-        // Update player display
         plugin.getPlatformAdapter().runSync(() -> {
             Player player = Bukkit.getPlayer(playerUUID);
-            if (player != null && player.isOnline()) {
-                String base = player.getName();
-                String displayName = joined ? base + " §b🎙" : base;
-                player.setPlayerListName(displayName);
+            if (player == null || !player.isOnline()) {
+                return;
+            }
+            if (joined) {
+                player.setPlayerListName(player.getName() + " \u00A7b(V)");
+            } else {
+                player.setPlayerListName(player.getName());
             }
         });
     }
@@ -96,7 +106,6 @@ public class VoiceStatusModule extends ListenerAdapter {
     }
 
     public void shutdown() {
-        // Clean up player list names
         for (UUID uuid : inVoice) {
             Player p = Bukkit.getPlayer(uuid);
             if (p != null && p.isOnline()) {
@@ -104,7 +113,6 @@ public class VoiceStatusModule extends ListenerAdapter {
             }
         }
         inVoice.clear();
-
         if (plugin.getBotManager().isConnected()) {
             plugin.getBotManager().getJda().removeEventListener(this);
         }

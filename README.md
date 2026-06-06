@@ -1,177 +1,109 @@
 <div align="center">
 
-<img src="images/banner.png" alt="ZDiscord Banner" width="100%">
+# ZDiscord
 
-<br/>
+Discord integration for Minecraft servers.
 
-# ⚡ ZDiscord
+[![Version](https://img.shields.io/badge/version-1.1.0-blue)](https://github.com/DemonZDevelopment/ZDiscord/releases)
+[![Minecraft](https://img.shields.io/badge/Minecraft-1.20.4%2B-green)](https://papermc.io)
+[![Platform](https://img.shields.io/badge/Paper%20%7C%20Folia%20%7C%20Spigot-orange)](https://papermc.io)
+[![Java](https://img.shields.io/badge/Java-17%2B-red)](https://adoptium.net)
+[![License](https://img.shields.io/badge/License-Apache%202.0-lightgrey)](LICENSE)
 
-### Premium Discord ↔ Minecraft Integration
-
-[![Version](https://img.shields.io/badge/version-1.0.0--beta-blue?style=for-the-badge)](https://github.com/DemonZDevelopment/ZDiscord/releases)
-[![Minecraft](https://img.shields.io/badge/Minecraft-1.21+-green?style=for-the-badge&logo=minecraft)](https://papermc.io)
-[![Platform](https://img.shields.io/badge/Paper%20%7C%20Folia%20%7C%20Spigot-Compatible-orange?style=for-the-badge)](https://papermc.io)
-[![Java](https://img.shields.io/badge/Java-17+-red?style=for-the-badge&logo=openjdk)](https://adoptium.net)
-[![bStats](https://img.shields.io/bstats/servers/29652?style=for-the-badge&label=Servers&color=cyan)](https://bstats.org/plugin/bukkit/MyZDiscord/29652)
-
-**The most feature-rich Discord bridge for Minecraft servers.**  
-One plugin. Zero compromises. Built by [DemonZ Development](https://github.com/DemonZDevelopment).
-
-[📥 Download](#installation) · [📖 Wiki](#configuration) · [🐛 Issues](https://github.com/DemonZDevelopment/ZDiscord/issues) · [💬 Discord](https://discord.gg/CJfEH3qKF)
+[Releases](https://github.com/DemonZDevelopment/ZDiscord/releases) · [Wiki](https://github.com/DemonZDevelopment/ZDiscord/wiki) · [Issues](https://github.com/DemonZDevelopment/ZDiscord/issues)
 
 </div>
 
 ---
 
-## ✨ Features
+## About
 
-<table>
-<tr>
-<td width="50%">
+ZDiscord is a Minecraft plugin that bridges your Minecraft server and Discord guild. It provides chat synchronisation, server status, account linking, tickets, leaderboards, anti-raid, and a small set of utility modules.
 
-### 💬 Bidirectional Chat Bridge
-Messages sync between Minecraft and Discord in real-time using webhooks with player head avatars.
+## Features
 
-### 📊 Live Server Status
-Auto-updating status embed with players, TPS, memory, and server IP — refreshes every 30 seconds.
+- **Chat bridge** — Two-way synchronisation between Minecraft and Discord. Webhooks are used to display player heads as avatars.
+- **Server status** — A single message in a Discord channel that auto-edits with player count, TPS, and memory.
+- **Console streaming** — Server log lines forwarded to a Discord channel.
+- **Account linking** — One-time codes link Discord and Minecraft accounts. Optionally enforced as link-to-join.
+- **Staff chat** — `/sc` toggles a staff-only chat that is also bridged to a Discord channel.
+- **Tickets** — Players open private support channels via a Discord button or `/ticket`.
+- **Leaderboards** — Kills, deaths, and playtime ranked via `/leaderboard`.
+- **Event messages** — Joins, quits, deaths, and advancements posted to a Discord channel.
+- **Performance monitor** — TPS and memory usage tracked over time with configurable alerts.
+- **Anti-raid** — Mass-join detection with optional automatic lockdown.
+- **Command logger** — Watched and critical commands posted to a staff channel.
+- **Voice status** — Linked players get a tab-list indicator while they are in a tracked Discord voice channel.
+- **Reaction roles** — Map message reactions to Discord roles and in-game permissions.
+- **Setup wizard** — `/setup` configures channels from Discord with dropdowns and buttons.
 
-### 🔗 Account Linking
-Link Discord accounts to Minecraft with one-time codes. Optional **Link-to-Join** enforcement.
+## Requirements
 
-</td>
-<td width="50%">
+- Java 17 or newer
+- Paper 1.20.4 or newer, Folia, or Spigot 1.20.4 or newer
+- A Discord application with a bot token. Enable the **Server Members** and **Message Content** intents on the bot.
 
-### 🔒 Command Logger
-Watches dangerous commands (`/op`, `/stop`, `/ban`) and logs them to Discord with severity levels.
+## Installation
 
-### 💬 Staff Chat
-Bidirectional `/sc` command bridges in-game staff chat with Discord. Toggle mode included.
+1. Download `ZDiscord-1.1.0.jar` from the [Releases](https://github.com/DemonZDevelopment/ZDiscord/releases) page.
+2. Place the JAR in your server's `plugins/` directory.
+3. Start the server to generate the default `config.yml` and `messages.yml`.
+4. Open `plugins/ZDiscord/config.yml` and set the following:
+   - `bot.token` — your bot token
+   - `bot.guild-id` — your Discord server ID
+   - `channels.chat` — the channel ID for chat bridge
+5. Restart the server.
+6. Run `/setup` in Discord to configure the remaining channels interactively.
 
-### 🎙️ Voice Status
-Shows a 🎙️ indicator on linked players who are active in Discord voice — real-time, no polling.
+## Configuration
 
-</td>
-</tr>
-</table>
+All configuration lives in `plugins/ZDiscord/config.yml`. A summary of the major sections:
 
-### And much more...
+| Section | Purpose |
+|---|---|
+| `storage` | YAML or MySQL backend for persistent data |
+| `bot` | Bot token, activity, and target guild |
+| `channels` | Discord channel IDs for each module |
+| `chat` | Chat bridge formatting and webhook options |
+| `events` | Join, quit, death, and advancement messages |
+| `status` | Server status embed |
+| `linking` | Account linking, optional enforcement, and reward commands |
+| `anti-raid` | Mass-join thresholds and lockdown behaviour |
+| `performance` | TPS and memory alert thresholds |
+| `command-logger` | Watched and critical commands |
+| `staff-chat`, `voice-status` | Staff chat bridge and voice status indicator |
 
-| Feature | Description |
-|---------|-------------|
-| 🎫 **Ticket System** | Create support tickets from Discord with a button panel + auto-categories |
-| 🏆 **Leaderboards** | Track kills, deaths, and playtime with Discord `/leaderboard` command |
-| 🛡️ **Anti-Raid** | Auto-lockdown on mass join detection with configurable thresholds |
-| 📈 **Performance Monitor** | TPS/memory alerts posted to Discord when thresholds are breached |
-| 🎭 **Reaction Roles** | Assign Discord roles via reactions — one click setup |
-| 📢 **Event Messages** | Join, quit, death, and advancement events forwarded to Discord |
-| ⚙️ **Setup Wizard** | `/setup` command configures everything from Discord — no file editing |
-| 📋 **Support Dump** | `/zdiscord dump` generates a diagnostics file for troubleshooting |
-| 📊 **bStats** | Server metrics tracked via [bStats](https://bstats.org/plugin/bukkit/MyZDiscord/29652) |
+User-facing strings are in `messages.yml` and accept `&` colour codes and the `%prefix%` placeholder.
 
----
+## Commands
 
-## 🚀 Installation
+### In-game
 
-### Requirements
-- **Java 17+**
-- **Paper 1.21+**, Folia, or Spigot
-- A [Discord Bot](https://discord.com/developers/applications) with:
-  - `GUILD_MESSAGES`, `GUILD_MEMBERS`, `MESSAGE_CONTENT`, `GUILD_VOICE_STATES` intents enabled
-
-### Quick Start
-
-1. **Download** `ZDiscord.jar` and drop it in your `plugins/` folder
-2. **Start** your server — config files will be generated
-3. **Edit** `plugins/ZDiscord/config.yml` — paste your bot token
-4. **Restart** your server
-5. **Run** `/setup` in Discord to see the setup wizard
-
-```yaml
-# config.yml — Just set these two values to get started:
-bot:
-  token: "YOUR_BOT_TOKEN_HERE"
-  guild-id: "YOUR_GUILD_ID"
-```
-
----
-
-## ⚙️ Configuration
-
-All configuration is in `plugins/ZDiscord/config.yml`. The plugin also supports **live setup from Discord**:
-
-| Command | What It Does |
-|---------|-------------|
-| `/setup` | Opens the interactive setup wizard |
-| `/setup module:chat channel:#channel` | Sets the chat bridge channel |
-| `/setup module:status channel:#channel` | Configures live server status |
-| `/setup module:events channel:#channel` | Sets the events channel |
-| `/setup module:console channel:#channel` | Sets the console channel |
-| `/setup module:tickets channel:#channel` | Creates a ticket panel with button |
-| `/setup module:staffchat channel:#channel` | Sets the staff chat channel |
-| `/setup module:cmdlog channel:#channel` | Sets the command logger channel |
-
----
-
-## 📋 Commands
-
-### In-Game Commands
 | Command | Permission | Description |
-|---------|-----------|-------------|
+|---|---|---|
 | `/zdiscord reload` | `zdiscord.admin` | Reload configuration |
-| `/zdiscord status` | `zdiscord.admin` | View bot connection info |
-| `/zdiscord link` | `zdiscord.link` | Generate account link code |
-| `/zdiscord dump` | `zdiscord.admin` | Generate support diagnostics |
-| `/zdiscord embed <title> <desc>` | `zdiscord.embed` | Send custom embed |
+| `/zdiscord status` | `zdiscord.admin` | Show bot and platform status |
+| `/zdiscord link` | `zdiscord.link` | Generate a link code |
+| `/zdiscord embed <title> <description>` | `zdiscord.embed` | Send a custom embed |
+| `/zdiscord ticket <subject>` | `zdiscord.ticket` | Open a support ticket |
 | `/zdiscord lockdown` | `zdiscord.admin` | Toggle anti-raid lockdown |
-| `/discord` | `zdiscord.discord` | Show Discord invite link |
-| `/sc [message]` | `zdiscord.staffchat` | Staff chat (toggle or message) |
+| `/zdiscord dump` | `zdiscord.admin` | Write a diagnostics file |
+| `/discord` | `zdiscord.discord` | Show the Discord invite link |
+| `/sc [message]` | `zdiscord.staffchat` | Send to staff chat (toggle with no message) |
 
-### Discord Slash Commands
+### Discord slash commands
+
 | Command | Description |
-|---------|-------------|
-| `/status` | View server status |
-| `/players` | View online players |
-| `/tps` | View server performance |
-| `/link <code>` | Link your Discord account |
-| `/ticket <subject>` | Create a support ticket |
-| `/leaderboard <stat>` | View leaderboards |
-| `/setup` | Setup wizard + channel configuration |
+|---|---|
+| `/status` | Server status |
+| `/players` | Online players |
+| `/tps` | Server performance |
+| `/link <code>` | Link a Discord account to a Minecraft account |
+| `/ticket <subject>` | Open a support ticket |
+| `/leaderboard <stat>` | View kills, deaths, or playtime leaderboard |
+| `/setup` | Open the setup wizard |
 
----
-
-## 🔌 Developer API
-
-Use ZDiscord as a dependency in your plugins via [JitPack](https://jitpack.io/#DemonZDevelopment/ZDiscord):
-
-### Maven
-```xml
-<repository>
-    <id>jitpack.io</id>
-    <url>https://jitpack.io</url>
-</repository>
-
-<dependency>
-    <groupId>com.github.DemonZDevelopment</groupId>
-    <artifactId>ZDiscord</artifactId>
-    <version>1.0.0-beta</version>
-    <scope>provided</scope>
-</dependency>
-```
-
-### Gradle
-```groovy
-repositories {
-    maven { url 'https://jitpack.io' }
-}
-
-dependencies {
-    compileOnly 'com.github.DemonZDevelopment:ZDiscord:1.0.0-beta'
-}
-```
-
----
-
-## 🏗️ Building from Source
+## Building
 
 ```bash
 git clone https://github.com/DemonZDevelopment/ZDiscord.git
@@ -179,32 +111,8 @@ cd ZDiscord
 mvn clean package
 ```
 
-The compiled JAR will be in `target/ZDiscord-1.0.0-beta.jar`.
+The shaded JAR is written to `target/ZDiscord-1.1.0.jar`.
 
----
+## License
 
-## 🤝 Contributing
-
-Contributions are welcome! Please open an issue first to discuss what you'd like to change.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
-
-## 📜 License
-
-This project is licensed under the Apache License — see the [LICENSE](LICENSE) file for details.
-
----
-
-<div align="center">
-
-**Made with ❤️ by [DemonZ Development](https://github.com/DemonZDevelopment)**
-
-⭐ Star this repo if you find it useful!
-
-</div>
+This project is licensed under the Apache License 2.0 — see [LICENSE](LICENSE).

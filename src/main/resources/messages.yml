@@ -1,73 +1,55 @@
-# ╔══════════════════════════════════════════════╗
-# ║        ZDiscord — Messages Configuration     ║
-# ╚══════════════════════════════════════════════╝
+# ZDiscord user-facing messages
+# Color codes use the '&' character (e.g. '&a' for green).
 
-prefix: "&b&l⚡ &3ZDiscord &8» &r"
+prefix: "&bZDiscord &8> &r"
 
-# ┌──────────────────────────────────────┐
-# │        General Messages              │
-# └──────────────────────────────────────┘
-reload-success: "%prefix%&a✓ Configuration reloaded successfully!"
-reload-fail: "%prefix%&c✗ Failed to reload configuration!"
-no-permission: "%prefix%&c✗ You don't have permission to do that."
-player-only: "%prefix%&c✗ This command can only be used by players."
-discord-link: "%prefix%&fJoin our Discord! &b&n%link%"
+# ── General ───────────────────────────────────────────────
+reload-success: "%prefix%&aConfiguration reloaded."
+reload-fail: "%prefix%&cFailed to reload configuration."
+no-permission: "%prefix%&cYou don't have permission to do that."
+player-only: "%prefix%&cThis command can only be used by players."
+discord-link: "%prefix%&fJoin our Discord: &b&n%link%"
 
-# ┌──────────────────────────────────────┐
-# │        Account Linking               │
-# └──────────────────────────────────────┘
-link-code-generated: "%prefix%&fYour link code: &b&l%code%\n%prefix%&7Use &e/link %code% &7in Discord!"
-link-success: "%prefix%&a✓ Account linked to &b%discord_name%&a!"
-link-already-linked: "%prefix%&e⚠ Your account is already linked!"
-link-invalid-code: "%prefix%&c✗ Invalid or expired link code."
-link-required: "%prefix%&c✗ You must link your Discord account to play!\n%prefix%&7Use &e/zdiscord link"
-unlink-success: "%prefix%&a✓ Your account has been unlinked."
+# ── Account linking ───────────────────────────────────────
+link-code-generated: "%prefix%&fYour link code: &b&l%code%\n%prefix%&7Use &e/link %code% &7in Discord."
+link-success: "%prefix%&aAccount linked to &b%discord_name%&a."
+link-already-linked: "%prefix%&eYour account is already linked."
+link-invalid-code: "%prefix%&cInvalid or expired link code."
+link-required: "%prefix%&cYou must link your Discord account to play!\n%prefix%&7Use &e/zdiscord link"
+unlink-success: "%prefix%&aYour account has been unlinked."
 
-# ┌──────────────────────────────────────┐
-# │        Tickets                       │
-# └──────────────────────────────────────┘
-ticket-created: "%prefix%&a✓ Ticket created! Check Discord for &b#%channel%"
-ticket-closed: "%prefix%&e⚙ Ticket &b#%id% &ehas been closed."
-ticket-max-reached: "%prefix%&c✗ Max open tickets reached (%max%)."
-ticket-not-found: "%prefix%&c✗ Ticket not found."
+# ── Tickets ───────────────────────────────────────────────
+ticket-created: "%prefix%&aTicket created. See &b#%channel%"
+ticket-closed: "%prefix%&eTicket &b#%id% &ehas been closed."
+ticket-max-reached: "%prefix%&cYou have reached the maximum number of open tickets (%max%)."
+ticket-not-found: "%prefix%&cTicket not found."
 
-# ┌──────────────────────────────────────┐
-# │        Anti-Raid                     │
-# └──────────────────────────────────────┘
-lockdown-enabled: "%prefix%&c&l⚠ SERVER LOCKDOWN &8» &cPossible raid detected!"
-lockdown-disabled: "%prefix%&a✓ Server lockdown has been lifted."
-lockdown-kick: "&c&l⚡ ZDiscord Lockdown\n\n&7The server is currently in lockdown mode.\n&7Please try again later."
+# ── Anti-raid ─────────────────────────────────────────────
+lockdown-enabled: "%prefix%&c&lSERVER LOCKDOWN &8> &cPossible raid detected."
+lockdown-disabled: "%prefix%&aServer lockdown has been lifted."
+lockdown-kick: "&c&lZDiscord Lockdown\n\n&7The server is currently in lockdown mode.\n&7Please try again later."
 
-# ┌──────────────────────────────────────┐
-# │        Status Indicators             │
-# └──────────────────────────────────────┘
-status-online: "🟢 Online"
-status-offline: "🔴 Offline"
-status-tps-good: "🟢 %tps%"
-status-tps-warn: "🟡 %tps%"
-status-tps-bad: "🔴 %tps%"
+# ── Status indicators (Discord embeds) ────────────────────
+status-online: "Online"
+status-offline: "Offline"
+status-tps-good: "%tps%"
+status-tps-warn: "%tps%"
+status-tps-bad: "%tps%"
 
-# ┌──────────────────────────────────────┐
-# │        Embed Builder                 │
-# └──────────────────────────────────────┘
-embed-created: "%prefix%&a✓ Embed sent to &b#%channel%"
-embed-no-title: "%prefix%&c✗ Please provide a title for your embed."
+# ── Embed builder ─────────────────────────────────────────
+embed-created: "%prefix%&aEmbed sent to &b#%channel%"
+embed-no-title: "%prefix%&cPlease provide a title for your embed."
 
-# ┌──────────────────────────────────────┐
-# │    Discord Slash Command Responses   │
-# └──────────────────────────────────────┘
-slash-status-title: "🎮 Server Status"
-slash-players-title: "👥 Online Players"
-slash-tps-title: "📊 Server Performance"
-slash-link-title: "🔗 Account Linking"
+# ── Slash command responses ───────────────────────────────
+slash-status-title: "Server Status"
+slash-players-title: "Online Players"
+slash-tps-title: "Server Performance"
+slash-link-title: "Account Linking"
 
-# ┌──────────────────────────────────────┐
-# │    Console & Ticket Messages         │
-# └──────────────────────────────────────┘
-console-disabled: "❌ Console commands are disabled. Set `misc.console-role` in config.yml."
-console-denied: "🚫 You don't have the required role to use console commands."
-ticket-not-ticket-channel: "❌ This is not a ticket channel."
-ticket-only-staff: "❌ Only support staff can perform this action."
-ticket-claimed: "✋ **%staff%** has claimed this ticket and will assist you shortly."
-ticket-closed-message: "🔒 This ticket has been closed by **%staff%**."
-
+# ── Console / ticket messages ─────────────────────────────
+console-disabled: "Console commands are disabled. Set `misc.console-role` in config.yml to enable them."
+console-denied: "You don't have the required role to use console commands."
+ticket-not-ticket-channel: "This is not a ticket channel."
+ticket-only-staff: "Only support staff can perform this action."
+ticket-claimed: "**%staff%** has claimed this ticket and will assist you shortly."
+ticket-closed-message: "This ticket has been closed by **%staff%**."

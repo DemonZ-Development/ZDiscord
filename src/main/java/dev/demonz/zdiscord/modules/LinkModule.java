@@ -1,29 +1,43 @@
+/*
+ * Copyright 2024 DemonZ Development
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package dev.demonz.zdiscord.modules;
 
 import dev.demonz.zdiscord.ZDiscord;
+import dev.demonz.zdiscord.util.PlaceholderUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Account linking module.
- * Links Discord accounts to Minecraft accounts with reward system.
- * Uses StorageManager for persistent data (YAML or MySQL).
+ * Account linking between Minecraft and Discord. Codes are valid for
+ * five minutes and may only be used once.
  */
 public class LinkModule {
 
+    private static final long LINK_EXPIRY_MS = 5L * 60L * 1000L;
+
     private final ZDiscord plugin;
-
-    // Maps: link code → {player UUID, creation timestamp}
     private final Map<String, PendingLink> pendingLinks = new ConcurrentHashMap<>();
-    // Maps: player UUID → discord ID
     private final Map<UUID, String> linkedAccounts = new ConcurrentHashMap<>();
-    // Maps: discord ID → player UUID
     private final Map<String, UUID> discordToMc = new ConcurrentHashMap<>();
-
-    private static final long LINK_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 
     public LinkModule(ZDiscord plugin) {
         this.plugin = plugin;
@@ -32,66 +46,61 @@ public class LinkModule {
     public void init() {
         loadData();
 
-        // Expire pending links every 30 seconds
         plugin.getPlatformAdapter().runAsyncTimer(() -> {
             long now = System.currentTimeMillis();
-            pendingLinks.entrySet().removeIf(entry -> now - entry.getValue().createdAt > LINK_EXPIRY_MS);
+            pendingLinks.entrySet().removeIf(
+                    e -> now - e.getValue().createdAt > LINK_EXPIRY_MS);
         }, 600L, 600L);
     }
 
     public void reload() {
-        // Re-load from storage in case data changed externally
         loadData();
     }
 
     private void loadData() {
         linkedAccounts.clear();
         discordToMc.clear();
-
-        Map<UUID, String> loaded = plugin.getStorageManager().loadLinks();
-        for (Map.Entry<UUID, String> entry : loaded.entrySet()) {
+        for (Map.Entry<UUID, String> entry : plugin.getStorageManager().loadLinks().entrySet()) {
             linkedAccounts.put(entry.getKey(), entry.getValue());
             discordToMc.put(entry.getValue(), entry.getKey());
         }
-        plugin.getLogger().info("Loaded " + linkedAccounts.size() + " linked accounts from "
-                + plugin.getStorageManager().getTypeName());
+        plugin.getLogger().info("Loaded " + linkedAccounts.size()
+                + " linked accounts from " + plugin.getStorageManager().getTypeName());
     }
 
     /**
-     * Generate a link code for a player.
+     * Generate a link code for a player. Returns null if the player is
+     * already linked (in which case the player has been notified).
      */
     public String generateCode(Player player) {
-        // Check if already linked
         if (linkedAccounts.containsKey(player.getUniqueId())) {
             player.sendMessage(plugin.getMessageManager().get("link-already-linked"));
             return null;
         }
-
-        // Generate 6-character code
+        // 6 characters of a UUID, uppercased — uniqueness is fine for
+        // short-lived codes given the 5-minute expiry.
         String code = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
         pendingLinks.put(code, new PendingLink(player.getUniqueId(), System.currentTimeMillis()));
-
         return code;
     }
 
     /**
-     * Process a link from Discord.
-     *
-     * @return true if link was successful
+     * Process a link from Discord. Returns true if the link was
+     * successfully established.
      */
     public boolean processLink(String discordId, String discordName, String code) {
-        PendingLink pending = pendingLinks.remove(code.toUpperCase());
-        if (pending == null)
+        if (code == null) {
             return false;
-
-        // Check if expired
+        }
+        PendingLink pending = pendingLinks.remove(code.trim().toUpperCase());
+        if (pending == null) {
+            return false;
+        }
         if (System.currentTimeMillis() - pending.createdAt > LINK_EXPIRY_MS) {
             return false;
         }
 
         UUID playerUUID = pending.playerUUID;
-
-        // Store link
         linkedAccounts.put(playerUUID, discordId);
         discordToMc.put(discordId, playerUUID);
         plugin.getStorageManager().saveLink(playerUUID, discordId);
@@ -113,20 +122,22 @@ public class LinkModule {
             }
         }
 
-        // Give rewards
+        // Run reward commands and notify the player on the main thread.
+        List<String> rewards = plugin.getConfigManager().getStringList("linking.rewards");
         plugin.getPlatformAdapter().runSync(() -> {
             Player player = Bukkit.getPlayer(playerUUID);
-            if (player != null) {
-                player.sendMessage(plugin.getMessageManager().get("link-success", "%discord_name%", discordName));
-
-                // Execute reward commands
-                for (String cmd : plugin.getConfigManager().getStringList("linking.rewards")) {
-                    try {
-                        String command = cmd.replace("%player%", player.getName());
-                        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
-                    } catch (Exception e) {
-                        plugin.getLogger().warning("Failed to execute link reward command: " + e.getMessage());
-                    }
+            if (player == null) {
+                return;
+            }
+            player.sendMessage(plugin.getMessageManager().get(
+                    "link-success", "%discord_name%", discordName));
+            for (String cmd : rewards) {
+                String resolved = PlaceholderUtil.resolve(cmd, player);
+                try {
+                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), resolved);
+                } catch (Exception e) {
+                    plugin.getLogger().warning("Failed to run link reward command: "
+                            + e.getMessage());
                 }
             }
         });
@@ -134,30 +145,18 @@ public class LinkModule {
         return true;
     }
 
-    /**
-     * Get the Discord ID linked to a player UUID.
-     */
     public String getDiscordId(UUID playerUUID) {
         return linkedAccounts.get(playerUUID);
     }
 
-    /**
-     * Get the player UUID linked to a Discord ID.
-     */
     public UUID getPlayerUUID(String discordId) {
         return discordToMc.get(discordId);
     }
 
-    /**
-     * Check if a player is linked.
-     */
     public boolean isLinked(UUID playerUUID) {
         return linkedAccounts.containsKey(playerUUID);
     }
 
-    /**
-     * Unlink a player.
-     */
     public void unlink(UUID playerUUID) {
         String discordId = linkedAccounts.remove(playerUUID);
         if (discordId != null) {
@@ -167,13 +166,9 @@ public class LinkModule {
     }
 
     public void shutdown() {
-        // Data is saved on each operation - nothing large to flush
     }
 
-    /**
-     * Internal record for tracking pending link codes with timestamps.
-     */
-    private static class PendingLink {
+    private static final class PendingLink {
         final UUID playerUUID;
         final long createdAt;
 

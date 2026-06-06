@@ -1,3 +1,19 @@
+/*
+ * Copyright 2024 DemonZ Development
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package dev.demonz.zdiscord.minecraft.commands;
 
 import dev.demonz.zdiscord.ZDiscord;
@@ -11,11 +27,17 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Main admin command: /zdiscord [reload|status|link|embed]
+ * Main admin command: {@code /zdiscord &lt;subcommand&gt;}.
+ *
+ * <p>Does not dump any secret values to its diagnostics output.</p>
  */
 public class ZDiscordCommand implements CommandExecutor, TabCompleter {
 
@@ -31,7 +53,6 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
             sendHelp(sender);
             return true;
         }
-
         switch (args[0].toLowerCase()) {
             case "reload":
                 handleReload(sender);
@@ -58,25 +79,19 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
                 sendHelp(sender);
                 break;
         }
-
         return true;
     }
 
     private void sendHelp(CommandSender sender) {
         sender.sendMessage("");
-        sender.sendMessage("§8§m                                              ");
-        sender.sendMessage("  §b§l⚡ §3§lZDiscord §8— §7Command Reference");
-        sender.sendMessage("§8§m                                              ");
-        sender.sendMessage("");
-        sender.sendMessage("  §b❯ §f/zd reload     §8· §7Reload all configs");
-        sender.sendMessage("  §b❯ §f/zd status     §8· §7Bot connection info");
-        sender.sendMessage("  §b❯ §f/zd link       §8· §7Link Discord account");
-        sender.sendMessage("  §b❯ §f/zd embed      §8· §7Create custom embed");
-        sender.sendMessage("  §b❯ §f/zd ticket     §8· §7Open support ticket");
-        sender.sendMessage("  §b❯ §f/zd lockdown   §8· §7Toggle raid lockdown");
-        sender.sendMessage("  §b❯ §f/zd dump       §8· §7Generate support log");
-        sender.sendMessage("");
-        sender.sendMessage("§8§m                                              ");
+        sender.sendMessage("ZDiscord commands:");
+        sender.sendMessage("  /zdiscord reload");
+        sender.sendMessage("  /zdiscord status");
+        sender.sendMessage("  /zdiscord link");
+        sender.sendMessage("  /zdiscord embed <title> <description>");
+        sender.sendMessage("  /zdiscord ticket <subject>");
+        sender.sendMessage("  /zdiscord lockdown");
+        sender.sendMessage("  /zdiscord dump");
         sender.sendMessage("");
     }
 
@@ -95,31 +110,25 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
-        boolean connected = plugin.getBotManager().isConnected();
-        String statusIcon = connected ? "§a§l⬤" : "§c§l⬤";
-        String statusText = connected ? "§a§lOnline" : "§c§lOffline";
+        var botManager = plugin.getBotManager();
+        boolean connected = botManager != null && botManager.isConnected();
+        String statusText = connected ? "Online" : "Offline";
 
         sender.sendMessage("");
-        sender.sendMessage("§8§m                                              ");
-        sender.sendMessage("  §b§l⚡ §3§lZDiscord §8— §7System Status");
-        sender.sendMessage("§8§m                                              ");
-        sender.sendMessage("");
-        sender.sendMessage("  " + statusIcon + " §7Discord Bot    " + statusText);
+        sender.sendMessage("ZDiscord status");
+        sender.sendMessage("  Discord bot: " + statusText);
         if (connected) {
-            String botName = plugin.getBotManager().getJda().getSelfUser().getName();
-            long ping = plugin.getBotManager().getJda().getGatewayPing();
-            int guilds = plugin.getBotManager().getJda().getGuilds().size();
-
-            sender.sendMessage("");
-            sender.sendMessage("  §3▸ §7Bot Name     §f" + botName);
-            sender.sendMessage(
-                    "  §3▸ §7Latency      §f" + ping + "ms" + (ping < 100 ? " §a●" : ping < 250 ? " §e●" : " §c●"));
-            sender.sendMessage("  §3▸ §7Guilds       §f" + guilds);
+            var jda = botManager.getJda();
+            if (jda != null) {
+                long ping = jda.getGatewayPing();
+                String pingLabel = ping < 100 ? "good" : ping < 250 ? "elevated" : "high";
+                sender.sendMessage("  Bot name: " + jda.getSelfUser().getName());
+                sender.sendMessage("  Gateway ping: " + ping + "ms (" + pingLabel + ")");
+                sender.sendMessage("  Guilds: " + jda.getGuilds().size());
+            }
         }
-        sender.sendMessage("  §3▸ §7Platform     §f" + plugin.getPlatformAdapter().getPlatformName());
-        sender.sendMessage("  §3▸ §7Version      §fv" + plugin.getDescription().getVersion());
-        sender.sendMessage("");
-        sender.sendMessage("§8§m                                              ");
+        sender.sendMessage("  Platform: " + plugin.getPlatformAdapter().getPlatformName());
+        sender.sendMessage("  Version: v" + plugin.getDescription().getVersion());
         sender.sendMessage("");
     }
 
@@ -133,13 +142,17 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
             return;
         }
         if (plugin.getLinkModule() == null) {
-            sender.sendMessage("§cAccount linking is disabled.");
+            sender.sendMessage("Account linking is disabled in config.yml.");
             return;
         }
 
         Player player = (Player) sender;
         String code = plugin.getLinkModule().generateCode(player);
-        sender.sendMessage(plugin.getMessageManager().get("link-code-generated", "%code%", code));
+        if (code == null) {
+            return;
+        }
+        sender.sendMessage(plugin.getMessageManager().get(
+                "link-code-generated", "%code%", code));
     }
 
     private void handleEmbed(CommandSender sender, String[] args) {
@@ -148,10 +161,9 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
             return;
         }
         if (args.length < 3) {
-            sender.sendMessage("§cUsage: /zdiscord embed <title> <description...>");
+            sender.sendMessage("Usage: /zdiscord embed <title> <description>");
             return;
         }
-
         String title = args[1];
         String description = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
         plugin.getEmbedBuilderModule().createAndSend(sender, title, description);
@@ -167,17 +179,15 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
             return;
         }
         if (plugin.getTicketModule() == null) {
-            sender.sendMessage("§cTicket system is disabled.");
+            sender.sendMessage("The ticket system is disabled in config.yml.");
             return;
         }
         if (args.length < 2) {
-            sender.sendMessage("§cUsage: /zdiscord ticket <subject...>");
+            sender.sendMessage("Usage: /zdiscord ticket <subject>");
             return;
         }
-
         String subject = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
-        Player player = (Player) sender;
-        plugin.getTicketModule().createTicketFromMC(player, subject);
+        plugin.getTicketModule().createTicketFromMC((Player) sender, subject);
     }
 
     private void handleLockdown(CommandSender sender) {
@@ -186,7 +196,7 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
             return;
         }
         if (plugin.getAntiRaidModule() == null) {
-            sender.sendMessage("§cAnti-raid module is disabled.");
+            sender.sendMessage("Anti-raid is disabled in config.yml.");
             return;
         }
         plugin.getAntiRaidModule().toggleLockdown(sender);
@@ -198,74 +208,67 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
-        try {
-            File dumpFile = new File(plugin.getDataFolder(), "dump-" + System.currentTimeMillis() + ".txt");
-            PrintWriter out = new PrintWriter(new FileWriter(dumpFile));
-
+        File dumpFile = new File(plugin.getDataFolder(),
+                "dump-" + System.currentTimeMillis() + ".txt");
+        try (PrintWriter out = new PrintWriter(new FileWriter(dumpFile))) {
             String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
-            out.println("═══════════════════════════════════════");
-            out.println("  ZDiscord Support Dump");
-            out.println("  Generated: " + timestamp);
-            out.println("═══════════════════════════════════════");
+            out.println("ZDiscord support dump");
+            out.println("Generated: " + timestamp);
             out.println();
 
-            // Server info
-            out.println("▸ Server: " + plugin.getServer().getName() + " " + plugin.getServer().getVersion());
-            out.println("▸ Platform: " + plugin.getPlatformAdapter().getPlatformName());
-            out.println("▸ ZDiscord: v" + plugin.getDescription().getVersion());
-            out.println("▸ Java: " + System.getProperty("java.version"));
-            out.println("▸ OS: " + System.getProperty("os.name") + " " + System.getProperty("os.arch"));
-            out.println("▸ Online Players: " + plugin.getServer().getOnlinePlayers().size());
+            out.println("Server: " + plugin.getServer().getName() + " " + plugin.getServer().getVersion());
+            out.println("Platform: " + plugin.getPlatformAdapter().getPlatformName());
+            out.println("ZDiscord: v" + plugin.getDescription().getVersion());
+            out.println("Java: " + System.getProperty("java.version"));
+            out.println("OS: " + System.getProperty("os.name") + " " + System.getProperty("os.arch"));
+            out.println("Online players: " + plugin.getServer().getOnlinePlayers().size());
             out.println();
 
-            // Discord bot info
-            out.println("── Discord Bot ──");
+            out.println("Discord bot");
             boolean connected = plugin.getBotManager() != null && plugin.getBotManager().isConnected();
-            out.println("▸ Connected: " + connected);
+            out.println("  Connected: " + connected);
             if (connected) {
-                out.println("▸ Bot User: " + plugin.getBotManager().getJda().getSelfUser().getName());
-                out.println("▸ Gateway Ping: " + plugin.getBotManager().getJda().getGatewayPing() + "ms");
-                out.println("▸ Guilds: " + plugin.getBotManager().getJda().getGuilds().size());
+                var jda = plugin.getBotManager().getJda();
+                if (jda != null) {
+                    out.println("  Bot name: " + jda.getSelfUser().getName());
+                    out.println("  Gateway ping: " + jda.getGatewayPing() + "ms");
+                    out.println("  Guilds: " + jda.getGuilds().size());
+                }
             }
             out.println();
 
-            // Module status
-            out.println("── Modules ──");
-            out.println("▸ Status:       " + (plugin.getStatusModule() != null ? "ON" : "OFF"));
-            out.println("▸ Leaderboard:  " + (plugin.getLeaderboardModule() != null ? "ON" : "OFF"));
-            out.println("▸ Tickets:      " + (plugin.getTicketModule() != null ? "ON" : "OFF"));
-            out.println("▸ Linking:      " + (plugin.getLinkModule() != null ? "ON" : "OFF"));
-            out.println("▸ Anti-Raid:    " + (plugin.getAntiRaidModule() != null ? "ON" : "OFF"));
-            out.println("▸ Performance:  " + (plugin.getPerformanceModule() != null ? "ON" : "OFF"));
-            out.println("▸ Cmd Logger:   " + (plugin.getCommandLoggerModule() != null ? "ON" : "OFF"));
-            out.println("▸ Staff Chat:   " + (plugin.getStaffChatModule() != null ? "ON" : "OFF"));
-            out.println("▸ Voice Status: " + (plugin.getVoiceStatusModule() != null ? "ON" : "OFF"));
+            out.println("Modules");
+            out.println("  Status:       " + (plugin.getStatusModule() != null ? "on" : "off"));
+            out.println("  Leaderboard:  " + (plugin.getLeaderboardModule() != null ? "on" : "off"));
+            out.println("  Tickets:      " + (plugin.getTicketModule() != null ? "on" : "off"));
+            out.println("  Linking:      " + (plugin.getLinkModule() != null ? "on" : "off"));
+            out.println("  Anti-raid:    " + (plugin.getAntiRaidModule() != null ? "on" : "off"));
+            out.println("  Performance:  " + (plugin.getPerformanceModule() != null ? "on" : "off"));
+            out.println("  Cmd logger:   " + (plugin.getCommandLoggerModule() != null ? "on" : "off"));
+            out.println("  Staff chat:   " + (plugin.getStaffChatModule() != null ? "on" : "off"));
+            out.println("  Voice status: " + (plugin.getVoiceStatusModule() != null ? "on" : "off"));
             out.println();
 
-            // Config overview (safe — no tokens)
-            out.println("── Config ──");
-            out.println("▸ Guild ID: " + plugin.getConfigManager().getString("bot.guild-id", "NOT SET"));
-            out.println("▸ Chat Channel: " + plugin.getConfigManager().getString("channels.chat", "NOT SET"));
-            out.println("▸ Webhooks: " + plugin.getConfigManager().getBoolean("chat.use-webhooks", true));
-            out.println("▸ Link Required: " + plugin.getConfigManager().getBoolean("linking.required", false));
-            out.println("▸ Config Version: " + plugin.getConfigManager().getConfig().getInt("config-version", 0));
+            out.println("Config");
+            out.println("  Guild ID: " + plugin.getConfigManager().getString("bot.guild-id", "not set"));
+            out.println("  Chat channel: " + plugin.getConfigManager().getString("channels.chat", "not set"));
+            out.println("  Webhooks: " + plugin.getConfigManager().getBoolean("chat.use-webhooks", true));
+            out.println("  Link required: " + plugin.getConfigManager().getBoolean("linking.required", false));
+            out.println("  Config version: " + plugin.getConfigManager().getInt("config-version", 0));
             out.println();
 
-            out.println("── End of Dump ──");
-            out.close();
-
-            sender.sendMessage("§b§l⚡ §aDump saved to §f" + dumpFile.getName());
-            sender.sendMessage("§7Share this file with support for troubleshooting.");
+            sender.sendMessage("Dump saved to " + dumpFile.getName()
+                    + ". Share this file with support for troubleshooting.");
         } catch (Exception e) {
-            sender.sendMessage("§cFailed to create dump: " + e.getMessage());
+            sender.sendMessage("Failed to create dump: " + e.getMessage());
         }
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> subs = new ArrayList<>(
-                    Arrays.asList("reload", "status", "link", "embed", "ticket", "lockdown", "dump"));
+            List<String> subs = new ArrayList<>(Arrays.asList(
+                    "reload", "status", "link", "embed", "ticket", "lockdown", "dump"));
             return subs.stream()
                     .filter(s -> s.startsWith(args[0].toLowerCase()))
                     .collect(Collectors.toList());

@@ -1,21 +1,46 @@
+/*
+ * Copyright 2024 DemonZ Development
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package dev.demonz.zdiscord.modules;
 
 import dev.demonz.zdiscord.ZDiscord;
+import dev.demonz.zdiscord.util.ColorUtil;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 /**
- * Streams server console output to a Discord channel.
- * Batches log lines every 2 seconds to avoid rate-limiting.
+ * Streams server log output to a Discord channel. Lines are batched
+ * every two seconds to stay within Discord rate limits. Only the
+ * server's root logger is hooked; the Bukkit plugin logger is left
+ * alone to avoid double-reporting.
  */
 public class ConsoleModule {
+
+    private static final long FLUSH_INTERVAL_TICKS = 40L;
+    private static final int MAX_BATCH_CHARS = 1900;
+    private static final int MAX_LINE_CHARS = 200;
 
     private final ZDiscord plugin;
     private final ConcurrentLinkedQueue<String> buffer = new ConcurrentLinkedQueue<>();
     private ConsoleHandler handler;
+    private Logger registeredLogger;
 
     public ConsoleModule(ZDiscord plugin) {
         this.plugin = plugin;
@@ -23,48 +48,42 @@ public class ConsoleModule {
 
     public void init() {
         String channelId = plugin.getConfigManager().getString("channels.console", "");
-        if (channelId == null || channelId.isEmpty() || channelId.startsWith("YOUR_"))
+        if (channelId.isEmpty() || channelId.startsWith("YOUR_")) {
             return;
-
-        // Attach a log handler to the server's root logger
-        handler = new ConsoleHandler();
-        org.bukkit.Bukkit.getLogger().addHandler(handler);
-
-        // Also attach to the server logger parent
-        java.util.logging.Logger serverLogger = plugin.getServer().getLogger();
-        if (serverLogger != null) {
-            serverLogger.addHandler(handler);
         }
 
-        // Flush buffer every 2 seconds
-        plugin.getPlatformAdapter().runAsyncTimer(this::flushBuffer, 40L, 40L);
+        handler = new ConsoleHandler();
+        registeredLogger = plugin.getServer().getLogger();
+        if (registeredLogger != null) {
+            registeredLogger.addHandler(handler);
+        }
 
+        plugin.getPlatformAdapter().runAsyncTimer(this::flushBuffer, FLUSH_INTERVAL_TICKS, FLUSH_INTERVAL_TICKS);
         plugin.debug("Console output streaming enabled.");
     }
 
     private void flushBuffer() {
-        if (buffer.isEmpty())
+        if (buffer.isEmpty()) {
             return;
-
+        }
         TextChannel channel = plugin.getBotManager().getTextChannel("channels.console");
-        if (channel == null)
+        if (channel == null) {
+            buffer.clear();
             return;
+        }
 
         StringBuilder batch = new StringBuilder();
         String line;
         while ((line = buffer.poll()) != null) {
-            // Truncate very long lines
-            if (line.length() > 200) {
-                line = line.substring(0, 197) + "...";
+            if (line.length() > MAX_LINE_CHARS) {
+                line = line.substring(0, MAX_LINE_CHARS - 3) + "...";
             }
-            if (batch.length() + line.length() + 1 > 1900) {
-                // Send current batch and start new one
+            if (batch.length() + line.length() + 1 > MAX_BATCH_CHARS) {
                 sendBatch(channel, batch.toString());
                 batch = new StringBuilder();
             }
-            batch.append(line).append("\n");
+            batch.append(line).append('\n');
         }
-
         if (batch.length() > 0) {
             sendBatch(channel, batch.toString());
         }
@@ -72,51 +91,32 @@ public class ConsoleModule {
 
     private void sendBatch(TextChannel channel, String content) {
         channel.sendMessage("```\n" + content + "```").queue(
-                s -> {
-                },
+                s -> { },
                 err -> plugin.debug("Console batch failed: " + err.getMessage()));
     }
 
     public void reload() {
-        // Nothing specific to reload — channel is read on each flush
     }
 
     public void shutdown() {
-        // Remove the log handler
-        if (handler != null) {
-            org.bukkit.Bukkit.getLogger().removeHandler(handler);
-            java.util.logging.Logger serverLogger = plugin.getServer().getLogger();
-            if (serverLogger != null) {
-                serverLogger.removeHandler(handler);
-            }
+        if (handler != null && registeredLogger != null) {
+            registeredLogger.removeHandler(handler);
         }
-
-        // Flush remaining buffer
         flushBuffer();
     }
 
-    /**
-     * Custom log handler that captures console output into our buffer.
-     */
-    private class ConsoleHandler extends Handler {
+    private final class ConsoleHandler extends Handler {
         @Override
         public void publish(LogRecord record) {
-            if (record == null || record.getMessage() == null)
+            if (record == null || record.getMessage() == null) {
                 return;
-
-            // Skip our own messages to avoid loops
+            }
             String loggerName = record.getLoggerName();
-            if (loggerName != null && loggerName.contains("ZDiscord"))
+            if (loggerName != null && loggerName.contains("ZDiscord")) {
                 return;
-
-            String msg = String.format("[%s] %s",
-                    record.getLevel().getName(),
-                    record.getMessage());
-
-            // Strip color codes
-            msg = msg.replaceAll("§[0-9a-fk-or]", "");
-            msg = msg.replaceAll("\u001B\\[[;\\d]*m", "");
-
+            }
+            String msg = "[" + record.getLevel().getName() + "] " + record.getMessage();
+            msg = ColorUtil.stripColor(msg);
             buffer.add(msg);
         }
 

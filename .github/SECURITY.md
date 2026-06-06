@@ -11,7 +11,7 @@
 
 Please **do not** open a public GitHub issue for security vulnerabilities.
 
-Send a private report to the project maintainers via GitHub's [private vulnerability reporting](https://github.com/DemonZDevelopment/ZDiscord/security/advisories/new) (or the contact details in the project README).
+Send a private report to the project maintainers via GitHub's [private vulnerability reporting](https://github.com/DemonZ-Development/ZDiscord/security/advisories/new) (or the contact details in the project README).
 
 Include:
 

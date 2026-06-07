@@ -18,7 +18,7 @@ Server-side
 
 ## Short description (max 100 chars)
 
-Discord integration for Paper, Folia, and Spigot servers. Chat bridge, tickets, leaderboards, anti-raid.
+Discord integration for Paper, Folia, and Spigot servers. Chat bridge, tickets, leaderboards, anti-raid, player profiles, confessions.
 
 ## Long description
 
@@ -26,7 +26,7 @@ ZDiscord is a Minecraft plugin that bridges your Minecraft server and Discord gu
 
 ### Features
 
-- **Chat bridge** — Two-way synchronisation between Minecraft and Discord. Webhooks are used to display player heads as avatars.
+- **Chat bridge** — Two-way synchronisation between Minecraft and Discord. Webhooks are used to display player heads as avatars. Linked players show their Discord name and avatar.
 - **Server status** — A single message in a Discord channel that auto-edits with player count, TPS, and memory.
 - **Console streaming** — Server log lines forwarded to a Discord channel.
 - **Account linking** — One-time codes link Discord and Minecraft accounts. Optionally enforced as link-to-join.
@@ -39,6 +39,9 @@ ZDiscord is a Minecraft plugin that bridges your Minecraft server and Discord gu
 - **Command logger** — Watched and critical commands posted to a staff channel.
 - **Voice status** — Linked players get a tab-list indicator while in a tracked Discord voice channel.
 - **Reaction roles** — Map message reactions to Discord roles and in-game permissions.
+- **Player profiles** — `/profile [player]` renders a rich embed with avatar, NameMC link, stats, and a follow button.
+- **Follow system** — Follow players to get DM notifications when they join. `/following` and `/unfollow` manage subscriptions.
+- **Anonymous confessions** — `/confess` posts to a dedicated channel with rate limiting and configurable appearance.
 - **Setup wizard** — `/setup` configures channels from Discord with dropdowns and buttons.
 
 ### Requirements
@@ -75,7 +78,7 @@ Apache License 2.0
 
 ## Tags
 
-`paper` `folia` `spigot` `discord` `chat` `tickets` `linking` `anti-cheat` `utility`
+`paper` `folia` `spigot` `discord` `chat` `tickets` `linking` `anti-raid` `utility`
 
 ## Donation / sponsor links
 

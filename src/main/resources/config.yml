@@ -34,6 +34,9 @@ channels:
   performance: ""
   achievements: ""
   ticket-category: ""
+  # Channel for /confess submissions. Leave empty to disable the
+  # /confess slash command entirely.
+  confessions: ""
 
 # ── Chat bridge ───────────────────────────────────────────
 chat:
@@ -79,6 +82,11 @@ events:
   advancement:
     enabled: true
     color: "#F1C40F"
+    # Show rarity badge when fewer than this fraction of players
+    # have the advancement (0.0–1.0). 0.25 = bottom 25%.
+    rarity-threshold: 0.25
+    # Set to false to suppress rarity and first-of-day badges.
+    show-rarity: true
 
 # ── Status module ─────────────────────────────────────────
 status:
@@ -189,6 +197,15 @@ misc:
   # Leave empty to disable Discord console commands entirely.
   console-role: ""
   debug: false
+  # Update-checker behaviour.
+  update-checker: true
+  # Set to true to suppress the in-game "Update available" banner
+  # sent to admins on join. The check still runs every 5 hours
+  # and still posts a silent embed to misc.update-channel.
+  update-silent: false
+  # Optional channel that receives a single quiet embed whenever
+  # a new plugin release is detected. Leave empty to disable.
+  update-channel: ""
 
 # ── Command logger ────────────────────────────────────────
 command-logger:
@@ -218,3 +235,18 @@ voice-status:
   enabled: true
   # Discord voice channel ID to track
   channel: ""
+
+# ── Player profile card (used by /profile) ───────────────
+profile:
+  embed:
+    color: "#9B59B6"
+
+# ── Follow (used by /profile Follow button) ──────────────
+follow:
+  enabled: true
+
+# ── Confessions (used by /confess) ───────────────────────
+confessions:
+  color: "#9B59B6"
+  # Cooldown in seconds between confessions per player.
+  cooldown: 300

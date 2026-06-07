@@ -35,6 +35,7 @@ import dev.demonz.zdiscord.modules.AntiRaidModule;
 import dev.demonz.zdiscord.modules.CommandLoggerModule;
 import dev.demonz.zdiscord.modules.ConsoleModule;
 import dev.demonz.zdiscord.modules.EmbedBuilderModule;
+import dev.demonz.zdiscord.modules.FollowModule;
 import dev.demonz.zdiscord.modules.LeaderboardModule;
 import dev.demonz.zdiscord.modules.LinkModule;
 import dev.demonz.zdiscord.modules.PerformanceModule;
@@ -87,6 +88,7 @@ public class ZDiscord extends JavaPlugin {
     private StaffChatModule staffChatModule;
     private VoiceStatusModule voiceStatusModule;
     private ConsoleModule consoleModule;
+    private FollowModule followModule;
 
     @Override
     public void onEnable() {
@@ -144,6 +146,7 @@ public class ZDiscord extends JavaPlugin {
         if (staffChatModule != null) staffChatModule.shutdown();
         if (voiceStatusModule != null) voiceStatusModule.shutdown();
         if (consoleModule != null) consoleModule.shutdown();
+        if (followModule != null) followModule.shutdown();
 
         if (storageManager != null) storageManager.shutdown();
         if (webhookManager != null) webhookManager.shutdown();
@@ -244,6 +247,9 @@ public class ZDiscord extends JavaPlugin {
             voiceStatusModule.init();
         }
 
+        followModule = new FollowModule(this);
+        followModule.init();
+
         getLogger().info("Modules initialised.");
     }
 
@@ -295,6 +301,7 @@ public class ZDiscord extends JavaPlugin {
         if (commandLoggerModule != null) commandLoggerModule.reload();
         if (staffChatModule != null) staffChatModule.reload();
         if (voiceStatusModule != null) voiceStatusModule.reload();
+        if (followModule != null) followModule.reload();
 
         if (botManager != null && botManager.isConnected()) {
             botManager.updateActivity();
@@ -384,6 +391,10 @@ public class ZDiscord extends JavaPlugin {
 
     public ConsoleModule getConsoleModule() {
         return consoleModule;
+    }
+
+    public FollowModule getFollowModule() {
+        return followModule;
     }
 
     public void debug(String message) {

@@ -24,7 +24,7 @@ ZDiscord is a Minecraft plugin that bridges your Minecraft server and Discord gu
 
 ## Features
 
-- **Chat bridge** — Two-way synchronisation between Minecraft and Discord. Webhooks are used to display player heads as avatars.
+- **Chat bridge** — Two-way synchronisation between Minecraft and Discord. Webhooks are used to display player heads as avatars. Linked players show their Discord name and avatar.
 - **Server status** — A single message in a Discord channel that auto-edits with player count, TPS, and memory.
 - **Console streaming** — Server log lines forwarded to a Discord channel.
 - **Account linking** — One-time codes link Discord and Minecraft accounts. Optionally enforced as link-to-join.
@@ -37,6 +37,9 @@ ZDiscord is a Minecraft plugin that bridges your Minecraft server and Discord gu
 - **Command logger** — Watched and critical commands posted to a staff channel.
 - **Voice status** — Linked players get a tab-list indicator while they are in a tracked Discord voice channel.
 - **Reaction roles** — Map message reactions to Discord roles and in-game permissions.
+- **Player profiles** — `/profile [player]` renders a rich embed with avatar, NameMC link, stats, and a follow button.
+- **Follow system** — Follow players to get DM notifications when they join. `/following` and `/unfollow` manage subscriptions.
+- **Anonymous confessions** — `/confess` posts to a dedicated channel with rate limiting and configurable appearance.
 - **Setup wizard** — `/setup` configures channels from Discord with dropdowns and buttons.
 
 ## Requirements
@@ -69,11 +72,16 @@ All configuration lives in `plugins/ZDiscord/config.yml`. A summary of the major
 | `chat` | Chat bridge formatting and webhook options |
 | `events` | Join, quit, death, and advancement messages |
 | `status` | Server status embed |
+| `leaderboard` | Tracked stats and top count |
 | `linking` | Account linking, optional enforcement, and reward commands |
 | `anti-raid` | Mass-join thresholds and lockdown behaviour |
 | `performance` | TPS and memory alert thresholds |
+| `tickets` | Categories, panel appearance, support roles |
+| `confessions` | Confession channel, cooldown, and color |
+| `follow` | Enable/disable follow features |
 | `command-logger` | Watched and critical commands |
 | `staff-chat`, `voice-status` | Staff chat bridge and voice status indicator |
+| `misc` | Update checks, invite link, console role, debug |
 
 User-facing strings are in `messages.yml` and accept `&` colour codes and the `%prefix%` placeholder.
 
@@ -88,7 +96,9 @@ User-facing strings are in `messages.yml` and accept `&` colour codes and the `%
 | `/zdiscord link` | `zdiscord.link` | Generate a link code |
 | `/zdiscord embed <title> <description>` | `zdiscord.embed` | Send a custom embed |
 | `/zdiscord ticket <subject>` | `zdiscord.ticket` | Open a support ticket |
+| `/zdiscord panel` | `zdiscord.admin` | (Re)post the ticket panel |
 | `/zdiscord lockdown` | `zdiscord.admin` | Toggle anti-raid lockdown |
+| `/zdiscord update [check\|dismiss]` | `zdiscord.admin` | Manual update check / dismiss banner |
 | `/zdiscord dump` | `zdiscord.admin` | Write a diagnostics file |
 | `/discord` | `zdiscord.discord` | Show the Discord invite link |
 | `/sc [message]` | `zdiscord.staffchat` | Send to staff chat (toggle with no message) |
@@ -102,7 +112,13 @@ User-facing strings are in `messages.yml` and accept `&` colour codes and the `%
 | `/tps` | Server performance |
 | `/link <code>` | Link a Discord account to a Minecraft account |
 | `/ticket <subject>` | Open a support ticket |
+| `/panel` | (Re)post the ticket panel (admin) |
 | `/leaderboard <stat>` | View kills, deaths, or playtime leaderboard |
+| `/profile [player]` | Player profile card with stats and follow button |
+| `/seen <player>` | Quick last-seen lookup |
+| `/following` | List players you follow |
+| `/unfollow <player>` | Stop following a player |
+| `/confess <message>` | Post an anonymous confession |
 | `/setup` | Open the setup wizard |
 
 ## Building

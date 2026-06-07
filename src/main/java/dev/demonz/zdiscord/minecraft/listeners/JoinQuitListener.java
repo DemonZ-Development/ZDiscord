@@ -49,13 +49,29 @@ public class JoinQuitListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        boolean firstJoin = !player.hasPlayedBefore();
 
         if (plugin.getBotManager().isConnected()
                 && plugin.getConfigManager().getBoolean("events.join.enabled", true)) {
-            sendEmbed(player, true);
+            sendEmbed(player, true, null, firstJoin);
         }
 
         joinTimestamps.put(player.getUniqueId(), System.currentTimeMillis());
+
+        if (firstJoin
+                && plugin.getConfigManager().getBoolean("events.join.show-first-join-indicator", true)) {
+            String welcome = plugin.getConfigManager().getString(
+                    "events.join.first-join-message", "");
+            if (!welcome.isEmpty()) {
+                String resolved = ColorUtil.stripColor(
+                        welcome
+                                .replace("%player%", player.getName())
+                                .replace("%displayname%", ColorUtil.stripColor(player.getDisplayName()))
+                                .replace("%uuid%", player.getUniqueId().toString()));
+                plugin.getPlatformAdapter().runLater(
+                        () -> player.sendMessage(resolved), 20L);
+            }
+        }
 
         if (plugin.getAntiRaidModule() != null) {
             plugin.getAntiRaidModule().onPlayerJoin(player);
@@ -86,11 +102,12 @@ public class JoinQuitListener implements Listener {
 
         if (plugin.getBotManager().isConnected()
                 && plugin.getConfigManager().getBoolean("events.quit.enabled", true)) {
-            sendEmbed(player, false);
+            // Compute session duration before sending so sendEmbed can include it.
+            sendEmbed(player, false, joinTime, false);
         }
     }
 
-    private void sendEmbed(Player player, boolean joined) {
+    private void sendEmbed(Player player, boolean joined, Long knownJoinTime, boolean firstJoin) {
         TextChannel channel = resolveEventChannel();
         if (channel == null) {
             return;
@@ -116,27 +133,93 @@ public class JoinQuitListener implements Listener {
                         .replace("%player%", player.getName())
                         .replace("%displayname%", ColorUtil.stripColor(player.getDisplayName())));
 
+        // Footer icon: configurable, with three layers of fallback.
+        //   1. events.<type>.footer-icon in config.yml
+        //   2. events.footer-icon (shared)
+        //   3. the guild's icon
+        //   4. null (Discord will render the footer with no icon)
+        String footerIcon = plugin.getConfigManager().getString(
+                "events." + typeKey + ".footer-icon", "");
+        if (footerIcon.isEmpty()) {
+            footerIcon = plugin.getConfigManager().getString("events.footer-icon", "");
+        }
+        if (footerIcon.isEmpty()) {
+            String guildIcon = channel.getGuild().getIconUrl();
+            if (guildIcon != null) {
+                footerIcon = guildIcon + "?size=64";
+            }
+        }
+
+        // Online count delta so the channel can see traffic at a glance.
+        int currentOnline = plugin.getServer().getOnlinePlayers().size();
+        int maxOnline = plugin.getServer().getMaxPlayers();
+        int delta = joined ? +1 : -1;
+        int prevOnline = currentOnline - delta;
+        String deltaSuffix = joined
+                ? " (was " + prevOnline + ")"
+                : " (was " + prevOnline + ")";
+
         EmbedBuilder embed = new EmbedBuilder()
-                .setAuthor(player.getName(), null, avatar)
-                .setTitle(title)
+                .setAuthor(player.getName(),
+                        "https://namemc.com/profile/" + player.getUniqueId(),
+                        avatar)
+                .setTitle((joined ? ":green_circle: " : ":red_circle: ") + title)
                 .setDescription("**" + player.getName() + "** " + verb + " the server")
                 .setColor(ColorUtil.parseHex(colorHex))
                 .setThumbnail(avatar)
                 .addField("Player", "`" + player.getName() + "`", true)
                 .addField("Online",
-                        plugin.getServer().getOnlinePlayers().size() + "/"
-                                + plugin.getServer().getMaxPlayers(), true)
+                        currentOnline + "/" + maxOnline + deltaSuffix, true)
                 .addField("Status",
                         joined ? ":white_check_mark: Online" : ":x: Offline", true)
-                .setFooter(resolvedMessage,
-                        joined ? "https://i.imgur.com/6P4Y0QI.png"
-                               : "https://i.imgur.com/0Z7YxQS.png")
+                .setFooter(resolvedMessage, footerIcon.isEmpty() ? null : footerIcon)
                 .setTimestamp(Instant.now());
+
+        if (joined && firstJoin
+                && plugin.getConfigManager().getBoolean("events.join.show-first-join-indicator", true)) {
+            embed.addField(":sparkles: New Player",
+                    "Welcome! This is **" + player.getName() + "**'s first join.", false);
+        }
+
+        // Add session duration on quit.
+        if (!joined) {
+            long seconds = -1;
+            if (knownJoinTime != null) {
+                seconds = (System.currentTimeMillis() - knownJoinTime) / 1000L;
+            } else {
+                Long joinTime = joinTimestamps.get(player.getUniqueId());
+                if (joinTime != null) {
+                    seconds = (System.currentTimeMillis() - joinTime) / 1000L;
+                }
+            }
+            if (seconds > 0) {
+                String duration = formatDuration(seconds);
+                embed.addField("Session", ":hourglass: " + duration, false);
+            }
+        }
 
         channel.sendMessageEmbeds(embed.build()).queue(
                 success -> { },
                 error -> plugin.debug("Failed to send "
                         + typeKey + " embed: " + error.getMessage()));
+    }
+
+    private String formatDuration(long seconds) {
+        if (seconds < 60) {
+            return seconds + "s";
+        }
+        long minutes = seconds / 60;
+        if (minutes < 60) {
+            return minutes + "m " + (seconds % 60) + "s";
+        }
+        long hours = minutes / 60;
+        minutes = minutes % 60;
+        if (hours < 24) {
+            return hours + "h " + minutes + "m";
+        }
+        long days = hours / 24;
+        hours = hours % 24;
+        return days + "d " + hours + "h";
     }
 
     private TextChannel resolveEventChannel() {

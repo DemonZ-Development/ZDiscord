@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.BooleanSupplier;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -47,6 +48,7 @@ public class YamlStorage implements StorageManager {
     private final File dataFolder;
     private final Logger logger;
     private final PlatformAdapter platform;
+    private final BooleanSupplier enabledSupplier;
 
     private File linksFile;
     private File statsFile;
@@ -61,19 +63,37 @@ public class YamlStorage implements StorageManager {
     private final ReentrantReadWriteLock dataLock = new ReentrantReadWriteLock();
 
     public YamlStorage(ZDiscord plugin) {
-        this(plugin.getDataFolder(), plugin.getLogger(), plugin.getPlatformAdapter());
+        this(plugin.getDataFolder(), plugin.getLogger(), plugin.getPlatformAdapter(),
+                () -> plugin.isEnabled());
     }
 
     /**
      * Test-friendly constructor. Production code uses the
      * {@link ZDiscord}-accepting variant; tests can supply a temporary
      * directory, a no-op logger, and a stub platform adapter that
-     * runs tasks synchronously on the caller thread.
+     * runs tasks synchronously on the caller thread. The
+     * {@code enabledSupplier} is consulted on every async flush so
+     * that writes made from a module's {@code shutdown()} method
+     * (which run after Bukkit has set the plugin to disabled) take
+     * the synchronous path instead of trying to register a task on
+     * a disabled plugin — which throws
+     * {@link IllegalPluginAccessException}.
      */
-    public YamlStorage(File dataFolder, Logger logger, PlatformAdapter platform) {
+    public YamlStorage(File dataFolder, Logger logger, PlatformAdapter platform,
+                       BooleanSupplier enabledSupplier) {
         this.dataFolder = dataFolder;
         this.logger = logger;
         this.platform = platform;
+        this.enabledSupplier = enabledSupplier != null ? enabledSupplier : () -> true;
+    }
+
+    /**
+     * Test-only convenience overload — assumes the plugin is always
+     * enabled, so all writes go through the async path (or the
+     * synchronous path if {@code platform} is null).
+     */
+    public YamlStorage(File dataFolder, Logger logger, PlatformAdapter platform) {
+        this(dataFolder, logger, platform, () -> true);
     }
 
     @Override
@@ -288,10 +308,18 @@ public class YamlStorage implements StorageManager {
      * Schedule an asynchronous file write. The lock is taken inside the
      * scheduled task so that the in-memory config and the on-disk file
      * cannot diverge.
+     *
+     * <p>If the owning plugin is already disabled (which happens when
+     * module {@code shutdown()} methods call {@code setData} after
+     * Bukkit has flipped the enabled flag), the write is performed
+     * synchronously on the calling thread. Otherwise the
+     * {@code BukkitScheduler} would throw
+     * {@link IllegalPluginAccessException} when asked to register a
+     * task on a disabled plugin.</p>
      */
     private void scheduleFlush(FileConfiguration config, File file,
                                ReentrantReadWriteLock lock, String label) {
-        if (platform == null) {
+        if (platform == null || !enabledSupplier.getAsBoolean()) {
             saveFileLocked(config, file, lock, label);
             return;
         }

@@ -38,6 +38,12 @@ channels:
 # ── Chat bridge ───────────────────────────────────────────
 chat:
   use-webhooks: true
+  # When the player has linked their Minecraft account, use the
+  # Discord identity (avatar + display name) for the webhook instead
+  # of their Minecraft skin/username. Unlinked players always use
+  # the Minecraft identity.
+  prefer-linked-avatar: true
+  prefer-linked-name: true
   webhook-name: "%displayname%"
   # %uuid% is replaced with the player's UUID (no dashes)
   avatar-url: "https://crafatar.com/avatars/%uuid%?overlay=true"
@@ -47,14 +53,25 @@ chat:
 
 # ── Event messages ────────────────────────────────────────
 events:
+  # Optional default footer icon for all event embeds. Falls back to
+  # the guild icon if empty. Per-event override below (events.join.footer-icon,
+  # events.quit.footer-icon, ...). Use a public https URL.
+  footer-icon: ""
   join:
     enabled: true
     message: "**%player%** joined the server"
     color: "#2ECC71"
+    # Optional override; leave empty to use events.footer-icon or the guild icon.
+    footer-icon: ""
+    # Send a private welcome message to the player the first time they join.
+    first-join-message: "&aWelcome to the server, &e%player%&a! Type &e/help&a to get started."
+    # Mark new players in the join embed with a :sparkles: indicator.
+    show-first-join-indicator: true
   quit:
     enabled: true
     message: "**%player%** left the server"
     color: "#E74C3C"
+    footer-icon: ""
   death:
     enabled: true
     message: "%death_message%"

@@ -38,9 +38,13 @@ public final class ChatBridge {
             return;
         }
         if (!plugin.getBotManager().isConnected()) {
+            plugin.debug("Chat bridge: bot is not connected; skipping MC->Discord for "
+                    + player.getName());
             return;
         }
         if (!player.hasPermission("zdiscord.chat")) {
+            plugin.debug("Chat bridge: " + player.getName()
+                    + " lacks zdiscord.chat permission; skipping");
             return;
         }
 
@@ -51,7 +55,7 @@ public final class ChatBridge {
 
         TextChannel chatChannel = plugin.getBotManager().getTextChannel("channels.chat");
         if (chatChannel == null) {
-            plugin.debug("Chat bridge: channels.chat is not configured.");
+            plugin.debug("Chat bridge: channels.chat is not configured (or id is wrong).");
             return;
         }
 

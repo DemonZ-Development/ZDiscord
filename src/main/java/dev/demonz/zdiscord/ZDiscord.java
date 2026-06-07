@@ -248,7 +248,9 @@ public class ZDiscord extends JavaPlugin {
     }
 
     private void registerListeners() {
-        getServer().getPluginManager().registerEvents(new ChatListener(this), this);
+        if (!paperModern) {
+            getServer().getPluginManager().registerEvents(new ChatListener(this), this);
+        }
         getServer().getPluginManager().registerEvents(new JoinQuitListener(this), this);
         getServer().getPluginManager().registerEvents(new DeathListener(this), this);
         getServer().getPluginManager().registerEvents(new AdvancementListener(this), this);

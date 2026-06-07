@@ -89,11 +89,12 @@ class ConfigManagerTest {
     @Test
     void readsTicketCategories(@TempDir Path tmp) {
         ConfigManager mgr = newManager(tmp.toFile());
-        var categories = mgr.getConfig()
-                .getConfigurationSection("tickets.categories");
-        assertNotNull(categories,
+        // Categories is a YAML list (each entry has id/label/...),
+        // not a section, so use getMapList and check the size.
+        var categories = mgr.getConfig().getMapList("tickets.categories");
+        assertFalse(categories.isEmpty(),
                 "Default config should include ticket categories");
-        assertTrue(categories.getKeys(false).size() >= 2,
+        assertTrue(categories.size() >= 2,
                 "Default config should define multiple ticket categories");
     }
 

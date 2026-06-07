@@ -23,9 +23,6 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -34,28 +31,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Logger;
 
 /**
  * Tiny in-house replacement for MockBukkit. Sets {@code Bukkit.server}
- * via reflection to a {@link Server} proxy that returns configurable
- * stubs for {@code getOnlinePlayers}, {@code getMaxPlayers},
- * {@code getTPS}, and {@code getWorld(String)}. Player instances
- * returned from the server are themselves proxies that only honour
- * the small set of methods exercised by the plugin's tests
- * ({@code getName}, {@code getUniqueId}, {@code getWorld},
- * {@code getLocation}, {@code getDisplayName}, {@code getHealth},
- * {@code getFoodLevel}, {@code isOnline}).
+ * via reflection to a {@link Server} stub that returns configurable
+ * values for {@code getOnlinePlayers}, {@code getMaxPlayers},
+ * {@code getTPS}, and {@code getWorld(String)}. Other methods return
+ * zero / null / empty; they're not exercised by the plugin's tests.
  *
  * <p>Why not just use MockBukkit? Two reasons:</p>
  * <ul>
  *   <li>JitPack now requires authentication for unauthenticated
  *       downloads, which breaks CI for any project that pulls a
  *       JitPack-only artifact.</li>
- *   <li>The plugin's tests only need a handful of {@code Server}
- *       methods. Using dynamic proxies keeps the fixture small and
- *       resilient to Bukkit API additions between Minecraft
- *       versions.</li>
+ *   <li>Generating a {@link Server} via {@code Proxy.newProxyInstance}
+ *       walks every method on the interface and triggers static
+ *       initializers of every referenced type. Some of those types
+ *       (e.g. {@code org.bukkit.generator.structure.StructureType})
+ *       call {@code Class.forName} on NMS classes that are not on
+ *       the test classpath, which throws and bricks the proxy. A
+ *       concrete stub class avoids that — the JVM only resolves
+ *       types we actually invoke.</li>
  * </ul>
  */
 public final class BukkitStub {
@@ -80,11 +76,7 @@ public final class BukkitStub {
             f.setAccessible(true);
             previous = (Server) f.get(null);
             state = new State();
-            Server proxy = (Server) Proxy.newProxyInstance(
-                    BukkitStub.class.getClassLoader(),
-                    new Class<?>[] { Server.class },
-                    new ServerHandler(state));
-            f.set(null, proxy);
+            f.set(null, state);
             return state;
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("Failed to install BukkitStub", e);
@@ -111,18 +103,24 @@ public final class BukkitStub {
         }
     }
 
-    /** Mutable state behind the dynamic proxy. */
-    public static final class State {
+    /**
+     * Mutable state behind the stub. Exposed to tests so they can add
+     * players, add worlds, and tweak TPS / max-players.
+     */
+    public static final class State implements Server {
         final Map<String, World> worlds = new HashMap<>();
         final List<Player> onlinePlayers = new ArrayList<>();
         int maxPlayers = 20;
         double[] tps = { 20.0, 20.0, 20.0 };
 
         public State addWorld(String name) {
-            World w = (World) Proxy.newProxyInstance(
-                    BukkitStub.class.getClassLoader(),
-                    new Class<?>[] { World.class },
-                    new WorldHandler(name));
+            World w = new World() {
+                private final UUID id = UUID.randomUUID();
+                @Override public String getName() { return name; }
+                @Override public UUID getUID() { return id; }
+                @Override public org.bukkit.generator.ChunkGenerator getGenerator() { return null; }
+                @Override public List<Player> getPlayers() { return Collections.emptyList(); }
+            };
             worlds.put(name.toLowerCase(), w);
             return this;
         }
@@ -142,17 +140,57 @@ public final class BukkitStub {
             this.maxPlayers = max;
             return this;
         }
+
+        // ── The only Server methods the plugin's tests call ────────
+
+        @Override
+        public Collection<? extends Player> getOnlinePlayers() {
+            return Collections.unmodifiableList(onlinePlayers);
+        }
+
+        @Override
+        public int getMaxPlayers() {
+            return maxPlayers;
+        }
+
+        @Override
+        public double[] getTPS() {
+            return tps.clone();
+        }
+
+        @Override
+        public World getWorld(String name) {
+            return name == null ? null : worlds.get(name.toLowerCase());
+        }
+
+        @Override
+        public List<World> getWorlds() {
+            return new ArrayList<>(worlds.values());
+        }
+
+        @Override
+        public String getName() { return "BukkitStub"; }
+        @Override
+        public String getVersion() { return "stub"; }
+        @Override
+        public String getBukkitVersion() { return "stub"; }
     }
 
     private static Player newPlayer(String name, World world) {
         PlayerData data = new PlayerData(name, world);
-        return (Player) Proxy.newProxyInstance(
-                BukkitStub.class.getClassLoader(),
-                new Class<?>[] { Player.class },
-                new PlayerHandler(data));
+        return new Player() {
+            @Override public String getName() { return data.name; }
+            @Override public UUID getUniqueId() { return data.id; }
+            @Override public World getWorld() { return data.world; }
+            @Override public Location getLocation() { return new Location(data.world, 0, 64, 0); }
+            @Override public String getDisplayName() { return data.name; }
+            @Override public double getHealth() { return 20.0; }
+            @Override public int getFoodLevel() { return 20; }
+            @Override public boolean isOnline() { return true; }
+        };
     }
 
-    /** Backing data for a proxied player. */
+    /** Backing data for a stubbed player. */
     private static final class PlayerData {
         static final AtomicInteger SEQ = new AtomicInteger();
         final String name;
@@ -164,103 +202,5 @@ public final class BukkitStub {
             this.id = new UUID(0, SEQ.incrementAndGet());
             this.world = world;
         }
-    }
-
-    private static final class ServerHandler implements InvocationHandler {
-        private final State s;
-
-        ServerHandler(State s) { this.s = s; }
-
-        @Override
-        public Object invoke(Object proxy, Method method, Object[] args) {
-            switch (method.getName()) {
-                case "getOnlinePlayers":
-                    return Collections.unmodifiableList(s.onlinePlayers);
-                case "getMaxPlayers":
-                    return s.maxPlayers;
-                case "getTPS":
-                    return s.tps.clone();
-                case "getWorld":
-                    return s.worlds.get(args[0] == null ? "" : ((String) args[0]).toLowerCase());
-                case "getWorlds":
-                    return new ArrayList<>(s.worlds.values());
-                case "hashCode":
-                    return 0;
-                case "equals":
-                    return proxy == args[0];
-                case "toString":
-                    return "BukkitStub$Server";
-                default:
-                    return defaultReturn(method);
-            }
-        }
-    }
-
-    private static final class WorldHandler implements InvocationHandler {
-        private final String name;
-        private final UUID id = UUID.randomUUID();
-
-        WorldHandler(String name) { this.name = name; }
-
-        @Override
-        public Object invoke(Object proxy, Method method, Object[] args) {
-            switch (method.getName()) {
-                case "getName": return name;
-                case "getUID": return id;
-                case "getPlayers": return Collections.emptyList();
-                case "hashCode": return id.hashCode();
-                case "equals": return proxy == args[0];
-                case "toString": return "BukkitStub$World[" + name + "]";
-                default: return defaultReturn(method);
-            }
-        }
-    }
-
-    private static final class PlayerHandler implements InvocationHandler {
-        private final PlayerData d;
-
-        PlayerHandler(PlayerData d) { this.d = d; }
-
-        @Override
-        public Object invoke(Object proxy, Method method, Object[] args) {
-            switch (method.getName()) {
-                case "getName": return d.name;
-                case "getUniqueId": return d.id;
-                case "getWorld": return d.world;
-                case "getLocation":
-                    return new Location(d.world, 0, 64, 0);
-                case "getDisplayName": return d.name;
-                case "getHealth": return 20.0;
-                case "getFoodLevel": return 20;
-                case "isOnline": return Boolean.TRUE;
-                case "hashCode": return d.id.hashCode();
-                case "equals": return proxy == args[0];
-                case "toString": return "BukkitStub$Player[" + d.name + "]";
-                default: return defaultReturn(method);
-            }
-        }
-    }
-
-    /** Default return value for proxy methods we don't implement. */
-    private static Object defaultReturn(Method method) {
-        Class<?> rt = method.getReturnType();
-        if (rt == boolean.class) return Boolean.FALSE;
-        if (rt == int.class) return 0;
-        if (rt == long.class) return 0L;
-        if (rt == double.class) return 0.0;
-        if (rt == float.class) return 0.0f;
-        if (rt == short.class) return (short) 0;
-        if (rt == byte.class) return (byte) 0;
-        if (rt == char.class) return (char) 0;
-        if (Collection.class.isAssignableFrom(rt) || Map.class.isAssignableFrom(rt)
-                || java.util.Optional.class.isAssignableFrom(rt)) {
-            return Collections.emptyList();
-        }
-        if (rt == String.class) return "stub";
-        if (rt == Logger.class) return Logger.getLogger("BukkitStub");
-        if (method.getName().startsWith("is") || method.getName().startsWith("has")) {
-            return Boolean.FALSE;
-        }
-        return null;
     }
 }

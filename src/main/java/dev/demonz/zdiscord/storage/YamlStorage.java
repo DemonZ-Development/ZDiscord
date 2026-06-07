@@ -244,7 +244,16 @@ public class YamlStorage implements StorageManager {
 
     @Override
     public void setData(String key, int value) {
-        setData(key, String.valueOf(value));
+        dataLock.writeLock().lock();
+        try {
+            // Set as Integer (not String) so getInt returns the value
+            // without relying on YamlConfiguration's string-to-int
+            // coercion, which is brittle across versions.
+            dataConfig.set("data." + key, value);
+        } finally {
+            dataLock.writeLock().unlock();
+        }
+        scheduleFlush(dataConfig, dataFile, dataLock, "plugin data");
     }
 
     private void createIfMissing(File file) {

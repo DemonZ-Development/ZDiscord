@@ -342,7 +342,7 @@ public class TicketModule {
                 .addField("Category", categoryLabel, true)
                 .addField("Opened by", "`" + username + "`", true)
                 .setColor(ColorUtil.parseHex(color))
-                .setFooter("Ticket #" + currentTicket + " \u2022 Use the buttons below to manage")
+                .setFooter("Ticket #" + ticketCounter.get() + " \u2022 Use the buttons below to manage")
                 .setTimestamp(Instant.now());
 
         channel.sendMessageEmbeds(embed.build())

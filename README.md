@@ -1,18 +1,16 @@
 <div align="center">
 
-<img src="images/banner.png" alt="ZDiscord" width="100%">
-
 # ZDiscord
 
 Discord integration for Minecraft servers.
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue)](https://github.com/DemonZ-Development/ZDiscord/releases)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue)](https://github.com/DemonZDevelopment/ZDiscord/releases)
 [![Minecraft](https://img.shields.io/badge/Minecraft-1.20.4%2B-green)](https://papermc.io)
 [![Platform](https://img.shields.io/badge/Paper%20%7C%20Folia%20%7C%20Spigot-orange)](https://papermc.io)
 [![Java](https://img.shields.io/badge/Java-17%2B-red)](https://adoptium.net)
 [![License](https://img.shields.io/badge/License-Apache%202.0-lightgrey)](LICENSE)
 
-[Releases](https://github.com/DemonZ-Development/ZDiscord/releases) · [Wiki](https://github.com/DemonZ-Development/ZDiscord/wiki) · [Issues](https://github.com/DemonZ-Development/ZDiscord/issues)
+[Releases](https://github.com/DemonZDevelopment/ZDiscord/releases) · [Wiki](https://github.com/DemonZDevelopment/ZDiscord/wiki) · [Issues](https://github.com/DemonZDevelopment/ZDiscord/issues)
 
 </div>
 
@@ -47,7 +45,7 @@ ZDiscord is a Minecraft plugin that bridges your Minecraft server and Discord gu
 
 ## Installation
 
-1. Download `ZDiscord-1.1.0.jar` from the [Releases](https://github.com/DemonZ-Development/ZDiscord/releases) page.
+1. Download `ZDiscord-1.1.0.jar` from the [Releases](https://github.com/DemonZDevelopment/ZDiscord/releases) page.
 2. Place the JAR in your server's `plugins/` directory.
 3. Start the server to generate the default `config.yml` and `messages.yml`.
 4. Open `plugins/ZDiscord/config.yml` and set the following:
@@ -108,7 +106,7 @@ User-facing strings are in `messages.yml` and accept `&` colour codes and the `%
 ## Building
 
 ```bash
-git clone https://github.com/DemonZ-Development/ZDiscord.git
+git clone https://github.com/DemonZDevelopment/ZDiscord.git
 cd ZDiscord
 mvn clean package
 ```

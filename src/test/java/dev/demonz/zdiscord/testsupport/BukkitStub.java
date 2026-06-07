@@ -22,9 +22,8 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -121,6 +120,7 @@ public final class BukkitStub {
                 @Override public int getFoodLevel() { return 20; }
                 @Override public boolean isOnline() { return true; }
                 @Override public Spigot spigot() { return new Spigot() {}; }
+                @Override public boolean isChunkSent(long chunkKey) { return true; }
             };
         }
 
@@ -132,10 +132,10 @@ public final class BukkitStub {
                 @Override public org.bukkit.generator.ChunkGenerator getGenerator() { return null; }
                 @Override public List<Player> getPlayers() { return new ArrayList<>(); }
                 @Override
-                public Map<org.bukkit.generator.structure.Structure, org.bukkit.util.StructureSearchResult>
+                public Collection<? extends org.bukkit.generator.structure.GeneratedStructure>
                         getStructures(int x, int z,
                                       org.bukkit.generator.structure.Structure structure) {
-                    return new HashMap<>();
+                    return new ArrayList<>();
                 }
             };
         }

@@ -16,7 +16,6 @@
 
 package dev.demonz.zdiscord.util;
 
-import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 
@@ -84,8 +83,8 @@ public final class PlaceholderUtil {
 
     private static String replaceCommon(String text) {
         return text
-                .replace("%online%", String.valueOf(Bukkit.getOnlinePlayers().size()))
-                .replace("%max%", String.valueOf(Bukkit.getMaxPlayers()))
+                .replace("%online%", String.valueOf(ServerBridge.onlinePlayers().size()))
+                .replace("%max%", String.valueOf(ServerBridge.maxPlayers()))
                 .replace("%tps%", String.format("%.1f", TPSUtil.getTPS()[0]));
     }
 

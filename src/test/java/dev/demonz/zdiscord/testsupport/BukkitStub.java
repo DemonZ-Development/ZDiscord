@@ -16,15 +16,12 @@
 
 package dev.demonz.zdiscord.testsupport;
 
-import org.bukkit.Bukkit;
-import org.bukkit.Server;
+import dev.demonz.zdiscord.util.ServerBridge;
+import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 
-import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,131 +29,74 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Tiny in-house replacement for MockBukkit. Sets {@code Bukkit.server}
- * via reflection to a {@link Server} stub that returns configurable
- * values for {@code getOnlinePlayers}, {@code getMaxPlayers},
- * {@code getTPS}, and {@code getWorld(String)}.
+ * Test fixture for the {@link ServerBridge} swappable backend.
  *
- * <p>Why not just use MockBukkit? Two reasons:</p>
- * <ul>
- *   <li>JitPack now requires authentication for unauthenticated
- *       downloads, which breaks CI for any project that pulls a
- *       JitPack-only artifact.</li>
- *   <li>The Bukkit {@code Server}, {@code World}, and {@code Player}
- *       interfaces have hundreds of methods. Implementing them
- *       inline is verbose, and using
- *       {@code Proxy.newProxyInstance} walks every method, which
- *       triggers the static initializer of every referenced type.
- *       One of those types — {@code StructureType} — calls
- *       {@code Class.forName} on CraftBukkit NMS classes that are
- *       not on the test classpath, which throws.</li>
- * </ul>
+ * <p>Install a stub backend in {@code @BeforeEach} and call
+ * {@link #uninstall()} in {@code @AfterEach}. The fixture exposes
+ * fluent builders so tests can add players / worlds and tweak TPS
+ * and max-players without writing a custom backend each time.</p>
  *
- * <p>The workaround: make the stub classes <em>abstract</em> (so
- * they only need to override the handful of methods the tests
- * actually call) and instantiate them via
- * {@code sun.misc.Unsafe.allocateInstance}, which skips the
- * constructor and the static-init walk that
- * {@code Proxy.newProxyInstance} does.</p>
+ * <p>Why not just use MockBukkit? JitPack now requires
+ * authentication for unauthenticated downloads, which breaks CI for
+ * any project that pulls a JitPack-only artifact. And the
+ * alternative of generating a {@code Server} proxy on
+ * {@code Bukkit.server} fails because the proxy walk triggers
+ * static initializers of types whose {@code Class.forName} calls
+ * hit CraftBukkit NMS classes that aren't on the test classpath.
+ * The plugin's own code now goes through
+ * {@link ServerBridge}, which is a four-method interface we can
+ * stub trivially.</p>
  */
 public final class BukkitStub {
 
     private BukkitStub() {
     }
 
-    private static Server previous;
     private static State state;
-    private static final sun.misc.Unsafe UNSAFE;
-
-    static {
-        try {
-            Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
-            f.setAccessible(true);
-            UNSAFE = (sun.misc.Unsafe) f.get(null);
-        } catch (ReflectiveOperationException e) {
-            throw new ExceptionInInitializerError(e);
-        }
-    }
 
     /**
-     * Install a fresh stub server. The previous value of
-     * {@code Bukkit.server} (if any) is stashed and will be restored
-     * by {@link #uninstall()}.
+     * Install a stub backend. The previous backend is stashed and
+     * will be restored by {@link #uninstall()}.
      */
     public static synchronized State install() {
         if (state != null) {
             throw new IllegalStateException("BukkitStub is already installed; call uninstall() first");
         }
-        try {
-            Field f = Bukkit.class.getDeclaredField("server");
-            f.setAccessible(true);
-            previous = (Server) f.get(null);
-
-            // Allocate abstract ServerState via Unsafe, then
-            // initialize its fields via reflection (the constructor
-            // is bypassed).
-            State s = (State) UNSAFE.allocateInstance(ServerState.class);
-            setField(ServerState.class, s, "worlds", new HashMap<String, World>());
-            setField(ServerState.class, s, "onlinePlayers", new ArrayList<Player>());
-            setField(ServerState.class, s, "maxPlayers", 20);
-            setField(ServerState.class, s, "tps", new double[] { 20.0, 20.0, 20.0 });
-
-            state = s;
-            f.set(null, state);
-            return state;
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Failed to install BukkitStub", e);
-        }
+        state = new State();
+        ServerBridge.setBackend(state);
+        return state;
     }
 
-    /**
-     * Restore the {@code Bukkit.server} that was in place before
-     * {@link #install()} was called.
-     */
+    /** Restore the production backend. */
     public static synchronized void uninstall() {
         if (state == null) {
             return;
         }
-        try {
-            Field f = Bukkit.class.getDeclaredField("server");
-            f.setAccessible(true);
-            f.set(null, previous);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Failed to uninstall BukkitStub", e);
-        } finally {
-            previous = null;
-            state = null;
-        }
-    }
-
-    private static void setField(Class<?> clazz, Object instance, String name, Object value)
-            throws ReflectiveOperationException {
-        Field f = clazz.getDeclaredField(name);
-        f.setAccessible(true);
-        f.set(instance, value);
+        ServerBridge.resetBackend();
+        state = null;
     }
 
     /**
-     * Mutable state behind the stub. Exposed to tests so they can add
-     * players, add worlds, and tweak TPS / max-players.
+     * Mutable state behind the stub. Holds the online-player list,
+     * the world map, and the TPS / max-players values. The
+     * fixture-specific methods ({@link #addPlayer}, {@link #addWorld},
+     * {@link #withTps}, {@link #withMaxPlayers}) are the test API;
+     * the {@link ServerBridge.Backend} methods are what the
+     * production code calls.
      */
-    public static abstract class State implements Server {
-        Map<String, World> worlds;
-        List<Player> onlinePlayers;
-        int maxPlayers;
-        double[] tps;
-
-        public State addWorld(String name) {
-            StubWorld w = createStubWorld(name);
-            worlds.put(name.toLowerCase(), w);
-            return this;
-        }
+    public static final class State extends ServerBridge.StubBackend {
+        private final AtomicInteger seq = new AtomicInteger();
 
         public Player addPlayer(String name) {
-            StubPlayer p = createStubPlayer(name,
-                    worlds.isEmpty() ? null : worlds.values().iterator().next());
+            World w = worlds.isEmpty() ? null : worlds.values().iterator().next();
+            Player p = newPlayer(name, w);
             onlinePlayers.add(p);
             return p;
+        }
+
+        public State addWorld(String name) {
+            worlds.put(name.toLowerCase(), newWorld(name));
+            return this;
         }
 
         public State withTps(double oneMinute, double fiveMinute, double fifteenMinute) {
@@ -169,101 +109,28 @@ public final class BukkitStub {
             return this;
         }
 
-        // ── The only Server methods the plugin's tests call ────────
-
-        @Override
-        public Collection<? extends Player> getOnlinePlayers() {
-            return Collections.unmodifiableList(onlinePlayers);
+        private Player newPlayer(String name, World world) {
+            UUID id = new UUID(0, seq.incrementAndGet());
+            return new Player() {
+                @Override public String getName() { return name; }
+                @Override public UUID getUniqueId() { return id; }
+                @Override public World getWorld() { return world; }
+                @Override public Location getLocation() { return new Location(world, 0, 64, 0); }
+                @Override public String getDisplayName() { return name; }
+                @Override public double getHealth() { return 20.0; }
+                @Override public int getFoodLevel() { return 20; }
+                @Override public boolean isOnline() { return true; }
+            };
         }
 
-        @Override
-        public int getMaxPlayers() {
-            return maxPlayers;
+        private World newWorld(String name) {
+            UUID id = UUID.randomUUID();
+            return new World() {
+                @Override public String getName() { return name; }
+                @Override public UUID getUID() { return id; }
+                @Override public org.bukkit.generator.ChunkGenerator getGenerator() { return null; }
+                @Override public List<Player> getPlayers() { return new ArrayList<>(); }
+            };
         }
-
-        @Override
-        public double[] getTPS() {
-            return tps.clone();
-        }
-
-        @Override
-        public World getWorld(String name) {
-            return name == null ? null : worlds.get(name.toLowerCase());
-        }
-
-        @Override
-        public List<World> getWorlds() {
-            return new ArrayList<>(worlds.values());
-        }
-    }
-
-    /**
-     * Abstract stub. Allocation is via
-     * {@link sun.misc.Unsafe#allocateInstance} in {@link #install()};
-     * we never call the constructor. The class is declared abstract
-     * so the compiler does not require us to implement every method
-     * of {@link Server}.
-     */
-    public static abstract class ServerState extends State {
-    }
-
-    /** Allocate a stub world. */
-    private static StubWorld createStubWorld(String name) {
-        try {
-            StubWorld w = (StubWorld) UNSAFE.allocateInstance(StubWorld.class);
-            setField(StubWorld.class, w, "name", name);
-            setField(StubWorld.class, w, "id", UUID.randomUUID());
-            return w;
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Failed to allocate StubWorld", e);
-        }
-    }
-
-    /** Allocate a stub player. */
-    private static StubPlayer createStubPlayer(String name, World world) {
-        try {
-            StubPlayer p = (StubPlayer) UNSAFE.allocateInstance(StubPlayer.class);
-            setField(StubPlayer.class, p, "name", name);
-            setField(StubPlayer.class, p, "id", new UUID(0, SEQ.incrementAndGet()));
-            setField(StubPlayer.class, p, "world", world);
-            return p;
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Failed to allocate StubPlayer", e);
-        }
-    }
-
-    private static final AtomicInteger SEQ = new AtomicInteger();
-
-    /**
-     * Abstract {@link World} stub. Allocated via
-     * {@link sun.misc.Unsafe#allocateInstance} in {@link #createStubWorld};
-     * the constructor is never called.
-     */
-    public static abstract class StubWorld implements World {
-        String name;
-        UUID id;
-
-        @Override public String getName() { return name; }
-        @Override public UUID getUID() { return id; }
-    }
-
-    /**
-     * Abstract {@link Player} stub. Allocated via
-     * {@link sun.misc.Unsafe#allocateInstance} in {@link #createStubPlayer};
-     * the constructor is never called.
-     */
-    public static abstract class StubPlayer implements Player {
-        String name;
-        UUID id;
-        World world;
-
-        @Override public String getName() { return name; }
-        @Override public UUID getUniqueId() { return id; }
-        @Override public World getWorld() { return world; }
-        @Override public org.bukkit.Location getLocation() { return new org.bukkit.Location(world, 0, 64, 0); }
-        @Override public String getDisplayName() { return name; }
-        @Override public double getHealth() { return 20.0; }
-        @Override public int getFoodLevel() { return 20; }
-        @Override public boolean isOnline() { return true; }
     }
 }

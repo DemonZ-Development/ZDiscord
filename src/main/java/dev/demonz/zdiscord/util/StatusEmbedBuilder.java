@@ -19,7 +19,6 @@ package dev.demonz.zdiscord.util;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.MessageEmbed;
-import org.bukkit.Bukkit;
 
 import java.time.Instant;
 
@@ -173,8 +172,8 @@ public final class StatusEmbedBuilder {
             ctx.tpsWarning = tpsWarning;
             ctx.tpsCritical = tpsCritical;
 
-            ctx.onlineCount = Bukkit.getOnlinePlayers().size();
-            ctx.maxCount = Bukkit.getMaxPlayers();
+            ctx.onlineCount = ServerBridge.onlinePlayers().size();
+            ctx.maxCount = ServerBridge.maxPlayers();
             ctx.online = true;
 
             Runtime runtime = Runtime.getRuntime();
@@ -185,7 +184,7 @@ public final class StatusEmbedBuilder {
             if (showPlayers && ctx.onlineCount > 0) {
                 StringBuilder list = new StringBuilder();
                 int shown = 0;
-                for (org.bukkit.entity.Player p : Bukkit.getOnlinePlayers()) {
+                for (org.bukkit.entity.Player p : ServerBridge.onlinePlayers()) {
                     if (shown > 0) {
                         list.append("\n");
                     }

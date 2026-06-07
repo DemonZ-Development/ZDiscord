@@ -16,27 +16,27 @@
 
 package dev.demonz.zdiscord.util;
 
-import be.seeseemelk.mockbukkit.MockBukkit;
-import be.seeseemelk.mockbukkit.ServerMock;
+import dev.demonz.zdiscord.testsupport.BukkitStub;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TPSUtilTest {
 
-    private ServerMock server;
+    private BukkitStub.State state;
 
     @BeforeEach
     void setUp() {
-        server = MockBukkit.mock();
+        state = BukkitStub.install();
     }
 
     @AfterEach
     void tearDown() {
-        MockBukkit.unmock();
+        BukkitStub.uninstall();
     }
 
     @Test
@@ -51,9 +51,16 @@ class TPSUtilTest {
         double[] tps = TPSUtil.getTPS();
         for (double v : tps) {
             assertNotNull(Double.valueOf(v));
-            assertEquals(true, v >= 0.0, "TPS should be non-negative");
-            assertEquals(true, v <= 25.0,
+            assertTrue(v >= 0.0, "TPS should be non-negative");
+            assertTrue(v <= 25.0,
                     "TPS should be capped around 20-25 (got " + v + ")");
         }
+    }
+
+    @Test
+    void reflectsServerStubTps() {
+        state.setTps(19.5, 20.0, 20.0);
+        double[] tps = TPSUtil.getTPS();
+        assertEquals(19.5, tps[0], 0.0001);
     }
 }

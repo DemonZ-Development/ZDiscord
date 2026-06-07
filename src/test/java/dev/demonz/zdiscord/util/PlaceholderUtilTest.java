@@ -16,8 +16,7 @@
 
 package dev.demonz.zdiscord.util;
 
-import be.seeseemelk.mockbukkit.MockBukkit;
-import be.seeseemelk.mockbukkit.ServerMock;
+import dev.demonz.zdiscord.testsupport.BukkitStub;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,16 +26,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PlaceholderUtilTest {
 
-    private ServerMock server;
+    private BukkitStub.State state;
 
     @BeforeEach
     void setUp() {
-        server = MockBukkit.mock();
+        state = BukkitStub.install();
     }
 
     @AfterEach
     void tearDown() {
-        MockBukkit.unmock();
+        BukkitStub.uninstall();
     }
 
     @Test
@@ -48,6 +47,7 @@ class PlaceholderUtilTest {
 
     @Test
     void resolvesTps() {
+        state.setTps(20.0, 20.0, 20.0);
         String result = PlaceholderUtil.resolveServer("TPS: %tps%");
         assertTrue(result.startsWith("TPS: 20.0"),
                 "Expected TPS to start with 20.0, got: " + result);
@@ -60,13 +60,22 @@ class PlaceholderUtilTest {
 
     @Test
     void resolvesPlayerTokens() {
-        server.addSimpleWorld("world");
-        var player = server.addPlayer();
+        state.addWorld("world");
+        var player = state.addPlayer("Alice");
         String result = PlaceholderUtil.resolve(
                 "name=%name% player=%player% uuid=%uuid% world=%world%",
                 player);
-        assertTrue(result.contains("name=" + player.getName()));
-        assertTrue(result.contains("player=" + player.getName()));
+        assertTrue(result.contains("name=Alice"));
+        assertTrue(result.contains("player=Alice"));
         assertTrue(result.contains("world=world"));
+    }
+
+    @Test
+    void onlineCountReflectsAddedPlayers() {
+        state.addWorld("world");
+        state.addPlayer("Alice");
+        state.addPlayer("Bob");
+        String result = PlaceholderUtil.resolveServer("Online: %online%");
+        assertEquals("Online: 2", result);
     }
 }

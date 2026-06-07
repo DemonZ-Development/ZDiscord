@@ -16,66 +16,80 @@
 
 package dev.demonz.zdiscord.config;
 
-import be.seeseemelk.mockbukkit.MockBukkit;
-import be.seeseemelk.mockbukkit.ServerMock;
-import dev.demonz.zdiscord.ZDiscord;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.logging.Logger;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Tests {@link ConfigManager} against the bundled {@code config.yml}.
+ * The plugin's own constructor needs a {@code JavaPlugin} instance,
+ * so we use the test-friendly constructor that takes a data folder,
+ * a logger, and a supplier of the default config resource.
+ */
 class ConfigManagerTest {
 
-    private ServerMock server;
-    private ZDiscord plugin;
-
-    @BeforeEach
-    void setUp() {
-        server = MockBukkit.mock();
-        plugin = MockBukkit.load(ZDiscord.class);
+    private static InputStream defaultConfig() {
+        return ConfigManagerTest.class.getClassLoader()
+                .getResourceAsStream("config.yml");
     }
 
-    @AfterEach
-    void tearDown() {
-        MockBukkit.unmock();
+    private static ConfigManager newManager(File dataFolder) {
+        return new ConfigManager(
+                dataFolder,
+                Logger.getLogger("ConfigManagerTest"),
+                ConfigManagerTest::defaultConfig);
     }
 
     @Test
-    void loadsDefaultConfig() {
-        assertNotNull(plugin.getConfigManager());
-        String token = plugin.getConfigManager().getString("bot.token");
+    void loadsDefaultConfig(@TempDir Path tmp) {
+        ConfigManager mgr = newManager(tmp.toFile());
+        assertNotNull(mgr);
+        String token = mgr.getString("bot.token");
         assertNotNull(token);
         assertTrue(token.startsWith("YOUR_")
-                || token.length() > 0,
+                        || token.length() > 0,
                 "Default config should provide a placeholder or real token");
     }
 
     @Test
-    void readsBooleanDefaults() {
-        boolean status = plugin.getConfigManager().getBoolean("status.enabled", true);
+    void readsBooleanDefaults(@TempDir Path tmp) {
+        ConfigManager mgr = newManager(tmp.toFile());
+        boolean status = mgr.getBoolean("status.enabled", true);
         assertTrue(status, "Default status.enabled should be true");
     }
 
     @Test
-    void readsIntDefaults() {
-        int interval = plugin.getConfigManager().getInt("status.update-interval", 30);
+    void readsIntDefaults(@TempDir Path tmp) {
+        ConfigManager mgr = newManager(tmp.toFile());
+        int interval = mgr.getInt("status.update-interval", 30);
         assertTrue(interval > 0, "Default status.update-interval should be positive");
     }
 
     @Test
-    void readsStringListDefaults() {
-        var roles = plugin.getConfigManager().getStringList("tickets.support-roles");
+    void readsStringListDefaults(@TempDir Path tmp) {
+        ConfigManager mgr = newManager(tmp.toFile());
+        var roles = mgr.getStringList("tickets.support-roles");
         assertNotNull(roles);
         assertFalse(roles.isEmpty(),
                 "Default tickets.support-roles should have at least one placeholder");
     }
 
     @Test
-    void readsTicketCategories() {
-        var categories = plugin.getConfigManager().getConfig()
+    void readsTicketCategories(@TempDir Path tmp) {
+        ConfigManager mgr = newManager(tmp.toFile());
+        var categories = mgr.getConfig()
                 .getConfigurationSection("tickets.categories");
         assertNotNull(categories,
                 "Default config should include ticket categories");
@@ -84,9 +98,23 @@ class ConfigManagerTest {
     }
 
     @Test
-    void configVersionIsBumped() {
-        int version = plugin.getConfigManager().getInt("config-version", 0);
+    void configVersionIsBumped(@TempDir Path tmp) {
+        ConfigManager mgr = newManager(tmp.toFile());
+        int version = mgr.getInt("config-version", 0);
         assertTrue(version >= 3,
                 "Config version should be 3 or higher after the rewrite");
+    }
+
+    @Test
+    void migrationIsIdempotent(@TempDir Path tmp) throws IOException {
+        // Create a config file that is older than the bundled default.
+        Path cfg = Paths.get(tmp.toString(), "config.yml");
+        Files.writeString(cfg, "config-version: 0\nbot:\n  token: old-token\n");
+
+        ConfigManager mgr = newManager(tmp.toFile());
+        assertEquals("old-token", mgr.getString("bot.token"),
+                "Existing values must be preserved across migration");
+        // After migration, version is bumped to CURRENT_VERSION.
+        assertEquals(ConfigManager.CURRENT_VERSION, mgr.getInt("config-version", 0));
     }
 }

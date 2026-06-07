@@ -17,17 +17,18 @@
 package dev.demonz.zdiscord.storage;
 
 import dev.demonz.zdiscord.ZDiscord;
+import dev.demonz.zdiscord.platform.PlatformAdapter;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 /**
@@ -43,7 +44,9 @@ import java.util.stream.Collectors;
  */
 public class YamlStorage implements StorageManager {
 
-    private final ZDiscord plugin;
+    private final File dataFolder;
+    private final Logger logger;
+    private final PlatformAdapter platform;
 
     private File linksFile;
     private File statsFile;
@@ -58,14 +61,26 @@ public class YamlStorage implements StorageManager {
     private final ReentrantReadWriteLock dataLock = new ReentrantReadWriteLock();
 
     public YamlStorage(ZDiscord plugin) {
-        this.plugin = plugin;
+        this(plugin.getDataFolder(), plugin.getLogger(), plugin.getPlatformAdapter());
+    }
+
+    /**
+     * Test-friendly constructor. Production code uses the
+     * {@link ZDiscord}-accepting variant; tests can supply a temporary
+     * directory, a no-op logger, and a stub platform adapter that
+     * runs tasks synchronously on the caller thread.
+     */
+    public YamlStorage(File dataFolder, Logger logger, PlatformAdapter platform) {
+        this.dataFolder = dataFolder;
+        this.logger = logger;
+        this.platform = platform;
     }
 
     @Override
     public void init() {
-        linksFile = new File(plugin.getDataFolder(), "linked_accounts.yml");
-        statsFile = new File(plugin.getDataFolder(), "leaderboard_data.yml");
-        dataFile = new File(plugin.getDataFolder(), "plugin_data.yml");
+        linksFile = new File(dataFolder, "linked_accounts.yml");
+        statsFile = new File(dataFolder, "leaderboard_data.yml");
+        dataFile = new File(dataFolder, "plugin_data.yml");
 
         createIfMissing(linksFile);
         createIfMissing(statsFile);
@@ -75,7 +90,7 @@ public class YamlStorage implements StorageManager {
         statsConfig = YamlConfiguration.loadConfiguration(statsFile);
         dataConfig = YamlConfiguration.loadConfiguration(dataFile);
 
-        plugin.getLogger().info("Storage: YAML file storage");
+        logger.info("Storage: YAML file storage");
     }
 
     @Override
@@ -108,7 +123,7 @@ public class YamlStorage implements StorageManager {
                         links.put(uuid, discordId);
                     }
                 } catch (IllegalArgumentException e) {
-                    plugin.getLogger().warning("Invalid UUID in linked_accounts.yml: " + uuidStr);
+                    logger.warning("Invalid UUID in linked_accounts.yml: " + uuidStr);
                 }
             }
         } finally {
@@ -160,7 +175,7 @@ public class YamlStorage implements StorageManager {
                     }
                     stats.put(uuid, playerStats);
                 } catch (IllegalArgumentException e) {
-                    plugin.getLogger().warning("Invalid UUID in leaderboard_data.yml: " + uuidStr);
+                    logger.warning("Invalid UUID in leaderboard_data.yml: " + uuidStr);
                 }
             }
         } finally {
@@ -238,7 +253,7 @@ public class YamlStorage implements StorageManager {
                 file.getParentFile().mkdirs();
                 file.createNewFile();
             } catch (IOException e) {
-                plugin.getLogger().severe("Failed to create storage file "
+                logger.severe("Failed to create storage file "
                         + file.getName() + ": " + e.getMessage());
             }
         }
@@ -254,7 +269,7 @@ public class YamlStorage implements StorageManager {
         try {
             config.save(file);
         } catch (IOException e) {
-            plugin.getLogger().severe("Failed to save " + label + ": " + e.getMessage());
+            logger.severe("Failed to save " + label + ": " + e.getMessage());
         } finally {
             lock.writeLock().unlock();
         }
@@ -267,6 +282,10 @@ public class YamlStorage implements StorageManager {
      */
     private void scheduleFlush(FileConfiguration config, File file,
                                ReentrantReadWriteLock lock, String label) {
-        plugin.getPlatformAdapter().runAsync(() -> saveFileLocked(config, file, lock, label));
+        if (platform == null) {
+            saveFileLocked(config, file, lock, label);
+            return;
+        }
+        platform.runAsync(() -> saveFileLocked(config, file, lock, label));
     }
 }

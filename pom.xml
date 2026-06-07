@@ -37,11 +37,6 @@
             <id>dv8tion</id>
             <url>https://m2.dv8tion.net/releases</url>
         </repository>
-
-        <repository>
-            <id>jitpack.io</id>
-            <url>https://jitpack.io</url>
-        </repository>
     </repositories>
 
     <dependencies>
@@ -105,12 +100,6 @@
             <scope>provided</scope> </dependency>
 
         <!-- Test dependencies -->
-        <dependency>
-            <groupId>com.github.seeseemelk</groupId>
-            <artifactId>MockBukkit-v1.20</artifactId>
-            <version>4.5.0</version>
-            <scope>test</scope>
-        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

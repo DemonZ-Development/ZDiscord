@@ -16,8 +16,7 @@
 
 package dev.demonz.zdiscord.util;
 
-import be.seeseemelk.mockbukkit.MockBukkit;
-import be.seeseemelk.mockbukkit.ServerMock;
+import dev.demonz.zdiscord.testsupport.BukkitStub;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,16 +30,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class StatusEmbedBuilderTest {
 
-    private ServerMock server;
-
     @BeforeEach
     void setUp() {
-        server = MockBukkit.mock();
+        BukkitStub.install();
     }
 
     @AfterEach
     void tearDown() {
-        MockBukkit.unmock();
+        BukkitStub.uninstall();
     }
 
     @Test
@@ -106,8 +103,7 @@ class StatusEmbedBuilderTest {
         MessageEmbed embed = StatusEmbedBuilder.build(ctx);
         assertNotNull(embed);
         boolean found = embed.getFields().stream()
-                .anyMatch(f -> f.getName() != null
-                        && f.getName().equals("Players")
+                .anyMatch(f -> "Players".equals(f.getName())
                         && f.getValue() != null
                         && f.getValue().contains("5"));
         assertTrue(found, "Player count '5' should appear in the Players field");

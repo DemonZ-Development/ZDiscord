@@ -23,3 +23,6 @@ Thumbs.db
 # Local config overrides
 config.local.yml
 messages.local.yml
+
+# Local AI / agent working notes
+AGENTS.md

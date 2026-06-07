@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 DemonZ Development
+ * Copyright 2026 DemonZ Development
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,10 @@ import org.bukkit.Bukkit;
 /**
  * Wrapper around {@code Bukkit.getTPS()} that returns 20.0 on platforms
  * where the API is not available (Spigot, generic Bukkit).
+ *
+ * <p>In production this delegates to the static
+ * {@link Bukkit#getTPS()} call. In tests it can be redirected via
+ * {@link ServerBridge}.</p>
  */
 public final class TPSUtil {
 
@@ -40,7 +44,7 @@ public final class TPSUtil {
             return FALLBACK.clone();
         }
         try {
-            return Bukkit.getTPS();
+            return ServerBridge.tps();
         } catch (NoSuchMethodError | Exception e) {
             tpsAvailable = false;
             return FALLBACK.clone();
@@ -58,7 +62,7 @@ public final class TPSUtil {
 
     private static boolean probe() {
         try {
-            Bukkit.getTPS();
+            ServerBridge.tps();
             return true;
         } catch (NoSuchMethodError e) {
             return false;

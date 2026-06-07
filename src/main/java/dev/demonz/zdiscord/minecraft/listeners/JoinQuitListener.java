@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 DemonZ Development
+ * Copyright 2026 DemonZ Development
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package dev.demonz.zdiscord.minecraft.listeners;
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.util.ColorUtil;
 import dev.demonz.zdiscord.util.HeadUtil;
-import dev.demonz.zdiscord.util.PlaceholderUtil;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import org.bukkit.entity.Player;
@@ -35,8 +34,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Forwards join/quit events to Discord and tracks per-player session
- * duration for the playtime leaderboard.
+ * Forwards join and quit events to Discord as polished embeds and
+ * tracks per-player session duration for the playtime leaderboard.
  */
 public class JoinQuitListener implements Listener {
 
@@ -47,57 +46,71 @@ public class JoinQuitListener implements Listener {
         this.plugin = plugin;
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onJoin(PlayerJoinEvent event) {
-        if (!plugin.getBotManager().isConnected()) {
-            return;
-        }
-        if (!plugin.getConfigManager().getBoolean("events.join.enabled", true)) {
-            return;
+        Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
+        boolean firstJoin = !player.hasPlayedBefore();
+        long now = System.currentTimeMillis();
+
+        // Persist activity timestamps + increment session counter
+        // off the main thread so a slow disk can't stall the join.
+        plugin.getPlatformAdapter().runAsync(() -> {
+            plugin.getStorageManager().setLastSeen(uuid, now);
+            plugin.getStorageManager().incrementSessions(uuid);
+            if (firstJoin) {
+                plugin.getStorageManager().setFirstJoin(uuid, now);
+            }
+        });
+
+        if (plugin.getBotManager().isConnected()
+                && plugin.getConfigManager().getBoolean("events.join.enabled", true)) {
+            sendEmbed(player, true, null, firstJoin);
         }
 
-        Player player = event.getPlayer();
+        joinTimestamps.put(uuid, now);
+
+        if (firstJoin
+                && plugin.getConfigManager().getBoolean("events.join.show-first-join-indicator", true)) {
+            String welcome = plugin.getConfigManager().getString(
+                    "events.join.first-join-message", "");
+            if (!welcome.isEmpty()) {
+                String resolved = ColorUtil.stripColor(
+                        welcome
+                                .replace("%player%", player.getName())
+                                .replace("%displayname%", ColorUtil.stripColor(player.getDisplayName()))
+                                .replace("%uuid%", player.getUniqueId().toString()));
+                plugin.getPlatformAdapter().runLater(
+                        () -> player.sendMessage(resolved), 20L);
+            }
+        }
+
+        // The first-join welcome is also mirrored to Discord as
+        // a private DM-style embed; we only render the indicator
+        // field there so the player can see the celebration in
+        // the events channel. Color codes in the template are
+        // converted to Discord markdown so the operator's choice
+        // of &l/&n still renders properly.
 
         if (plugin.getAntiRaidModule() != null) {
             plugin.getAntiRaidModule().onPlayerJoin(player);
         }
 
-        joinTimestamps.put(player.getUniqueId(), System.currentTimeMillis());
+        // Notify any Discord users following this player. Done
+        // after the activity write so the follow storage is
+        // guaranteed to be initialized.
+        if (plugin.getFollowModule() != null) {
+            plugin.getFollowModule().onPlayerJoin(player);
+        }
 
         plugin.getPlatformAdapter().runAsync(() -> plugin.getBotManager().updateActivity());
-
-        TextChannel channel = resolveEventChannel();
-        if (channel == null) {
-            return;
-        }
-
-        String template = plugin.getConfigManager().getString(
-                "events.join.message", "**%player%** joined the server");
-        String message = PlaceholderUtil.resolve(template, player);
-        String colorHex = plugin.getConfigManager().getString("events.join.color", "#2ECC71");
-        String avatarUrl = resolveAvatar(player);
-
-        EmbedBuilder embed = new EmbedBuilder()
-                .setAuthor(message, null, avatarUrl)
-                .setColor(ColorUtil.parseHex(colorHex))
-                .setFooter("Players online: "
-                        + plugin.getServer().getOnlinePlayers().size() + "/"
-                        + plugin.getServer().getMaxPlayers())
-                .setTimestamp(Instant.now());
-
-        channel.sendMessageEmbeds(embed.build()).queue();
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onQuit(PlayerQuitEvent event) {
-        if (!plugin.getBotManager().isConnected()) {
-            return;
-        }
-        if (!plugin.getConfigManager().getBoolean("events.quit.enabled", true)) {
-            return;
-        }
-
         Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
+        long now = System.currentTimeMillis();
 
         // Defer the activity update and online count by one tick so the
         // player is actually removed from the online list when we read it.
@@ -106,32 +119,141 @@ public class JoinQuitListener implements Listener {
                         () -> plugin.getBotManager().updateActivity()),
                 2L);
 
-        Long joinTime = joinTimestamps.remove(player.getUniqueId());
+        Long joinTime = joinTimestamps.remove(uuid);
         if (joinTime != null && plugin.getLeaderboardModule() != null) {
-            long sessionSeconds = (System.currentTimeMillis() - joinTime) / 1000L;
+            long sessionSeconds = (now - joinTime) / 1000L;
             if (sessionSeconds > 0) {
                 plugin.getLeaderboardModule().incrementStatBy(
-                        player.getUniqueId(), "playtime", sessionSeconds);
+                        uuid, "playtime", sessionSeconds);
             }
         }
 
+        // Update last-seen on quit too — covers the rare case where
+        // a player disconnects abnormally (crash) and never fires
+        // a follow-up join, leaving the join's timestamp stale.
+        plugin.getPlatformAdapter().runAsync(
+                () -> plugin.getStorageManager().setLastSeen(uuid, now));
+
+        if (plugin.getBotManager().isConnected()
+                && plugin.getConfigManager().getBoolean("events.quit.enabled", true)) {
+            // Compute session duration before sending so sendEmbed can include it.
+            sendEmbed(player, false, joinTime, false);
+        }
+    }
+
+    private void sendEmbed(Player player, boolean joined, Long knownJoinTime, boolean firstJoin) {
         TextChannel channel = resolveEventChannel();
         if (channel == null) {
             return;
         }
 
+        String typeKey = joined ? "join" : "quit";
         String template = plugin.getConfigManager().getString(
-                "events.quit.message", "**%player%** left the server");
-        String message = PlaceholderUtil.resolve(template, player);
-        String colorHex = plugin.getConfigManager().getString("events.quit.color", "#E74C3C");
-        String avatarUrl = resolveAvatar(player);
+                "events." + typeKey + ".message",
+                joined ? "**%player%** joined the server"
+                       : "**%player%** left the server");
+        String colorHex = plugin.getConfigManager().getString(
+                "events." + typeKey + ".color",
+                joined ? "#2ECC71" : "#E74C3C");
+
+        String title = joined
+                ? "Player Joined"
+                : "Player Left";
+        String verb = joined ? "joined" : "left";
+
+        String avatar = resolveAvatar(player);
+        String resolvedMessage = ColorUtil.toDiscordMarkdown(
+                template
+                        .replace("%player%", player.getName())
+                        .replace("%displayname%", ColorUtil.stripColor(player.getDisplayName())));
+
+        // Footer icon: configurable, with three layers of fallback.
+        //   1. events.<type>.footer-icon in config.yml
+        //   2. events.footer-icon (shared)
+        //   3. the guild's icon
+        //   4. null (Discord will render the footer with no icon)
+        String footerIcon = plugin.getConfigManager().getString(
+                "events." + typeKey + ".footer-icon", "");
+        if (footerIcon.isEmpty()) {
+            footerIcon = plugin.getConfigManager().getString("events.footer-icon", "");
+        }
+        if (footerIcon.isEmpty()) {
+            String guildIcon = channel.getGuild().getIconUrl();
+            if (guildIcon != null) {
+                footerIcon = guildIcon + "?size=64";
+            }
+        }
+
+        // Online count delta so the channel can see traffic at a glance.
+        int currentOnline = plugin.getServer().getOnlinePlayers().size();
+        int maxOnline = plugin.getServer().getMaxPlayers();
+        int delta = joined ? +1 : -1;
+        int prevOnline = currentOnline - delta;
+        String deltaSuffix = joined
+                ? " (was " + prevOnline + ")"
+                : " (was " + prevOnline + ")";
 
         EmbedBuilder embed = new EmbedBuilder()
-                .setAuthor(message, null, avatarUrl)
+                .setAuthor(player.getName(),
+                        "https://namemc.com/profile/" + player.getUniqueId(),
+                        avatar)
+                .setTitle((joined ? ":green_circle: " : ":red_circle: ") + title)
+                .setDescription("**" + player.getName() + "** " + verb + " the server")
                 .setColor(ColorUtil.parseHex(colorHex))
+                .setThumbnail(avatar)
+                .addField("Player", "`" + player.getName() + "`", true)
+                .addField("Online",
+                        currentOnline + "/" + maxOnline + deltaSuffix, true)
+                .addField("Status",
+                        joined ? ":white_check_mark: Online" : ":x: Offline", true)
+                .setFooter(resolvedMessage, footerIcon.isEmpty() ? null : footerIcon)
                 .setTimestamp(Instant.now());
 
-        channel.sendMessageEmbeds(embed.build()).queue();
+        if (joined && firstJoin
+                && plugin.getConfigManager().getBoolean("events.join.show-first-join-indicator", true)) {
+            embed.addField(":sparkles: New Player",
+                    "Welcome! This is **" + player.getName() + "**'s first join.", false);
+        }
+
+        // Add session duration on quit.
+        if (!joined) {
+            long seconds = -1;
+            if (knownJoinTime != null) {
+                seconds = (System.currentTimeMillis() - knownJoinTime) / 1000L;
+            } else {
+                Long joinTime = joinTimestamps.get(player.getUniqueId());
+                if (joinTime != null) {
+                    seconds = (System.currentTimeMillis() - joinTime) / 1000L;
+                }
+            }
+            if (seconds > 0) {
+                String duration = formatDuration(seconds);
+                embed.addField("Session", ":hourglass: " + duration, false);
+            }
+        }
+
+        channel.sendMessageEmbeds(embed.build()).queue(
+                success -> { },
+                error -> plugin.debug("Failed to send "
+                        + typeKey + " embed: " + error.getMessage()));
+    }
+
+    private String formatDuration(long seconds) {
+        if (seconds < 60) {
+            return seconds + "s";
+        }
+        long minutes = seconds / 60;
+        if (minutes < 60) {
+            return minutes + "m " + (seconds % 60) + "s";
+        }
+        long hours = minutes / 60;
+        minutes = minutes % 60;
+        if (hours < 24) {
+            return hours + "h " + minutes + "m";
+        }
+        long days = hours / 24;
+        hours = hours % 24;
+        return days + "d " + hours + "h";
     }
 
     private TextChannel resolveEventChannel() {

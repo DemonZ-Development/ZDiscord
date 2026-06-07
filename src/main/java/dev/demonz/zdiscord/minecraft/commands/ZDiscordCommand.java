@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 DemonZ Development
+ * Copyright 2026 DemonZ Development
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,16 @@
 package dev.demonz.zdiscord.minecraft.commands;
 
 import dev.demonz.zdiscord.ZDiscord;
+import dev.demonz.zdiscord.util.UpdateChecker;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -42,6 +47,7 @@ import java.util.stream.Collectors;
 public class ZDiscordCommand implements CommandExecutor, TabCompleter {
 
     private final ZDiscord plugin;
+    private final Set<UUID> dismissedUpdates = new HashSet<>();
 
     public ZDiscordCommand(ZDiscord plugin) {
         this.plugin = plugin;
@@ -69,8 +75,14 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
             case "ticket":
                 handleTicket(sender, args);
                 break;
+            case "panel":
+                handlePanel(sender);
+                break;
             case "lockdown":
                 handleLockdown(sender);
+                break;
+            case "update":
+                handleUpdate(sender, args);
                 break;
             case "dump":
                 handleDump(sender);
@@ -90,7 +102,9 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("  /zdiscord link");
         sender.sendMessage("  /zdiscord embed <title> <description>");
         sender.sendMessage("  /zdiscord ticket <subject>");
+        sender.sendMessage("  /zdiscord panel");
         sender.sendMessage("  /zdiscord lockdown");
+        sender.sendMessage("  /zdiscord update [check|dismiss]");
         sender.sendMessage("  /zdiscord dump");
         sender.sendMessage("");
     }
@@ -190,6 +204,48 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
         plugin.getTicketModule().createTicketFromMC((Player) sender, subject);
     }
 
+    private void handlePanel(CommandSender sender) {
+        if (!sender.hasPermission("zdiscord.admin")) {
+            sender.sendMessage(plugin.getMessageManager().get("no-permission"));
+            return;
+        }
+        if (plugin.getTicketModule() == null) {
+            sender.sendMessage("The ticket system is disabled in config.yml.");
+            return;
+        }
+        if (plugin.getBotManager() == null || !plugin.getBotManager().isConnected()) {
+            sender.sendMessage("The Discord bot is not connected.");
+            return;
+        }
+        String panelChannelId = plugin.getConfigManager().getString("tickets.panel-channel", "");
+        if (panelChannelId.isEmpty()) {
+            String categoryId = plugin.getConfigManager().getString("channels.ticket-category", "");
+            if (!categoryId.isEmpty()) {
+                panelChannelId = categoryId;
+            }
+        }
+        if (panelChannelId.isEmpty()) {
+            sender.sendMessage("Set tickets.panel-channel in config.yml first, "
+                    + "or run /setup in Discord to configure tickets.");
+            return;
+        }
+        final String targetChannelId = panelChannelId;
+        plugin.getPlatformAdapter().runAsync(() -> {
+            try {
+                var channel = plugin.getBotManager().getJda()
+                        .getTextChannelById(targetChannelId);
+                if (channel == null) {
+                    sender.sendMessage("Channel ID '" + targetChannelId + "' was not found.");
+                    return;
+                }
+                plugin.getTicketModule().postPanel(channel);
+                sender.sendMessage("Ticket panel posted in <#" + targetChannelId + ">.");
+            } catch (Exception e) {
+                sender.sendMessage("Failed to post panel: " + e.getMessage());
+            }
+        });
+    }
+
     private void handleLockdown(CommandSender sender) {
         if (!sender.hasPermission("zdiscord.admin")) {
             sender.sendMessage(plugin.getMessageManager().get("no-permission"));
@@ -200,6 +256,65 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
             return;
         }
         plugin.getAntiRaidModule().toggleLockdown(sender);
+    }
+
+    private void handleUpdate(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("zdiscord.admin")) {
+            sender.sendMessage(plugin.getMessageManager().get("no-permission"));
+            return;
+        }
+        if (args.length >= 2) {
+            switch (args[1].toLowerCase()) {
+                case "dismiss":
+                    if (sender instanceof Player) {
+                        dismissedUpdates.add(((Player) sender).getUniqueId());
+                    }
+                    sender.sendMessage(plugin.getMessageManager().getRaw("prefix")
+                            + "\u00a77Update notification dismissed for this session.");
+                    return;
+                case "check":
+                    runManualUpdateCheck(sender);
+                    return;
+                default:
+                    break;
+            }
+        }
+        sender.sendMessage("Current: v" + plugin.getDescription().getVersion());
+        if (plugin.getConfigManager().getBoolean("misc.update-checker", true)) {
+            sender.sendMessage("Update checker: enabled. Use /zdiscord update check to query now.");
+        } else {
+            sender.sendMessage("Update checker: disabled in config.yml.");
+        }
+    }
+
+    private void runManualUpdateCheck(CommandSender sender) {
+        plugin.getPlatformAdapter().runAsync(() -> {
+            try {
+                String latest = UpdateChecker.fetchLatestSync();
+                if (latest == null) {
+                    sender.sendMessage("Could not reach the Modrinth API right now.");
+                } else if (UpdateChecker.isNewer(latest,
+                        plugin.getDescription().getVersion())) {
+                    sender.sendMessage("\u00a7aLatest version: v" + latest
+                            + " (you are running v"
+                            + plugin.getDescription().getVersion() + ")");
+                } else {
+                    sender.sendMessage(
+                            "\u00a7aYou are running the latest version (v"
+                                    + plugin.getDescription().getVersion() + ").");
+                }
+            } catch (Exception e) {
+                sender.sendMessage("Update check failed: " + e.getMessage());
+            }
+        });
+    }
+
+    public boolean isDismissed(UUID playerId) {
+        return dismissedUpdates.contains(playerId);
+    }
+
+    public void clearDismissed() {
+        dismissedUpdates.clear();
     }
 
     private void handleDump(CommandSender sender) {
@@ -268,9 +383,15 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             List<String> subs = new ArrayList<>(Arrays.asList(
-                    "reload", "status", "link", "embed", "ticket", "lockdown", "dump"));
+                    "reload", "status", "link", "embed", "ticket",
+                    "panel", "lockdown", "update", "dump"));
             return subs.stream()
                     .filter(s -> s.startsWith(args[0].toLowerCase()))
+                    .collect(Collectors.toList());
+        }
+        if (args.length == 2 && "update".equalsIgnoreCase(args[0])) {
+            return Arrays.asList("check", "dismiss").stream()
+                    .filter(s -> s.startsWith(args[1].toLowerCase()))
                     .collect(Collectors.toList());
         }
         return Collections.emptyList();

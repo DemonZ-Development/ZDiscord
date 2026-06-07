@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 DemonZ Development
+ * Copyright 2026 DemonZ Development
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,18 +17,20 @@
 package dev.demonz.zdiscord.minecraft.listeners;
 
 import dev.demonz.zdiscord.ZDiscord;
-import dev.demonz.zdiscord.util.ColorUtil;
-import dev.demonz.zdiscord.util.HeadUtil;
-import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
-import org.bukkit.entity.Player;
+import dev.demonz.zdiscord.minecraft.ChatBridge;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 
 /**
- * Forwards Minecraft chat messages to the configured Discord channel,
- * using webhooks (when enabled) to display player heads as avatars.
+ * Forwards Minecraft chat messages to the configured Discord channel.
+ *
+ * <p>This listener is the universal fallback for Spigot servers and for
+ * Paper servers where the modern {@code AsyncChatEvent} was not
+ * cancelled. On Paper the higher-priority modern listener is
+ * responsible for the actual send; we set {@code ignoreCancelled = true}
+ * here so we never double-send.</p>
  */
 public class ChatListener implements Listener {
 
@@ -40,36 +42,6 @@ public class ChatListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onChat(AsyncPlayerChatEvent event) {
-        if (!plugin.getBotManager().isConnected()) {
-            return;
-        }
-
-        Player player = event.getPlayer();
-        if (!player.hasPermission("zdiscord.chat")) {
-            return;
-        }
-
-        String message = ColorUtil.stripColor(event.getMessage());
-
-        TextChannel chatChannel = plugin.getBotManager().getTextChannel("channels.chat");
-        if (chatChannel == null) {
-            return;
-        }
-
-        boolean useWebhooks = plugin.getConfigManager().getBoolean("chat.use-webhooks", true);
-
-        if (useWebhooks && plugin.getWebhookManager() != null) {
-            String avatarUrl = plugin.getConfigManager()
-                    .getString("chat.avatar-url", "https://crafatar.com/avatars/%uuid%?overlay=true");
-            String resolvedAvatar = HeadUtil.resolve(avatarUrl, player.getUniqueId(), player.getName());
-            String webhookName = plugin.getConfigManager()
-                    .getString("chat.webhook-name", "%displayname%")
-                    .replace("%player%", player.getName())
-                    .replace("%displayname%", ColorUtil.stripColor(player.getDisplayName()));
-
-            plugin.getWebhookManager().sendWebhookMessage(chatChannel, webhookName, resolvedAvatar, message);
-        } else {
-            chatChannel.sendMessage("**" + player.getName() + "** " + message).queue();
-        }
+        ChatBridge.forward(plugin, event.getPlayer(), event.getMessage());
     }
 }

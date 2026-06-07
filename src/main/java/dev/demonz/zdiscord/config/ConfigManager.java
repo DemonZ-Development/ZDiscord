@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 DemonZ Development
+ * Copyright 2026 DemonZ Development
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,8 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
+import java.util.function.Supplier;
+import java.util.logging.Logger;
 
 /**
  * Loads and provides typed accessors for {@code config.yml}.
@@ -43,23 +45,59 @@ public class ConfigManager {
      * The current config-version. Increment when the schema changes in a
      * non-additive way.
      */
-    public static final int CURRENT_VERSION = 2;
+    public static final int CURRENT_VERSION = 3;
 
-    private final ZDiscord plugin;
+    private final File dataFolder;
+    private final Logger logger;
+    private final Supplier<InputStream> defaultResource;
     private final File configFile;
     private FileConfiguration config;
 
+    /**
+     * Production constructor. Sources the default config from the
+     * plugin's JAR.
+     */
     public ConfigManager(ZDiscord plugin) {
-        this.plugin = plugin;
-        this.configFile = new File(plugin.getDataFolder(), "config.yml");
+        this(
+                plugin.getDataFolder(),
+                plugin.getLogger(),
+                () -> plugin.getResource("config.yml"));
+    }
+
+    /**
+     * Test-friendly constructor. The {@code defaultResource} supplier
+     * is called each time the file needs to be (re-)read from defaults
+     * — it can return a fresh stream to the bundled resource, or null
+     * to skip default loading.
+     */
+    public ConfigManager(File dataFolder,
+                         Logger logger,
+                         Supplier<InputStream> defaultResource) {
+        this.dataFolder = dataFolder;
+        this.logger = logger;
+        this.defaultResource = defaultResource;
+        this.configFile = new File(dataFolder, "config.yml");
         saveDefaultConfig();
         reload();
         migrateIfNeeded();
     }
 
     private void saveDefaultConfig() {
-        if (!configFile.exists()) {
-            plugin.saveResource("config.yml", false);
+        if (configFile.exists()) {
+            return;
+        }
+        if (!dataFolder.exists() && !dataFolder.mkdirs()) {
+            logger.warning("Could not create data folder: " + dataFolder);
+        }
+        if (defaultResource == null) {
+            return;
+        }
+        try (InputStream in = defaultResource.get()) {
+            if (in != null) {
+                Files.copy(in, configFile.toPath());
+            }
+        } catch (IOException e) {
+            logger.warning("Failed to copy default config: " + e.getMessage());
         }
     }
 
@@ -69,12 +107,12 @@ public class ConfigManager {
             return;
         }
 
-        plugin.getLogger().info("Configuration is at v" + current
+        logger.info("Configuration is at v" + current
                 + "; current schema is v" + CURRENT_VERSION + ". Merging in any new keys.");
 
-        InputStream defStream = plugin.getResource("config.yml");
+        InputStream defStream = defaultResource == null ? null : defaultResource.get();
         if (defStream == null) {
-            plugin.getLogger().warning("Default config.yml not found in JAR; skipping migration.");
+            logger.warning("Default config.yml not found in JAR; skipping migration.");
             return;
         }
 
@@ -87,10 +125,10 @@ public class ConfigManager {
             }
             config.set("config-version", CURRENT_VERSION);
             config.save(configFile);
-            plugin.getLogger().info("Configuration migration complete. New defaults have been added; existing values preserved.");
+            logger.info("Configuration migration complete. New defaults have been added; existing values preserved.");
         } catch (IOException e) {
-            plugin.getLogger().severe("Failed to write migrated config: " + e.getMessage());
-            plugin.getLogger().severe("A backup of your existing config has been written to config.yml.bak");
+            logger.severe("Failed to write migrated config: " + e.getMessage());
+            logger.severe("A backup of your existing config has been written to config.yml.bak");
             try {
                 Files.copy(configFile.toPath(),
                         new File(configFile.getParentFile(), "config.yml.bak").toPath(),
@@ -105,7 +143,7 @@ public class ConfigManager {
 
         // Also merge in defaults from the JAR so that newly added keys are
         // visible via getX(path, defaultValue) even if the on-disk file is older.
-        InputStream defStream = plugin.getResource("config.yml");
+        InputStream defStream = defaultResource == null ? null : defaultResource.get();
         if (defStream != null) {
             YamlConfiguration defaults = YamlConfiguration.loadConfiguration(new InputStreamReader(defStream));
             config.setDefaults(defaults);

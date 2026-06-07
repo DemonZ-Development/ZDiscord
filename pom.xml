@@ -11,7 +11,7 @@
 
     <name>ZDiscord</name>
     <description>Discord integration for Minecraft servers (Paper, Folia, Spigot)</description>
-    <url>https://github.com/DemonZDevelopment/ZDiscord</url>
+    <url>https://github.com/DemonZ-Development/ZDiscord</url>
 
     <properties>
         <java.version>17</java.version>
@@ -36,11 +36,6 @@
         <repository>
             <id>dv8tion</id>
             <url>https://m2.dv8tion.net/releases</url>
-        </repository>
-
-        <repository>
-            <id>jitpack.io</id>
-            <url>https://jitpack.io</url>
         </repository>
     </repositories>
 
@@ -103,6 +98,14 @@
             <artifactId>slf4j-simple</artifactId>
             <version>1.7.36</version>
             <scope>provided</scope> </dependency>
+
+        <!-- Test dependencies -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.2</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -122,6 +125,19 @@
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <argLine>-Xmx1024m</argLine>
+                    <trimStackTrace>false</trimStackTrace>
+                    <includes>
+                        <include>**/*Test.java</include>
+                    </includes>
                 </configuration>
             </plugin>
 

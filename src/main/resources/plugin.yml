@@ -4,7 +4,7 @@ main: dev.demonz.zdiscord.ZDiscord
 api-version: '1.20'
 description: Discord integration for Minecraft servers
 author: DemonZ Development
-website: https://github.com/DemonZDevelopment/ZDiscord
+website: https://github.com/DemonZ-Development/ZDiscord
 
 folia-supported: true
 

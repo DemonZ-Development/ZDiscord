@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 DemonZ Development
+ * Copyright 2026 DemonZ Development
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,20 +17,25 @@
 package dev.demonz.zdiscord.discord.listeners;
 
 import dev.demonz.zdiscord.ZDiscord;
+import dev.demonz.zdiscord.modules.TicketModule;
+import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.entities.Member;
-import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.interactions.components.buttons.Button;
 
 import java.util.List;
 
 /**
- * Handles ticket panel button interactions (close, claim).
+ * Handles ticket panel interactions: panel button, category dropdown,
+ * and the in-ticket management buttons (close / claim / transcript).
  */
 public class TicketButtonListener extends ListenerAdapter {
 
-    private static final long DELETE_DELAY_TICKS = 100L; // 5 seconds
+    private static final long DELETE_DELAY_TICKS = 100L;
+    private static final String QUICK_ACTION = "quick";
 
     private final ZDiscord plugin;
 
@@ -40,16 +45,63 @@ public class TicketButtonListener extends ListenerAdapter {
 
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
-        switch (event.getComponentId()) {
-            case "zdiscord_ticket_close":
+        String id = event.getComponentId();
+        if (!id.startsWith(TicketModule.PANEL_BUTTON_ID)) {
+            return;
+        }
+        if (plugin.getTicketModule() == null) {
+            event.reply("The ticket system is disabled.").setEphemeral(true).queue();
+            return;
+        }
+
+        String action = id.substring(TicketModule.PANEL_BUTTON_ID.length() + 1);
+        switch (action) {
+            case QUICK_ACTION:
+                handleQuickOpen(event);
+                break;
+            case "close":
                 handleClose(event);
                 break;
-            case "zdiscord_ticket_claim":
+            case "claim":
                 handleClaim(event);
+                break;
+            case "transcript":
+                handleTranscript(event);
                 break;
             default:
                 break;
         }
+    }
+
+    @Override
+    public void onStringSelectInteraction(StringSelectInteractionEvent event) {
+        if (!TicketModule.PANEL_SELECT_ID.equals(event.getComponentId())) {
+            return;
+        }
+        if (plugin.getTicketModule() == null) {
+            event.reply("The ticket system is disabled.").setEphemeral(true).queue();
+            return;
+        }
+        String categoryId = event.getValues().get(0);
+        plugin.getTicketModule().createTicketForCategory(event.getUser(), categoryId);
+        event.reply("Your support ticket has been created. Check the new channel.")
+                .setEphemeral(true).queue();
+    }
+
+    private void handleQuickOpen(ButtonInteractionEvent event) {
+        if (plugin.getTicketModule() == null) {
+            event.reply("The ticket system is disabled.").setEphemeral(true).queue();
+            return;
+        }
+        String defaultId = plugin.getTicketModule().defaultCategoryId();
+        if (defaultId == null) {
+            event.reply("No default ticket category is configured.")
+                    .setEphemeral(true).queue();
+            return;
+        }
+        plugin.getTicketModule().createTicketForCategory(event.getUser(), defaultId);
+        event.reply("Your support ticket has been created. Check the new channel.")
+                .setEphemeral(true).queue();
     }
 
     private void handleClose(ButtonInteractionEvent event) {
@@ -57,7 +109,7 @@ public class TicketButtonListener extends ListenerAdapter {
             return;
         }
         TextChannel channel = event.getChannel().asTextChannel();
-        if (!channel.getName().startsWith("ticket-")) {
+        if (!isTicketChannel(channel)) {
             event.reply(plugin.getMessageManager().getRaw("ticket-not-ticket-channel"))
                     .setEphemeral(true).queue();
             return;
@@ -89,7 +141,8 @@ public class TicketButtonListener extends ListenerAdapter {
         if (event.getMember() == null) {
             return;
         }
-        if (!event.getChannel().getName().startsWith("ticket-")) {
+        TextChannel channel = event.getChannel().asTextChannel();
+        if (!isTicketChannel(channel)) {
             event.reply(plugin.getMessageManager().getRaw("ticket-not-ticket-channel"))
                     .setEphemeral(true).queue();
             return;
@@ -102,6 +155,15 @@ public class TicketButtonListener extends ListenerAdapter {
 
         event.reply(plugin.getMessageManager().get(
                 "ticket-claimed", "%staff%", event.getMember().getEffectiveName())).queue();
+    }
+
+    private void handleTranscript(ButtonInteractionEvent event) {
+        event.reply(":hourglass: Transcript generation is not implemented yet.")
+                .setEphemeral(true).queue();
+    }
+
+    private boolean isTicketChannel(TextChannel channel) {
+        return channel != null && channel.getName().startsWith("ticket-");
     }
 
     private boolean isSupport(Member member) {
@@ -131,4 +193,12 @@ public class TicketButtonListener extends ListenerAdapter {
             }
         }
     }
+
+    /**
+     * Re-export of the legacy close button ID so older messages
+     * created before the rewrite still work.
+     */
+    @SuppressWarnings("unused")
+    private static final Button LEGACY_CLOSE = Button.danger(
+            "zdiscord_ticket_close", "Close");
 }

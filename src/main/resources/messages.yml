@@ -23,6 +23,8 @@ ticket-created: "%prefix%&aTicket created. See &b#%channel%"
 ticket-closed: "%prefix%&eTicket &b#%id% &ehas been closed."
 ticket-max-reached: "%prefix%&cYou have reached the maximum number of open tickets (%max%)."
 ticket-not-found: "%prefix%&cTicket not found."
+ticket-category-unknown: "%prefix%&cThat ticket category is no longer available."
+ticket-no-default: "%prefix%&cNo default ticket category is configured."
 
 # ── Anti-raid ─────────────────────────────────────────────
 lockdown-enabled: "%prefix%&c&lSERVER LOCKDOWN &8> &cPossible raid detected."
@@ -45,6 +47,9 @@ slash-status-title: "Server Status"
 slash-players-title: "Online Players"
 slash-tps-title: "Server Performance"
 slash-link-title: "Account Linking"
+slash-profile-title: "Player Profile"
+slash-seen-title: "Last Seen"
+slash-following-title: "Following"
 
 # ── Console / ticket messages ─────────────────────────────
 console-disabled: "Console commands are disabled. Set `misc.console-role` in config.yml to enable them."

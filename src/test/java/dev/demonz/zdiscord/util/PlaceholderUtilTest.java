@@ -47,7 +47,7 @@ class PlaceholderUtilTest {
 
     @Test
     void resolvesTps() {
-        state.setTps(20.0, 20.0, 20.0);
+        state.withTps(20.0, 20.0, 20.0);
         String result = PlaceholderUtil.resolveServer("TPS: %tps%");
         assertTrue(result.startsWith("TPS: 20.0"),
                 "Expected TPS to start with 20.0, got: " + result);

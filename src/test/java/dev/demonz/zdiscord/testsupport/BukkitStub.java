@@ -198,11 +198,13 @@ public final class BukkitStub {
     }
 
     /**
-     * Concrete-but-abstract stub. Allocation is via
+     * Abstract stub. Allocation is via
      * {@link sun.misc.Unsafe#allocateInstance} in {@link #install()};
-     * we never call the constructor.
+     * we never call the constructor. The class is declared abstract
+     * so the compiler does not require us to implement every method
+     * of {@link Server}.
      */
-    public static class ServerState extends State {
+    public static abstract class ServerState extends State {
     }
 
     /** Allocate a stub world. */

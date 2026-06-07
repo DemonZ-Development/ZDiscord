@@ -59,7 +59,7 @@ class TPSUtilTest {
 
     @Test
     void reflectsServerStubTps() {
-        state.setTps(19.5, 20.0, 20.0);
+        state.withTps(19.5, 20.0, 20.0);
         double[] tps = TPSUtil.getTPS();
         assertEquals(19.5, tps[0], 0.0001);
     }

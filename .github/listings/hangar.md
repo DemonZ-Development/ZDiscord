@@ -60,6 +60,10 @@ It supports Paper 1.20.4 or newer, Folia, and Spigot 1.20.4 or newer.
 5. Restart the server.
 6. Run `/setup` in Discord to configure the remaining channels.
 
+### bStats
+
+<script>var defined = 29652;</script><script src="https://bstats.org/loader.js"></script>
+
 ### License
 
 Apache License 2.0
@@ -69,17 +73,6 @@ Apache License 2.0
 - Source: https://github.com/DemonZ-Development/ZDiscord
 - Issues: https://github.com/DemonZ-Development/ZDiscord/issues
 - Wiki: https://github.com/DemonZ-Development/ZDiscord/wiki
-
-## bStats
-
-Embed this in the description HTML:
-
-```html
-<script>
-  var defined = 29652;
-</script>
-<script src="https://bstats.org/loader.js"></script>
-```
 
 ## Tags
 

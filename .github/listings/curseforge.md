@@ -58,6 +58,10 @@ ZDiscord bridges your Minecraft server and Discord guild. Chat flows both ways, 
 5. Restart the server.
 6. Run `/setup` in Discord to configure the remaining channels.
 
+### bStats
+
+<script>var defined = 29652;</script><script src="https://bstats.org/loader.js"></script>
+
 ### License
 
 Apache License 2.0
@@ -83,17 +87,6 @@ https://github.com/DemonZ-Development/ZDiscord/issues
 - Spigot - Chat
 - Spigot - Admin Tools
 - Paper - Admin Tools
-
-## bStats
-
-Embed this in the description HTML:
-
-```html
-<script>
-  var defined = 29652;
-</script>
-<script src="https://bstats.org/loader.js"></script>
-```
 
 ## Tags
 

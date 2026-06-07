@@ -66,6 +66,10 @@ ZDiscord bridges your Minecraft server and Discord guild. Chat flows both ways, 
 
 All configuration lives in `plugins/ZDiscord/config.yml`. User-facing strings are in `messages.yml`. See the wiki for a full reference.
 
+### bStats
+
+<script>var defined = 29652;</script><script src="https://bstats.org/loader.js"></script>
+
 ### License
 
 Apache License 2.0
@@ -76,16 +80,7 @@ Apache License 2.0
 - Issues: https://github.com/DemonZ-Development/ZDiscord/issues
 - Wiki: https://github.com/DemonZ-Development/ZDiscord/wiki
 
-## bStats
 
-Embed this in the long description HTML:
-
-```html
-<script>
-  var defined = 29652;
-</script>
-<script src="https://bstats.org/loader.js"></script>
-```
 
 ## Tags
 

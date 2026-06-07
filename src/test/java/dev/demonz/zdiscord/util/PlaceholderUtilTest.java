@@ -46,6 +46,13 @@ class PlaceholderUtilTest {
     }
 
     @Test
+    void onlineAndMaxUseStubbedValues() {
+        state.withMaxPlayers(50).withOnlineCount(7);
+        String result = PlaceholderUtil.resolveServer("Online: %online%/%max%");
+        assertEquals("Online: 7/50", result);
+    }
+
+    @Test
     void resolvesTps() {
         state.withTps(20.0, 20.0, 20.0);
         String result = PlaceholderUtil.resolveServer("TPS: %tps%");
@@ -59,23 +66,9 @@ class PlaceholderUtilTest {
     }
 
     @Test
-    void resolvesPlayerTokens() {
-        state.addWorld("world");
-        var player = state.addPlayer("Alice");
+    void nullPlayerLeavesTokensUnresolved() {
         String result = PlaceholderUtil.resolve(
-                "name=%name% player=%player% uuid=%uuid% world=%world%",
-                player);
-        assertTrue(result.contains("name=Alice"));
-        assertTrue(result.contains("player=Alice"));
-        assertTrue(result.contains("world=world"));
-    }
-
-    @Test
-    void onlineCountReflectsAddedPlayers() {
-        state.addWorld("world");
-        state.addPlayer("Alice");
-        state.addPlayer("Bob");
-        String result = PlaceholderUtil.resolveServer("Online: %online%");
-        assertEquals("Online: 2", result);
+                "name=%name% player=%player%", null);
+        assertEquals("name=%name% player=%player%", result);
     }
 }

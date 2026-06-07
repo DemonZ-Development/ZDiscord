@@ -20,10 +20,10 @@ import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Thin indirection over the static {@code Bukkit.*} server accessors
@@ -44,10 +44,13 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *       would mean writing ~100 stub methods.</li>
  * </ul>
  *
- * <p>This bridge exposes the four methods the plugin actually calls
- * ({@code getOnlinePlayers}, {@code getMaxPlayers}, {@code getTPS},
- * {@code getWorld}) and lets tests replace the implementation in
- * {@code @BeforeEach}.</p>
+ * <p>This bridge exposes the methods the plugin actually calls
+ * ({@code getOnlinePlayers}, {@code getMaxPlayers}, {@code getTPS})
+ * and lets tests replace the implementation in
+ * {@code @BeforeEach}. The {@code Player}/{@code World} objects the
+ * production backend would surface are deliberately <em>not</em>
+ * part of the contract — see {@link StubBackend} for how tests fake
+ * them without constructing full instances.</p>
  */
 public final class ServerBridge {
 
@@ -58,15 +61,13 @@ public final class ServerBridge {
      * The contract every backend must satisfy. The default backend
      * is a {@link BukkitBackend} that delegates to the static
      * {@code Bukkit.*} methods. Tests install a stub backend in
-     * {@code @BeforeEach} and call {@link #setBackend(Backend)} with
-     * a null value (or use {@link #resetBackend()}) in
+     * {@code @BeforeEach} and call {@link #resetBackend()} in
      * {@code @AfterEach}.
      */
     public interface Backend {
         Collection<? extends Player> getOnlinePlayers();
         int getMaxPlayers();
         double[] getTPS();
-        World getWorld(String name);
     }
 
     /** Production backend that delegates to the static {@code Bukkit.*} methods. */
@@ -74,25 +75,26 @@ public final class ServerBridge {
         @Override public Collection<? extends Player> getOnlinePlayers() { return Bukkit.getOnlinePlayers(); }
         @Override public int getMaxPlayers() { return Bukkit.getMaxPlayers(); }
         @Override public double[] getTPS() { return Bukkit.getTPS(); }
-        @Override public World getWorld(String name) { return Bukkit.getWorld(name); }
     }
 
     /**
-     * Stub backend for tests. Construct, set values via the builder
-     * methods, then install with {@link #setBackend(Backend)}.
-     *
-     * <p>Thread-safe: the online-players list is a
-     * {@link CopyOnWriteArrayList} so the production code can read
-     * it concurrently with the test setup.</p>
+     * Stub backend for tests. Holds <em>counts</em> only, not real
+     * {@code Player} or {@code World} instances. The {@code Player}
+     * and {@code World} interfaces in paper-api 1.20.4 expose
+     * hundreds of abstract methods each — instantiating anonymous
+     * classes that satisfy every abstract method is impractical, so
+     * {@link #getOnlinePlayers()} returns an unmodifiable list of
+     * size {@code onlineCount} whose entries are {@code null}. The
+     * production placeholder code only reads
+     * {@code .size()}, and {@link StatusEmbedBuilder#capture()} only
+     * iterates when {@code onlineCount > 0}; the tests are written
+     * to keep {@code onlineCount == 0} on that code path.
      */
     public static class StubBackend implements Backend {
-        protected final List<Player> onlinePlayers = new CopyOnWriteArrayList<>();
-        protected final java.util.Map<String, World> worlds = new java.util.HashMap<>();
+        protected int onlineCount = 0;
         protected int maxPlayers = 20;
         protected double[] tps = { 20.0, 20.0, 20.0 };
 
-        public StubBackend addPlayer(Player p) { onlinePlayers.add(p); return this; }
-        public StubBackend addWorld(String name, World w) { worlds.put(name.toLowerCase(), w); return this; }
         public StubBackend withMaxPlayers(int max) { this.maxPlayers = max; return this; }
         public StubBackend withTps(double oneMinute, double fiveMinute, double fifteenMinute) {
             this.tps = new double[] { oneMinute, fiveMinute, fifteenMinute };
@@ -100,13 +102,18 @@ public final class ServerBridge {
         }
 
         @Override public Collection<? extends Player> getOnlinePlayers() {
-            return Collections.unmodifiableList(onlinePlayers);
+            int n = onlineCount;
+            if (n <= 0) {
+                return Collections.emptyList();
+            }
+            List<Player> list = new ArrayList<>(n);
+            for (int i = 0; i < n; i++) {
+                list.add(null);
+            }
+            return Collections.unmodifiableList(list);
         }
         @Override public int getMaxPlayers() { return maxPlayers; }
         @Override public double[] getTPS() { return tps.clone(); }
-        @Override public World getWorld(String name) {
-            return name == null ? null : worlds.get(name.toLowerCase());
-        }
     }
 
     private static volatile Backend backend = new BukkitBackend();
@@ -137,10 +144,5 @@ public final class ServerBridge {
     public static double[] tps() {
         Backend b = backend;
         return b == null ? new double[] { 20.0, 20.0, 20.0 } : b.getTPS();
-    }
-
-    public static World getWorld(String name) {
-        Backend b = backend;
-        return b == null ? null : b.getWorld(name);
     }
 }

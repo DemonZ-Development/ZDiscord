@@ -157,7 +157,9 @@ public class StatusModule {
         ctx.maxCount = BukkitMaxPlayers();
 
         try {
-            channel.editMessageEmbedsById(statusMessageId, StatusEmbedBuilder.build(ctx)).complete();
+            channel.editMessageEmbedsById(statusMessageId, StatusEmbedBuilder.build(ctx)).queue(
+                    null,
+                    e -> plugin.debug("Failed to send offline status: " + e.getMessage()));
         } catch (Exception e) {
             plugin.debug("Failed to send offline status: " + e.getMessage());
         }

@@ -30,6 +30,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.UUID;
 
 /**
@@ -41,7 +42,7 @@ public class ReactionRoleModule {
     private final ZDiscord plugin;
     private final File dataFile;
     private FileConfiguration data;
-    private final Map<String, Map<String, RoleMapping>> mappings = new HashMap<>();
+    private final Map<String, Map<String, RoleMapping>> mappings = new ConcurrentHashMap<>();
 
     public ReactionRoleModule(ZDiscord plugin) {
         this.plugin = plugin;

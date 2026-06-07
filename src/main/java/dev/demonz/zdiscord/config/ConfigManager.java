@@ -110,13 +110,12 @@ public class ConfigManager {
         logger.info("Configuration is at v" + current
                 + "; current schema is v" + CURRENT_VERSION + ". Merging in any new keys.");
 
-        InputStream defStream = defaultResource == null ? null : defaultResource.get();
-        if (defStream == null) {
-            logger.warning("Default config.yml not found in JAR; skipping migration.");
-            return;
-        }
+        try (InputStream defStream = defaultResource == null ? null : defaultResource.get()) {
+            if (defStream == null) {
+                logger.warning("Default config.yml not found in JAR; skipping migration.");
+                return;
+            }
 
-        try {
             FileConfiguration defaults = YamlConfiguration.loadConfiguration(new InputStreamReader(defStream));
             for (String key : defaults.getKeys(true)) {
                 if (!config.contains(key)) {
@@ -135,6 +134,8 @@ public class ConfigManager {
                         StandardCopyOption.REPLACE_EXISTING);
             } catch (IOException ignored) {
             }
+        } catch (Exception e) {
+            logger.warning("Failed to read default config for migration: " + e.getMessage());
         }
     }
 
@@ -143,11 +144,14 @@ public class ConfigManager {
 
         // Also merge in defaults from the JAR so that newly added keys are
         // visible via getX(path, defaultValue) even if the on-disk file is older.
-        InputStream defStream = defaultResource == null ? null : defaultResource.get();
-        if (defStream != null) {
-            YamlConfiguration defaults = YamlConfiguration.loadConfiguration(new InputStreamReader(defStream));
-            config.setDefaults(defaults);
-            config.options().copyDefaults(true);
+        try (InputStream defStream = defaultResource == null ? null : defaultResource.get()) {
+            if (defStream != null) {
+                YamlConfiguration defaults = YamlConfiguration.loadConfiguration(new InputStreamReader(defStream));
+                config.setDefaults(defaults);
+                config.options().copyDefaults(true);
+            }
+        } catch (Exception e) {
+            logger.warning("Failed to load default config: " + e.getMessage());
         }
     }
 

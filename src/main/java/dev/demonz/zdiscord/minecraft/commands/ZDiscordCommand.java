@@ -24,9 +24,9 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 
-import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -47,7 +47,7 @@ import java.util.stream.Collectors;
 public class ZDiscordCommand implements CommandExecutor, TabCompleter {
 
     private final ZDiscord plugin;
-    private final Set<UUID> dismissedUpdates = new HashSet<>();
+    private final Set<UUID> dismissedUpdates = ConcurrentHashMap.newKeySet();
 
     public ZDiscordCommand(ZDiscord plugin) {
         this.plugin = plugin;

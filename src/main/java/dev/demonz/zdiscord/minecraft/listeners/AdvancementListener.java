@@ -39,12 +39,6 @@ import java.time.Instant;
  */
 public class AdvancementListener implements Listener {
 
-    /**
-     * Unlockers below this fraction of the active player base
-     * are considered "rare" and the embed shows the trophy
-     * badge. 0.25 = bottom 25%.
-     */
-    private static final double RARITY_THRESHOLD = 0.25;
 
     private final ZDiscord plugin;
 

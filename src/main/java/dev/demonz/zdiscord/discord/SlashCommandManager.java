@@ -46,8 +46,6 @@ import java.util.stream.Collectors;
  */
 public class SlashCommandManager extends ListenerAdapter {
 
-    private static final long CONFESSION_COOLDOWN_MS = 5 * 60 * 1000L;
-
     private final ZDiscord plugin;
 
     /** discord user id → last confession epoch ms (rate-limit). */

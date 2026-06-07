@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Support ticket system. Each ticket is a private Discord channel
@@ -54,14 +55,14 @@ public class TicketModule {
 
     private final ZDiscord plugin;
     private final Map<String, Integer> openTicketsByUser = new ConcurrentHashMap<>();
-    private int ticketCounter = 0;
+    private final AtomicInteger ticketCounter = new AtomicInteger(0);
 
     public TicketModule(ZDiscord plugin) {
         this.plugin = plugin;
     }
 
     public void init() {
-        ticketCounter = plugin.getStorageManager().getDataInt("ticket-counter", 0);
+        ticketCounter.set(plugin.getStorageManager().getDataInt("ticket-counter", 0));
         String openData = plugin.getStorageManager().getData("open-tickets", "");
         openTicketsByUser.clear();
         if (!openData.isEmpty()) {
@@ -78,7 +79,7 @@ public class TicketModule {
                 }
             }
         }
-        plugin.debug("Ticket module initialised (counter: " + ticketCounter
+        plugin.debug("Ticket module initialised (counter: " + ticketCounter.get()
                 + ", categories: " + getCategories().size()
                 + ", tracked users: " + openTicketsByUser.size() + ")");
     }
@@ -277,12 +278,12 @@ public class TicketModule {
             category = guild.getCategoryById(categoryChannelId);
         }
 
-        ticketCounter++;
-        plugin.getStorageManager().setData("ticket-counter", ticketCounter);
+        int currentTicket = ticketCounter.incrementAndGet();
+        plugin.getStorageManager().setData("ticket-counter", currentTicket);
 
         TicketCategory cat = getCategory(categoryId);
 
-        String channelName = "ticket-" + String.format("%04d", ticketCounter)
+        String channelName = "ticket-" + String.format("%04d", currentTicket)
                 + "-" + username.toLowerCase().replaceAll("[^a-z0-9-]", "");
 
         try {
@@ -341,7 +342,7 @@ public class TicketModule {
                 .addField("Category", categoryLabel, true)
                 .addField("Opened by", "`" + username + "`", true)
                 .setColor(ColorUtil.parseHex(color))
-                .setFooter("Ticket #" + ticketCounter + " \u2022 Use the buttons below to manage")
+                .setFooter("Ticket #" + currentTicket + " \u2022 Use the buttons below to manage")
                 .setTimestamp(Instant.now());
 
         channel.sendMessageEmbeds(embed.build())
@@ -475,7 +476,7 @@ public class TicketModule {
     }
 
     public void shutdown() {
-        plugin.getStorageManager().setData("ticket-counter", ticketCounter);
+        plugin.getStorageManager().setData("ticket-counter", ticketCounter.get());
         saveOpenTickets();
     }
 

@@ -78,7 +78,14 @@ Apache License 2.0
 
 ## bStats
 
-[![bStats Servers](https://bstats.org/signatures/bukkit/29652/server-count.svg)](https://bstats.org/plugin/bukkit/ZDiscord)
+Embed this in the long description HTML:
+
+```html
+<script>
+  var defined = 29652;
+</script>
+<script src="https://bstats.org/loader.js"></script>
+```
 
 ## Tags
 

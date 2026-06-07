@@ -79,7 +79,9 @@ Apache License 2.0
 
 ## bStats
 
-[IMG]https://bstats.org/signatures/bukkit/29652/server-count.svg[/IMG]
+Spigot uses BBCode and does not support embedded JavaScript. Link to the live graph instead:
+
+[URL=https://bstats.org/plugin/bukkit/ZDiscord][IMG]https://bstats.org/signatures/bukkit/29652/server-count.svg[/IMG][/URL]
 
 ## External links
 

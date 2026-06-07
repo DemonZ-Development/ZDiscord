@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 DemonZ Development
+ * Copyright 2024 DemonZ Development
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,10 +26,9 @@ import org.bukkit.event.Listener;
 
 /**
  * Paper-specific chat listener that consumes the modern
- * {@code AsyncChatEvent}. Does NOT cancel the event — the chat
- * message must still be shown to the player. The legacy
- * {@link ChatListener} is simply not registered on Paper, so there
- * is no double-send.
+ * {@code AsyncChatEvent}. Cancelling the event prevents the legacy
+ * {@code AsyncPlayerChatEvent} from firing as well, so the chat
+ * message is only forwarded once.
  *
  * <p>Only registered when Paper is detected at startup — see
  * {@code ZDiscord.registerListeners()}.</p>
@@ -48,5 +47,6 @@ public class PaperChatListener implements Listener {
     public void onChat(AsyncChatEvent event) {
         String message = PLAIN.serialize(event.message());
         ChatBridge.forward(plugin, event.getPlayer(), message);
+        event.setCancelled(true);
     }
 }

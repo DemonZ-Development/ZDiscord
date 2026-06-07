@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 DemonZ Development
+ * Copyright 2024 DemonZ Development
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,20 +17,35 @@
 package dev.demonz.zdiscord.testsupport;
 
 import dev.demonz.zdiscord.util.ServerBridge;
+import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.entity.Player;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Test fixture for the {@link ServerBridge} swappable backend.
  *
  * <p>Install a stub backend in {@code @BeforeEach} and call
  * {@link #uninstall()} in {@code @AfterEach}. The fixture exposes
- * fluent builders so tests can tweak TPS, max-players, and the
- * online-player <em>count</em> (without constructing real
- * {@code Player} objects — see the class Javadoc on
- * {@link ServerBridge.StubBackend} for why).</p>
+ * fluent builders so tests can add players / worlds and tweak TPS
+ * and max-players without writing a custom backend each time.</p>
  *
  * <p>Why not just use MockBukkit? JitPack now requires
  * authentication for unauthenticated downloads, which breaks CI for
- * any project that pulls a JitPack-only artifact.</p>
+ * any project that pulls a JitPack-only artifact. And the
+ * alternative of generating a {@code Server} proxy on
+ * {@code Bukkit.server} fails because the proxy walk triggers
+ * static initializers of types whose {@code Class.forName} calls
+ * hit CraftBukkit NMS classes that aren't on the test classpath.
+ * The plugin's own code now goes through
+ * {@link ServerBridge}, which is a four-method interface we can
+ * stub trivially.</p>
  */
 public final class BukkitStub {
 
@@ -62,12 +77,27 @@ public final class BukkitStub {
     }
 
     /**
-     * Mutable state behind the stub. The fixture-specific methods
-     * ({@link #withTps}, {@link #withMaxPlayers},
-     * {@link #withOnlineCount}) drive the
-     * {@link ServerBridge.Backend} values that production code reads.
+     * Mutable state behind the stub. Holds the online-player list,
+     * the world map, and the TPS / max-players values. The
+     * fixture-specific methods ({@link #addPlayer}, {@link #addWorld},
+     * {@link #withTps}, {@link #withMaxPlayers}) are the test API;
+     * the {@link ServerBridge.Backend} methods are what the
+     * production code calls.
      */
     public static final class State extends ServerBridge.StubBackend {
+        private final AtomicInteger seq = new AtomicInteger();
+
+        public Player addPlayer(String name) {
+            World w = worlds.isEmpty() ? null : worlds.values().iterator().next();
+            Player p = newPlayer(name, w);
+            onlinePlayers.add(p);
+            return p;
+        }
+
+        public State addWorld(String name) {
+            worlds.put(name.toLowerCase(), newWorld(name));
+            return this;
+        }
 
         public State withTps(double oneMinute, double fiveMinute, double fifteenMinute) {
             this.tps = new double[] { oneMinute, fiveMinute, fifteenMinute };
@@ -79,15 +109,28 @@ public final class BukkitStub {
             return this;
         }
 
-        /**
-         * Prime the online-player count that
-         * {@code ServerBridge.onlinePlayers().size()} returns. The
-         * actual {@code Player} instances are never created — see
-         * the class Javadoc for why.
-         */
-        public State withOnlineCount(int count) {
-            this.onlineCount = count;
-            return this;
+        private Player newPlayer(String name, World world) {
+            UUID id = new UUID(0, seq.incrementAndGet());
+            return new Player() {
+                @Override public String getName() { return name; }
+                @Override public UUID getUniqueId() { return id; }
+                @Override public World getWorld() { return world; }
+                @Override public Location getLocation() { return new Location(world, 0, 64, 0); }
+                @Override public String getDisplayName() { return name; }
+                @Override public double getHealth() { return 20.0; }
+                @Override public int getFoodLevel() { return 20; }
+                @Override public boolean isOnline() { return true; }
+            };
+        }
+
+        private World newWorld(String name) {
+            UUID id = UUID.randomUUID();
+            return new World() {
+                @Override public String getName() { return name; }
+                @Override public UUID getUID() { return id; }
+                @Override public org.bukkit.generator.ChunkGenerator getGenerator() { return null; }
+                @Override public List<Player> getPlayers() { return new ArrayList<>(); }
+            };
         }
     }
 }

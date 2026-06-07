@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 DemonZ Development
+ * Copyright 2024 DemonZ Development
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,14 +17,11 @@
 package dev.demonz.zdiscord.util;
 
 import dev.demonz.zdiscord.ZDiscord;
-import dev.demonz.zdiscord.util.ColorUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.dv8tion.jda.api.EmbedBuilder;
-import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -38,23 +35,15 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * Polls the Modrinth API for newer releases of the plugin and
- * notifies admins on join. The check runs at startup, then every
- * five hours, so long-running servers stay up to date without a
- * restart. The check itself is silent (no console spam, no join
- * banner for non-admins); admins still get a clickable in-game
- * banner on next join unless {@code misc.update-silent} is set,
- * and a one-time quiet embed is posted to
- * {@code misc.update-channel} (if configured) the first time a
- * new version is detected — no pings, no looping.
+ * notifies admins on join. The check runs at startup, then every six
+ * hours, so long-running servers stay up to date without a restart.
  */
 public class UpdateChecker implements Listener {
 
@@ -63,7 +52,7 @@ public class UpdateChecker implements Listener {
             "https://api.modrinth.com/v2/project/" + PROJECT_SLUG + "/version";
     private static final String PAGE_URL = "https://modrinth.com/project/" + PROJECT_SLUG;
 
-    private static final long REPEAT_CHECK_TICKS = 20L * 60L * 60L * 5L;
+    private static final long REPEAT_CHECK_TICKS = 20L * 60L * 60L * 6L;
     private static final Pattern VERSION_TOKEN =
             Pattern.compile("(\\d+)\\.(\\d+)(?:\\.(\\d+))?(?:-(.+))?");
 
@@ -73,15 +62,6 @@ public class UpdateChecker implements Listener {
     private volatile String releaseDate;
     private volatile boolean updateAvailable;
     private volatile int lastCheckErrorCount;
-
-    /**
-     * Tracks whether we've already announced this latest version
-     * to the configured Discord channel. Reset to false the moment
-     * a newer version is detected, so a server that's been running
-     * across multiple plugin releases still gets a fresh notice
-     * for each one.
-     */
-    private final AtomicBoolean discordAnnouncedForCurrent = new AtomicBoolean(false);
 
     public UpdateChecker(ZDiscord plugin) {
         this.plugin = plugin;
@@ -118,22 +98,10 @@ public class UpdateChecker implements Listener {
             String currentVersion = plugin.getDescription().getVersion();
             if (isNewer(latestVersion, currentVersion)) {
                 updateAvailable = true;
-                // A newer release was just detected. Force the
-                // Discord channel to re-announce, even if the
-                // previous tick already announced an older
-                // "newer" version.
-                discordAnnouncedForCurrent.set(false);
                 plugin.getLogger().info("A new version of ZDiscord is available: v"
                         + latestVersion + " (" + PAGE_URL + ")");
             } else {
                 updateAvailable = false;
-            }
-
-            // Silent Discord broadcast. The flag prevents
-            // re-posts on every periodic tick.
-            if (updateAvailable
-                    && discordAnnouncedForCurrent.compareAndSet(false, true)) {
-                postSilentDiscordNotice(currentVersion);
             }
         } catch (Exception e) {
             lastCheckErrorCount++;
@@ -143,47 +111,6 @@ public class UpdateChecker implements Listener {
                 connection.disconnect();
             }
         }
-    }
-
-    /**
-     * Post a single quiet embed to {@code misc.update-channel}
-     * (if configured) when a new version is detected. No
-     * @everyone / @here, no pings, just an embed with a
-     * download button. Does nothing if the channel id is
-     * missing or the bot is not connected.
-     */
-    private void postSilentDiscordNotice(String currentVersion) {
-        if (!plugin.getBotManager().isConnected()) {
-            return;
-        }
-        String channelId = plugin.getConfigManager()
-                .getString("misc.update-channel", "").trim();
-        if (channelId.isEmpty() || channelId.startsWith("YOUR_")) {
-            return;
-        }
-        TextChannel channel = plugin.getBotManager().getJda()
-                .getTextChannelById(channelId);
-        if (channel == null) {
-            plugin.debug("Update-check Discord channel '" + channelId
-                    + "' not found.");
-            return;
-        }
-        EmbedBuilder embed = new EmbedBuilder()
-                .setTitle(":arrows_counterclockwise: ZDiscord update available")
-                .setDescription("A new version of **ZDiscord** is available. "
-                        + "No action is required — this is a quiet notice.\n\n"
-                        + "Installed: `v" + currentVersion + "`\n"
-                        + "Latest: `v" + latestVersion + "`")
-                .setColor(0xF1C40F)
-                .addField("Changelog", PAGE_URL + "/changelog", false)
-                .addField("Download", PAGE_URL + "/versions", false)
-                .setTimestamp(Instant.now())
-                .setFooter("Silent update check", null);
-        channel.sendMessageEmbeds(embed.build()).queue(
-                success -> plugin.debug("Posted silent update notice to "
-                        + channelId),
-                error -> plugin.debug("Failed to post silent update notice: "
-                        + error.getMessage()));
     }
 
     /**
@@ -246,13 +173,6 @@ public class UpdateChecker implements Listener {
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         if (!updateAvailable) {
-            return;
-        }
-        // When the operator has marked the update check as
-        // "silent", the in-game banner is suppressed entirely;
-        // the only signal is the (also silent) Discord embed
-        // posted to misc.update-channel, and the server log.
-        if (plugin.getConfigManager().getBoolean("misc.update-silent", false)) {
             return;
         }
         Player player = event.getPlayer();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 DemonZ Development
+ * Copyright 2024 DemonZ Development
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,18 +49,10 @@ public class DiscordChatListener extends ListenerAdapter {
         String chatChannelId = plugin.getConfigManager().getString("channels.chat");
         String consoleChannelId = plugin.getConfigManager().getString("channels.console");
 
-        if (chatChannelId == null || chatChannelId.isEmpty()) {
-            plugin.debug("Discord chat listener fired but channels.chat is not set in config.yml");
-            return;
-        }
-
         if (event.getChannel().getId().equals(chatChannelId)) {
             handleChatMessage(event);
-        } else if (consoleChannelId != null && event.getChannel().getId().equals(consoleChannelId)) {
+        } else if (event.getChannel().getId().equals(consoleChannelId)) {
             handleConsoleCommand(event);
-        } else {
-            plugin.debug("Discord message in non-bridge channel #"
-                    + event.getChannel().getName() + " (id=" + event.getChannel().getId() + "); ignoring");
         }
     }
 

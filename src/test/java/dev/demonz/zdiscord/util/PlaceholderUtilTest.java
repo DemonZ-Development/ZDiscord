@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 DemonZ Development
+ * Copyright 2024 DemonZ Development
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,17 +40,9 @@ class PlaceholderUtilTest {
 
     @Test
     void resolvesOnlineAndMax() {
-        state.withMaxPlayers(0);
         String result = PlaceholderUtil.resolveServer(
                 "Online: %online%/%max%");
         assertEquals("Online: 0/0", result);
-    }
-
-    @Test
-    void onlineAndMaxUseStubbedValues() {
-        state.withMaxPlayers(50).withOnlineCount(7);
-        String result = PlaceholderUtil.resolveServer("Online: %online%/%max%");
-        assertEquals("Online: 7/50", result);
     }
 
     @Test
@@ -67,9 +59,23 @@ class PlaceholderUtilTest {
     }
 
     @Test
-    void nullPlayerLeavesTokensUnresolved() {
+    void resolvesPlayerTokens() {
+        state.addWorld("world");
+        var player = state.addPlayer("Alice");
         String result = PlaceholderUtil.resolve(
-                "name=%name% player=%player%", null);
-        assertEquals("name=%name% player=%player%", result);
+                "name=%name% player=%player% uuid=%uuid% world=%world%",
+                player);
+        assertTrue(result.contains("name=Alice"));
+        assertTrue(result.contains("player=Alice"));
+        assertTrue(result.contains("world=world"));
+    }
+
+    @Test
+    void onlineCountReflectsAddedPlayers() {
+        state.addWorld("world");
+        state.addPlayer("Alice");
+        state.addPlayer("Bob");
+        String result = PlaceholderUtil.resolveServer("Online: %online%");
+        assertEquals("Online: 2", result);
     }
 }

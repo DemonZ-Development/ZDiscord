@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 DemonZ Development
+ * Copyright 2024 DemonZ Development
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -76,19 +76,6 @@ public class LeaderboardModule {
         statsCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>())
                 .put(stat, value);
         plugin.getStorageManager().saveStat(uuid, stat, value);
-    }
-
-    /**
-     * @return the current value of {@code stat} for {@code uuid},
-     *         or {@code 0} if the player has no entry.
-     */
-    public long getStat(UUID uuid, String stat) {
-        var map = statsCache.get(uuid);
-        if (map == null) {
-            return 0L;
-        }
-        Long v = map.get(stat);
-        return v == null ? 0L : v;
     }
 
     public List<Map.Entry<UUID, Long>> getLeaderboard(String stat, int limit) {

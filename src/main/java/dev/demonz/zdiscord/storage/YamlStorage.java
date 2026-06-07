@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 DemonZ Development
+ * Copyright 2024 DemonZ Development
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.BooleanSupplier;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -48,61 +47,33 @@ public class YamlStorage implements StorageManager {
     private final File dataFolder;
     private final Logger logger;
     private final PlatformAdapter platform;
-    private final BooleanSupplier enabledSupplier;
 
     private File linksFile;
     private File statsFile;
     private File dataFile;
-    private File activityFile;
-    private File advancementsFile;
-    private File followsFile;
 
     private FileConfiguration linksConfig;
     private FileConfiguration statsConfig;
     private FileConfiguration dataConfig;
-    private FileConfiguration activityConfig;
-    private FileConfiguration advancementsConfig;
-    private FileConfiguration followsConfig;
 
     private final ReentrantReadWriteLock linksLock = new ReentrantReadWriteLock();
     private final ReentrantReadWriteLock statsLock = new ReentrantReadWriteLock();
     private final ReentrantReadWriteLock dataLock = new ReentrantReadWriteLock();
-    private final ReentrantReadWriteLock activityLock = new ReentrantReadWriteLock();
-    private final ReentrantReadWriteLock advancementsLock = new ReentrantReadWriteLock();
-    private final ReentrantReadWriteLock followsLock = new ReentrantReadWriteLock();
 
     public YamlStorage(ZDiscord plugin) {
-        this(plugin.getDataFolder(), plugin.getLogger(), plugin.getPlatformAdapter(),
-                () -> plugin.isEnabled());
+        this(plugin.getDataFolder(), plugin.getLogger(), plugin.getPlatformAdapter());
     }
 
     /**
      * Test-friendly constructor. Production code uses the
      * {@link ZDiscord}-accepting variant; tests can supply a temporary
      * directory, a no-op logger, and a stub platform adapter that
-     * runs tasks synchronously on the caller thread. The
-     * {@code enabledSupplier} is consulted on every async flush so
-     * that writes made from a module's {@code shutdown()} method
-     * (which run after Bukkit has set the plugin to disabled) take
-     * the synchronous path instead of trying to register a task on
-     * a disabled plugin — which throws
-     * {@link IllegalPluginAccessException}.
+     * runs tasks synchronously on the caller thread.
      */
-    public YamlStorage(File dataFolder, Logger logger, PlatformAdapter platform,
-                       BooleanSupplier enabledSupplier) {
+    public YamlStorage(File dataFolder, Logger logger, PlatformAdapter platform) {
         this.dataFolder = dataFolder;
         this.logger = logger;
         this.platform = platform;
-        this.enabledSupplier = enabledSupplier != null ? enabledSupplier : () -> true;
-    }
-
-    /**
-     * Test-only convenience overload — assumes the plugin is always
-     * enabled, so all writes go through the async path (or the
-     * synchronous path if {@code platform} is null).
-     */
-    public YamlStorage(File dataFolder, Logger logger, PlatformAdapter platform) {
-        this(dataFolder, logger, platform, () -> true);
     }
 
     @Override
@@ -110,23 +81,14 @@ public class YamlStorage implements StorageManager {
         linksFile = new File(dataFolder, "linked_accounts.yml");
         statsFile = new File(dataFolder, "leaderboard_data.yml");
         dataFile = new File(dataFolder, "plugin_data.yml");
-        activityFile = new File(dataFolder, "player_activity.yml");
-        advancementsFile = new File(dataFolder, "advancement_unlocks.yml");
-        followsFile = new File(dataFolder, "player_follows.yml");
 
         createIfMissing(linksFile);
         createIfMissing(statsFile);
         createIfMissing(dataFile);
-        createIfMissing(activityFile);
-        createIfMissing(advancementsFile);
-        createIfMissing(followsFile);
 
         linksConfig = YamlConfiguration.loadConfiguration(linksFile);
         statsConfig = YamlConfiguration.loadConfiguration(statsFile);
         dataConfig = YamlConfiguration.loadConfiguration(dataFile);
-        activityConfig = YamlConfiguration.loadConfiguration(activityFile);
-        advancementsConfig = YamlConfiguration.loadConfiguration(advancementsFile);
-        followsConfig = YamlConfiguration.loadConfiguration(followsFile);
 
         logger.info("Storage: YAML file storage");
     }
@@ -138,9 +100,6 @@ public class YamlStorage implements StorageManager {
         saveFileLocked(linksConfig, linksFile, linksLock, "linked accounts");
         saveFileLocked(statsConfig, statsFile, statsLock, "leaderboard data");
         saveFileLocked(dataConfig, dataFile, dataLock, "plugin data");
-        saveFileLocked(activityConfig, activityFile, activityLock, "player activity");
-        saveFileLocked(advancementsConfig, advancementsFile, advancementsLock, "advancement unlocks");
-        saveFileLocked(followsConfig, followsFile, followsLock, "player follows");
     }
 
     @Override
@@ -297,217 +256,6 @@ public class YamlStorage implements StorageManager {
         scheduleFlush(dataConfig, dataFile, dataLock, "plugin data");
     }
 
-    // ─── Player Activity ─────────────────────────────────────
-
-    @Override
-    public void setLastSeen(UUID playerUUID, long millis) {
-        String key = playerUUID.toString();
-        activityLock.writeLock().lock();
-        try {
-            long current = activityConfig.getLong("activity." + key + ".lastSeen", 0L);
-            if (millis > current) {
-                activityConfig.set("activity." + key + ".lastSeen", millis);
-            }
-        } finally {
-            activityLock.writeLock().unlock();
-        }
-        scheduleFlush(activityConfig, activityFile, activityLock, "player activity");
-    }
-
-    @Override
-    public long getLastSeen(UUID playerUUID) {
-        activityLock.readLock().lock();
-        try {
-            return activityConfig.getLong("activity." + playerUUID + ".lastSeen", 0L);
-        } finally {
-            activityLock.readLock().unlock();
-        }
-    }
-
-    @Override
-    public void setFirstJoin(UUID playerUUID, long millis) {
-        String key = playerUUID.toString();
-        activityLock.writeLock().lock();
-        try {
-            if (!activityConfig.contains("activity." + key + ".firstJoin")) {
-                activityConfig.set("activity." + key + ".firstJoin", millis);
-            }
-        } finally {
-            activityLock.writeLock().unlock();
-        }
-        scheduleFlush(activityConfig, activityFile, activityLock, "player activity");
-    }
-
-    @Override
-    public long getFirstJoin(UUID playerUUID) {
-        activityLock.readLock().lock();
-        try {
-            return activityConfig.getLong("activity." + playerUUID + ".firstJoin", 0L);
-        } finally {
-            activityLock.readLock().unlock();
-        }
-    }
-
-    @Override
-    public void incrementSessions(UUID playerUUID) {
-        String key = playerUUID.toString();
-        activityLock.writeLock().lock();
-        try {
-            long current = activityConfig.getLong("activity." + key + ".sessions", 0L);
-            activityConfig.set("activity." + key + ".sessions", current + 1);
-        } finally {
-            activityLock.writeLock().unlock();
-        }
-        scheduleFlush(activityConfig, activityFile, activityLock, "player activity");
-    }
-
-    @Override
-    public long getSessions(UUID playerUUID) {
-        activityLock.readLock().lock();
-        try {
-            return activityConfig.getLong("activity." + playerUUID + ".sessions", 0L);
-        } finally {
-            activityLock.readLock().unlock();
-        }
-    }
-
-    // ─── Advancement Unlocks ─────────────────────────────────
-
-    @Override
-    public void recordAdvancementUnlock(UUID playerUUID, String advancementKey) {
-        String player = playerUUID.toString();
-        advancementsLock.writeLock().lock();
-        try {
-            String path = "players." + player + ".advancements." + advancementKey;
-            if (!advancementsConfig.contains(path)) {
-                advancementsConfig.set(path, System.currentTimeMillis());
-            }
-        } finally {
-            advancementsLock.writeLock().unlock();
-        }
-        scheduleFlush(advancementsConfig, advancementsFile, advancementsLock,
-                "advancement unlocks");
-    }
-
-    @Override
-    public int getPlayerAdvancementCount(UUID playerUUID) {
-        advancementsLock.readLock().lock();
-        try {
-            var section = advancementsConfig.getConfigurationSection(
-                    "players." + playerUUID + ".advancements");
-            return section == null ? 0 : section.getKeys(false).size();
-        } finally {
-            advancementsLock.readLock().unlock();
-        }
-    }
-
-    @Override
-    public int getAdvancementUnlockerCount(String advancementKey) {
-        advancementsLock.readLock().lock();
-        try {
-            var players = advancementsConfig.getConfigurationSection("players");
-            if (players == null) return 0;
-            int count = 0;
-            for (String player : players.getKeys(false)) {
-                if (advancementsConfig.contains(
-                        "players." + player + ".advancements." + advancementKey)) {
-                    count++;
-                }
-            }
-            return count;
-        } finally {
-            advancementsLock.readLock().unlock();
-        }
-    }
-
-    @Override
-    public int getAdvancementActivePlayerCount() {
-        advancementsLock.readLock().lock();
-        try {
-            var players = advancementsConfig.getConfigurationSection("players");
-            return players == null ? 0 : players.getKeys(false).size();
-        } finally {
-            advancementsLock.readLock().unlock();
-        }
-    }
-
-    // ─── Player Followers ────────────────────────────────────
-
-    @Override
-    public void addFollower(UUID playerUUID, String discordId) {
-        followsLock.writeLock().lock();
-        try {
-            java.util.List<String> list = followsConfig.getStringList(
-                    "followers." + playerUUID);
-            if (!list.contains(discordId)) {
-                list.add(discordId);
-                followsConfig.set("followers." + playerUUID, list);
-            }
-            java.util.List<String> followed = followsConfig.getStringList(
-                    "following." + discordId);
-            if (!followed.contains(playerUUID.toString())) {
-                followed.add(playerUUID.toString());
-                followsConfig.set("following." + discordId, followed);
-            }
-        } finally {
-            followsLock.writeLock().unlock();
-        }
-        scheduleFlush(followsConfig, followsFile, followsLock, "player follows");
-    }
-
-    @Override
-    public void removeFollower(UUID playerUUID, String discordId) {
-        followsLock.writeLock().lock();
-        try {
-            java.util.List<String> list = followsConfig.getStringList(
-                    "followers." + playerUUID);
-            if (list.remove(discordId)) {
-                followsConfig.set("followers." + playerUUID, list);
-            }
-            java.util.List<String> followed = followsConfig.getStringList(
-                    "following." + discordId);
-            if (followed.remove(playerUUID.toString())) {
-                followsConfig.set("following." + discordId, followed);
-            }
-        } finally {
-            followsLock.writeLock().unlock();
-        }
-        scheduleFlush(followsConfig, followsFile, followsLock, "player follows");
-    }
-
-    @Override
-    public java.util.Set<String> getFollowers(UUID playerUUID) {
-        followsLock.readLock().lock();
-        try {
-            return new java.util.HashSet<>(followsConfig.getStringList(
-                    "followers." + playerUUID));
-        } finally {
-            followsLock.readLock().unlock();
-        }
-    }
-
-    @Override
-    public java.util.Set<UUID> getFollowedPlayers(String discordId) {
-        followsLock.readLock().lock();
-        try {
-            java.util.Set<UUID> out = new java.util.HashSet<>();
-            for (String raw : followsConfig.getStringList("following." + discordId)) {
-                try {
-                    out.add(UUID.fromString(raw));
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
-            return out;
-        } finally {
-            followsLock.readLock().unlock();
-        }
-    }
-
-    @Override
-    public boolean isFollowing(UUID playerUUID, String discordId) {
-        return getFollowers(playerUUID).contains(discordId);
-    }
-
     private void createIfMissing(File file) {
         if (!file.exists()) {
             try {
@@ -540,18 +288,10 @@ public class YamlStorage implements StorageManager {
      * Schedule an asynchronous file write. The lock is taken inside the
      * scheduled task so that the in-memory config and the on-disk file
      * cannot diverge.
-     *
-     * <p>If the owning plugin is already disabled (which happens when
-     * module {@code shutdown()} methods call {@code setData} after
-     * Bukkit has flipped the enabled flag), the write is performed
-     * synchronously on the calling thread. Otherwise the
-     * {@code BukkitScheduler} would throw
-     * {@link IllegalPluginAccessException} when asked to register a
-     * task on a disabled plugin.</p>
      */
     private void scheduleFlush(FileConfiguration config, File file,
                                ReentrantReadWriteLock lock, String label) {
-        if (platform == null || !enabledSupplier.getAsBoolean()) {
+        if (platform == null) {
             saveFileLocked(config, file, lock, label);
             return;
         }

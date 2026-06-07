@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 DemonZ Development
+ * Copyright 2024 DemonZ Development
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,19 +32,9 @@ import java.time.Instant;
 
 /**
  * Forwards advancement completions to a Discord channel. Recipe
- * advancements are skipped. Each announcement is enriched with
- * a rarity badge ("first of the day" or "rare — only N% of
- * players have this") computed from the persistent
- * advancement-unlock ledger in storage.
+ * advancements are skipped.
  */
 public class AdvancementListener implements Listener {
-
-    /**
-     * Unlockers below this fraction of the active player base
-     * are considered "rare" and the embed shows the trophy
-     * badge. 0.25 = bottom 25%.
-     */
-    private static final double RARITY_THRESHOLD = 0.25;
 
     private final ZDiscord plugin;
 
@@ -70,30 +60,6 @@ public class AdvancementListener implements Listener {
         Player player = event.getPlayer();
         String advancementName = formatAdvancementName(key);
 
-        // Persist the unlock into the ledger and pull the rarity
-        // stats in the same async hop. Storage I/O is on the hot
-        // path, so we defer the embed build by one tick.
-        String finalKey = key;
-        String finalName = advancementName;
-        plugin.getPlatformAdapter().runAsync(() -> {
-            plugin.getStorageManager().recordAdvancementUnlock(
-                    player.getUniqueId(), finalKey);
-            int unlockers = plugin.getStorageManager()
-                    .getAdvancementUnlockerCount(finalKey);
-            int active = plugin.getStorageManager()
-                    .getAdvancementActivePlayerCount();
-            boolean firstOfDay = unlockers <= 1;
-            boolean rare = active >= 5
-                    && ((double) unlockers / (double) active) < RARITY_THRESHOLD;
-            plugin.getPlatformAdapter().runForEntity(player,
-                    () -> sendEmbed(player, finalName, unlockers, active,
-                            firstOfDay, rare));
-        });
-    }
-
-    private void sendEmbed(Player player, String advancementName,
-                           int unlockers, int active, boolean firstOfDay,
-                           boolean rare) {
         TextChannel channel = plugin.getBotManager().getTextChannel("channels.achievements");
         if (channel == null) {
             channel = plugin.getBotManager().getTextChannel("channels.events");
@@ -108,50 +74,16 @@ public class AdvancementListener implements Listener {
         String colorHex = plugin.getConfigManager()
                 .getString("events.advancement.color", "#F1C40F");
         String avatarFormat = plugin.getConfigManager()
-                .getString("chat.avatar-url",
-                        "https://crafatar.com/avatars/%uuid%?overlay=true");
-        String avatarUrl = HeadUtil.resolve(avatarFormat,
-                player.getUniqueId(), player.getName());
-
-        int colorInt = ColorUtil.parseHex(colorHex).getRGB() & 0xFFFFFF;
-        // Rare overrides the configured colour with a saturated
-        // gold; first-of-day is allowed to keep the default.
-        if (rare) {
-            colorInt = 0xF1C40F;
-        } else if (firstOfDay) {
-            colorInt = 0x2ECC71;
-        }
+                .getString("chat.avatar-url", "https://crafatar.com/avatars/%uuid%?overlay=true");
+        String avatarUrl = HeadUtil.resolve(avatarFormat, player.getUniqueId(), player.getName());
 
         EmbedBuilder embed = new EmbedBuilder()
                 .setAuthor(player.getName() + " earned an advancement", null, avatarUrl)
-                .setTitle(":trophy: " + advancementName)
-                .setColor(colorInt)
+                .setTitle(advancementName)
+                .setColor(ColorUtil.parseHex(colorHex))
                 .setTimestamp(Instant.now());
 
-        if (firstOfDay) {
-            embed.addField(":1st_place_medal: First of the day",
-                    "**" + player.getName() + "** is the first player "
-                            + "to unlock this advancement in the last 24 hours.",
-                    false);
-        } else if (rare && active > 0) {
-            int pct = (int) Math.round((unlockers * 100.0) / active);
-            embed.addField(":sparkles: Rare achievement",
-                    "Only **" + pct + "%** of players who've logged "
-                            + "an advancement on this server have unlocked this one "
-                            + "(" + unlockers + " out of " + active + ").",
-                    false);
-        }
-
-        if (active > 0 && !rare && !firstOfDay) {
-            int pct = (int) Math.round((unlockers * 100.0) / active);
-            embed.addField("Unlocked by", pct + "% of players ("
-                    + unlockers + " of " + active + ")", true);
-        }
-
-        channel.sendMessageEmbeds(embed.build()).queue(
-                success -> { },
-                error -> plugin.debug("Failed to send advancement embed: "
-                        + error.getMessage()));
+        channel.sendMessageEmbeds(embed.build()).queue();
     }
 
     private String formatAdvancementName(String key) {

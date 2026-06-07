@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 DemonZ Development
+ * Copyright 2024 DemonZ Development
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,29 +56,23 @@ public final class StatusEmbedBuilder {
             int memPercent = ctx.maxMemoryMb > 0
                     ? (int) ((ctx.usedMemoryMb * 100.0) / ctx.maxMemoryMb) : 0;
 
-            if (ctx.showPlayers) {
-                embed.addField("Players",
-                        "**" + ctx.onlineCount + "** / " + ctx.maxCount
-                                + "\n`" + playerBar(ctx.onlineCount, ctx.maxCount) + "`",
-                        true);
-            }
+            embed.addField("Players",
+                    "**" + ctx.onlineCount + "** / " + ctx.maxCount
+                            + "\n`" + playerBar(ctx.onlineCount, ctx.maxCount) + "`",
+                    true);
 
-            if (ctx.showTps) {
-                embed.addField("TPS",
-                        "`" + String.format("%.1f", ctx.tps) + "` / 20.0"
-                                + (ctx.tps >= ctx.tpsWarning ? "  :white_check_mark:"
-                                        : ctx.tps >= ctx.tpsCritical ? "  :warning:"
-                                                : "  :no_entry:"),
-                        true);
-            }
+            embed.addField("TPS",
+                    "`" + String.format("%.1f", ctx.tps) + "` / 20.0"
+                            + (ctx.tps >= ctx.tpsWarning ? "  :white_check_mark:"
+                                    : ctx.tps >= ctx.tpsCritical ? "  :warning:"
+                                            : "  :no_entry:"),
+                    true);
 
-            if (ctx.showMemory) {
-                embed.addField("Memory",
-                        String.format("`%dMB` / `%dMB` (%d%%)\n`%s`",
-                                ctx.usedMemoryMb, ctx.maxMemoryMb, memPercent,
-                                memoryBar(memPercent)),
-                        false);
-            }
+            embed.addField("Memory",
+                    String.format("`%dMB` / `%dMB` (%d%%)\n`%s`",
+                            ctx.usedMemoryMb, ctx.maxMemoryMb, memPercent,
+                            memoryBar(memPercent)),
+                    false);
 
             if (ctx.showPlayers && ctx.onlineCount > 0 && ctx.playerList != null) {
                 embed.addField(":busts_in_silhouette: Online Players",

@@ -47,6 +47,9 @@ slash-status-title: "Server Status"
 slash-players-title: "Online Players"
 slash-tps-title: "Server Performance"
 slash-link-title: "Account Linking"
+slash-profile-title: "Player Profile"
+slash-seen-title: "Last Seen"
+slash-following-title: "Following"
 
 # ── Console / ticket messages ─────────────────────────────
 console-disabled: "Console commands are disabled. Set `misc.console-role` in config.yml to enable them."

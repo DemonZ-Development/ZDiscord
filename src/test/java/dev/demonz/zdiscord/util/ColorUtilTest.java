@@ -70,4 +70,59 @@ class ColorUtilTest {
     void stripColorLeavesPlainTextAlone() {
         assertTrue(ColorUtil.stripColor("plain text").equals("plain text"));
     }
+
+    @Test
+    void toDiscordMarkdownConvertsBold() {
+        assertEquals("**hi**", ColorUtil.toDiscordMarkdown("&lhi&r"));
+    }
+
+    @Test
+    void toDiscordMarkdownConvertsItalic() {
+        assertEquals("*hi*", ColorUtil.toDiscordMarkdown("&ohi&r"));
+    }
+
+    @Test
+    void toDiscordMarkdownConvertsUnderline() {
+        assertEquals("__hi__", ColorUtil.toDiscordMarkdown("&nhi&r"));
+    }
+
+    @Test
+    void toDiscordMarkdownConvertsStrikethrough() {
+        assertEquals("~~hi~~", ColorUtil.toDiscordMarkdown("&mhi&r"));
+    }
+
+    @Test
+    void toDiscordMarkdownDropsColorCodes() {
+        assertEquals("hello", ColorUtil.toDiscordMarkdown("&ahello&r"));
+    }
+
+    @Test
+    void toDiscordMarkdownHandlesSectionSign() {
+        assertEquals("**hi**", ColorUtil.toDiscordMarkdown("\u00A7lhi\u00A7r"));
+    }
+
+    @Test
+    void toDiscordMarkdownClosesNestedRuns() {
+        // Italic is opened inside bold and both are closed
+        // by &r (reset). Discord renders this as bold text
+        // containing a single italic span, terminated by a
+        // bold-italic boundary marker.
+        assertEquals("**a *b***", ColorUtil.toDiscordMarkdown("&la &ob&r"));
+    }
+
+    @Test
+    void toDiscordMarkdownTogglesBold() {
+        // The second &l toggles bold off.
+        assertEquals("**hi**", ColorUtil.toDiscordMarkdown("&lhi&l"));
+    }
+
+    @Test
+    void toDiscordMarkdownHandlesEmptyString() {
+        assertEquals("", ColorUtil.toDiscordMarkdown(""));
+    }
+
+    @Test
+    void toDiscordMarkdownHandlesNull() {
+        assertEquals("", ColorUtil.toDiscordMarkdown(null));
+    }
 }

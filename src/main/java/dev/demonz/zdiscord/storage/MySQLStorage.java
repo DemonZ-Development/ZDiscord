@@ -97,6 +97,29 @@ public class MySQLStorage implements StorageManager {
                             "data_value TEXT, " +
                             "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" +
                             ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            stmt.executeUpdate(
+                    "CREATE TABLE IF NOT EXISTS zdiscord_player_activity (" +
+                            "player_uuid VARCHAR(36) PRIMARY KEY, " +
+                            "last_seen BIGINT NOT NULL DEFAULT 0, " +
+                            "first_join BIGINT NOT NULL DEFAULT 0, " +
+                            "sessions BIGINT NOT NULL DEFAULT 0" +
+                            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            stmt.executeUpdate(
+                    "CREATE TABLE IF NOT EXISTS zdiscord_advancement_unlocks (" +
+                            "player_uuid VARCHAR(36) NOT NULL, " +
+                            "advancement_key VARCHAR(255) NOT NULL, " +
+                            "unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                            "PRIMARY KEY (player_uuid, advancement_key)" +
+                            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            stmt.executeUpdate(
+                    "CREATE TABLE IF NOT EXISTS zdiscord_player_follows (" +
+                            "player_uuid VARCHAR(36) NOT NULL, " +
+                            "discord_id VARCHAR(20) NOT NULL, " +
+                            "PRIMARY KEY (player_uuid, discord_id)" +
+                            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         } catch (SQLException e) {
             plugin.getLogger().severe("Failed to create MySQL tables: " + e.getMessage());
         }
@@ -286,5 +309,234 @@ public class MySQLStorage implements StorageManager {
     @Override
     public void setData(String key, int value) {
         setData(key, String.valueOf(value));
+    }
+
+    // ─── Player Activity ─────────────────────────────────────
+
+    @Override
+    public void setLastSeen(UUID playerUUID, long millis) {
+        plugin.getPlatformAdapter().runAsync(() -> {
+            try (Connection conn = dataSource.getConnection();
+                    PreparedStatement ps = conn.prepareStatement(
+                            "INSERT INTO zdiscord_player_activity (player_uuid, last_seen) VALUES (?, ?) " +
+                                    "ON DUPLICATE KEY UPDATE last_seen = GREATEST(last_seen, VALUES(last_seen))")) {
+                ps.setString(1, playerUUID.toString());
+                ps.setLong(2, millis);
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                plugin.getLogger().severe("Failed to setLastSeen in MySQL: " + e.getMessage());
+            }
+        });
+    }
+
+    @Override
+    public long getLastSeen(UUID playerUUID) {
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(
+                        "SELECT last_seen FROM zdiscord_player_activity WHERE player_uuid = ?")) {
+            ps.setString(1, playerUUID.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getLong("last_seen");
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().warning("Failed to getLastSeen from MySQL: " + e.getMessage());
+        }
+        return 0L;
+    }
+
+    @Override
+    public void setFirstJoin(UUID playerUUID, long millis) {
+        plugin.getPlatformAdapter().runAsync(() -> {
+            try (Connection conn = dataSource.getConnection();
+                    PreparedStatement ps = conn.prepareStatement(
+                            "INSERT IGNORE INTO zdiscord_player_activity (player_uuid, first_join) VALUES (?, ?)")) {
+                ps.setString(1, playerUUID.toString());
+                ps.setLong(2, millis);
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                plugin.getLogger().severe("Failed to setFirstJoin in MySQL: " + e.getMessage());
+            }
+        });
+    }
+
+    @Override
+    public long getFirstJoin(UUID playerUUID) {
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(
+                        "SELECT first_join FROM zdiscord_player_activity WHERE player_uuid = ?")) {
+            ps.setString(1, playerUUID.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getLong("first_join");
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().warning("Failed to getFirstJoin from MySQL: " + e.getMessage());
+        }
+        return 0L;
+    }
+
+    @Override
+    public void incrementSessions(UUID playerUUID) {
+        plugin.getPlatformAdapter().runAsync(() -> {
+            try (Connection conn = dataSource.getConnection();
+                    PreparedStatement ps = conn.prepareStatement(
+                            "INSERT INTO zdiscord_player_activity (player_uuid, sessions) VALUES (?, 1) " +
+                                    "ON DUPLICATE KEY UPDATE sessions = sessions + 1")) {
+                ps.setString(1, playerUUID.toString());
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                plugin.getLogger().severe("Failed to incrementSessions in MySQL: " + e.getMessage());
+            }
+        });
+    }
+
+    @Override
+    public long getSessions(UUID playerUUID) {
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(
+                        "SELECT sessions FROM zdiscord_player_activity WHERE player_uuid = ?")) {
+            ps.setString(1, playerUUID.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getLong("sessions");
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().warning("Failed to getSessions from MySQL: " + e.getMessage());
+        }
+        return 0L;
+    }
+
+    // ─── Advancement Unlocks ─────────────────────────────────
+
+    @Override
+    public void recordAdvancementUnlock(UUID playerUUID, String advancementKey) {
+        plugin.getPlatformAdapter().runAsync(() -> {
+            try (Connection conn = dataSource.getConnection();
+                    PreparedStatement ps = conn.prepareStatement(
+                            "INSERT IGNORE INTO zdiscord_advancement_unlocks " +
+                                    "(player_uuid, advancement_key) VALUES (?, ?)")) {
+                ps.setString(1, playerUUID.toString());
+                ps.setString(2, advancementKey);
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                plugin.getLogger().severe("Failed to recordAdvancementUnlock in MySQL: " + e.getMessage());
+            }
+        });
+    }
+
+    @Override
+    public int getPlayerAdvancementCount(UUID playerUUID) {
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(
+                        "SELECT COUNT(*) FROM zdiscord_advancement_unlocks WHERE player_uuid = ?")) {
+            ps.setString(1, playerUUID.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().warning("Failed to getPlayerAdvancementCount from MySQL: " + e.getMessage());
+        }
+        return 0;
+    }
+
+    @Override
+    public int getAdvancementUnlockerCount(String advancementKey) {
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(
+                        "SELECT COUNT(*) FROM zdiscord_advancement_unlocks WHERE advancement_key = ?")) {
+            ps.setString(1, advancementKey);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().warning("Failed to getAdvancementUnlockerCount from MySQL: " + e.getMessage());
+        }
+        return 0;
+    }
+
+    @Override
+    public int getAdvancementActivePlayerCount() {
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(
+                        "SELECT COUNT(DISTINCT player_uuid) FROM zdiscord_advancement_unlocks")) {
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().warning("Failed to getAdvancementActivePlayerCount from MySQL: " + e.getMessage());
+        }
+        return 0;
+    }
+
+    // ─── Player Followers ────────────────────────────────────
+
+    @Override
+    public void addFollower(UUID playerUUID, String discordId) {
+        plugin.getPlatformAdapter().runAsync(() -> {
+            try (Connection conn = dataSource.getConnection();
+                    PreparedStatement ps = conn.prepareStatement(
+                            "INSERT IGNORE INTO zdiscord_player_follows (player_uuid, discord_id) VALUES (?, ?)")) {
+                ps.setString(1, playerUUID.toString());
+                ps.setString(2, discordId);
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                plugin.getLogger().severe("Failed to addFollower in MySQL: " + e.getMessage());
+            }
+        });
+    }
+
+    @Override
+    public void removeFollower(UUID playerUUID, String discordId) {
+        plugin.getPlatformAdapter().runAsync(() -> {
+            try (Connection conn = dataSource.getConnection();
+                    PreparedStatement ps = conn.prepareStatement(
+                            "DELETE FROM zdiscord_player_follows WHERE player_uuid = ? AND discord_id = ?")) {
+                ps.setString(1, playerUUID.toString());
+                ps.setString(2, discordId);
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                plugin.getLogger().severe("Failed to removeFollower in MySQL: " + e.getMessage());
+            }
+        });
+    }
+
+    @Override
+    public java.util.Set<String> getFollowers(UUID playerUUID) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(
+                        "SELECT discord_id FROM zdiscord_player_follows WHERE player_uuid = ?")) {
+            ps.setString(1, playerUUID.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) out.add(rs.getString("discord_id"));
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().warning("Failed to getFollowers from MySQL: " + e.getMessage());
+        }
+        return out;
+    }
+
+    @Override
+    public java.util.Set<UUID> getFollowedPlayers(String discordId) {
+        java.util.Set<UUID> out = new java.util.HashSet<>();
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(
+                        "SELECT player_uuid FROM zdiscord_player_follows WHERE discord_id = ?")) {
+            ps.setString(1, discordId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    try {
+                        out.add(UUID.fromString(rs.getString("player_uuid")));
+                    } catch (IllegalArgumentException ignored) {
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().warning("Failed to getFollowedPlayers from MySQL: " + e.getMessage());
+        }
+        return out;
+    }
+
+    @Override
+    public boolean isFollowing(UUID playerUUID, String discordId) {
+        return getFollowers(playerUUID).contains(discordId);
     }
 }

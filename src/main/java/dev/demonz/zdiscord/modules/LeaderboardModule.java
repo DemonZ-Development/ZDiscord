@@ -78,6 +78,19 @@ public class LeaderboardModule {
         plugin.getStorageManager().saveStat(uuid, stat, value);
     }
 
+    /**
+     * @return the current value of {@code stat} for {@code uuid},
+     *         or {@code 0} if the player has no entry.
+     */
+    public long getStat(UUID uuid, String stat) {
+        var map = statsCache.get(uuid);
+        if (map == null) {
+            return 0L;
+        }
+        Long v = map.get(stat);
+        return v == null ? 0L : v;
+    }
+
     public List<Map.Entry<UUID, Long>> getLeaderboard(String stat, int limit) {
         return statsCache.entrySet().stream()
                 .filter(e -> e.getValue().containsKey(stat))

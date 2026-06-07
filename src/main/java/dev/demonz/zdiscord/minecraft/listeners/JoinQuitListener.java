@@ -49,14 +49,26 @@ public class JoinQuitListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
         boolean firstJoin = !player.hasPlayedBefore();
+        long now = System.currentTimeMillis();
+
+        // Persist activity timestamps + increment session counter
+        // off the main thread so a slow disk can't stall the join.
+        plugin.getPlatformAdapter().runAsync(() -> {
+            plugin.getStorageManager().setLastSeen(uuid, now);
+            plugin.getStorageManager().incrementSessions(uuid);
+            if (firstJoin) {
+                plugin.getStorageManager().setFirstJoin(uuid, now);
+            }
+        });
 
         if (plugin.getBotManager().isConnected()
                 && plugin.getConfigManager().getBoolean("events.join.enabled", true)) {
             sendEmbed(player, true, null, firstJoin);
         }
 
-        joinTimestamps.put(player.getUniqueId(), System.currentTimeMillis());
+        joinTimestamps.put(uuid, now);
 
         if (firstJoin
                 && plugin.getConfigManager().getBoolean("events.join.show-first-join-indicator", true)) {
@@ -73,8 +85,22 @@ public class JoinQuitListener implements Listener {
             }
         }
 
+        // The first-join welcome is also mirrored to Discord as
+        // a private DM-style embed; we only render the indicator
+        // field there so the player can see the celebration in
+        // the events channel. Color codes in the template are
+        // converted to Discord markdown so the operator's choice
+        // of &l/&n still renders properly.
+
         if (plugin.getAntiRaidModule() != null) {
             plugin.getAntiRaidModule().onPlayerJoin(player);
+        }
+
+        // Notify any Discord users following this player. Done
+        // after the activity write so the follow storage is
+        // guaranteed to be initialized.
+        if (plugin.getFollowModule() != null) {
+            plugin.getFollowModule().onPlayerJoin(player);
         }
 
         plugin.getPlatformAdapter().runAsync(() -> plugin.getBotManager().updateActivity());
@@ -83,6 +109,8 @@ public class JoinQuitListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
+        long now = System.currentTimeMillis();
 
         // Defer the activity update and online count by one tick so the
         // player is actually removed from the online list when we read it.
@@ -91,14 +119,20 @@ public class JoinQuitListener implements Listener {
                         () -> plugin.getBotManager().updateActivity()),
                 2L);
 
-        Long joinTime = joinTimestamps.remove(player.getUniqueId());
+        Long joinTime = joinTimestamps.remove(uuid);
         if (joinTime != null && plugin.getLeaderboardModule() != null) {
-            long sessionSeconds = (System.currentTimeMillis() - joinTime) / 1000L;
+            long sessionSeconds = (now - joinTime) / 1000L;
             if (sessionSeconds > 0) {
                 plugin.getLeaderboardModule().incrementStatBy(
-                        player.getUniqueId(), "playtime", sessionSeconds);
+                        uuid, "playtime", sessionSeconds);
             }
         }
+
+        // Update last-seen on quit too — covers the rare case where
+        // a player disconnects abnormally (crash) and never fires
+        // a follow-up join, leaving the join's timestamp stale.
+        plugin.getPlatformAdapter().runAsync(
+                () -> plugin.getStorageManager().setLastSeen(uuid, now));
 
         if (plugin.getBotManager().isConnected()
                 && plugin.getConfigManager().getBoolean("events.quit.enabled", true)) {
@@ -128,7 +162,7 @@ public class JoinQuitListener implements Listener {
         String verb = joined ? "joined" : "left";
 
         String avatar = resolveAvatar(player);
-        String resolvedMessage = ColorUtil.stripColor(
+        String resolvedMessage = ColorUtil.toDiscordMarkdown(
                 template
                         .replace("%player%", player.getName())
                         .replace("%displayname%", ColorUtil.stripColor(player.getDisplayName())));

@@ -26,6 +26,7 @@ import java.util.UUID;
 import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -126,5 +127,73 @@ class YamlStorageTest {
         assertEquals("1", reopened.loadLinks().get(uuid));
         assertEquals(7L, (long) reopened.loadStats().get(uuid).get("kills"));
         assertEquals("bar", reopened.getData("foo", ""));
+    }
+
+    @Test
+    void lastSeenIsMonotonic(@TempDir Path tmp) {
+        YamlStorage storage = newStorage(tmp.toFile());
+        UUID uuid = UUID.randomUUID();
+        storage.setLastSeen(uuid, 1_000L);
+        storage.setLastSeen(uuid, 500L); // smaller — should NOT roll back
+        assertEquals(1_000L, storage.getLastSeen(uuid));
+        storage.setLastSeen(uuid, 2_000L); // larger — should update
+        assertEquals(2_000L, storage.getLastSeen(uuid));
+    }
+
+    @Test
+    void firstJoinIsSetOnce(@TempDir Path tmp) {
+        YamlStorage storage = newStorage(tmp.toFile());
+        UUID uuid = UUID.randomUUID();
+        storage.setFirstJoin(uuid, 1_000L);
+        storage.setFirstJoin(uuid, 9_000L); // ignored
+        assertEquals(1_000L, storage.getFirstJoin(uuid));
+    }
+
+    @Test
+    void sessionCounterIncrements(@TempDir Path tmp) {
+        YamlStorage storage = newStorage(tmp.toFile());
+        UUID uuid = UUID.randomUUID();
+        assertEquals(0L, storage.getSessions(uuid));
+        storage.incrementSessions(uuid);
+        storage.incrementSessions(uuid);
+        storage.incrementSessions(uuid);
+        assertEquals(3L, storage.getSessions(uuid));
+    }
+
+    @Test
+    void advancementUnlocksAreIdempotent(@TempDir Path tmp) {
+        YamlStorage storage = newStorage(tmp.toFile());
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        storage.recordAdvancementUnlock(a, "story/root");
+        storage.recordAdvancementUnlock(a, "story/root"); // duplicate
+        storage.recordAdvancementUnlock(b, "story/root");
+        storage.recordAdvancementUnlock(b, "story/mine_stone");
+
+        assertEquals(1, storage.getPlayerAdvancementCount(a),
+                "Duplicate unlock should not increase count");
+        assertEquals(2, storage.getPlayerAdvancementCount(b));
+        assertEquals(2, storage.getAdvancementUnlockerCount("story/root"));
+        assertEquals(1, storage.getAdvancementUnlockerCount("story/mine_stone"));
+        assertEquals(2, storage.getAdvancementActivePlayerCount());
+    }
+
+    @Test
+    void followersRoundTrip(@TempDir Path tmp) {
+        YamlStorage storage = newStorage(tmp.toFile());
+        UUID uuid = UUID.randomUUID();
+        storage.addFollower(uuid, "111");
+        storage.addFollower(uuid, "222");
+        storage.addFollower(uuid, "111"); // duplicate
+
+        assertEquals(2, storage.getFollowers(uuid).size());
+        assertTrue(storage.isFollowing(uuid, "111"));
+        assertTrue(storage.isFollowing(uuid, "222"));
+        assertFalse(storage.isFollowing(uuid, "333"));
+
+        storage.removeFollower(uuid, "111");
+        assertFalse(storage.isFollowing(uuid, "111"));
+        assertEquals(1, storage.getFollowers(uuid).size());
+        assertTrue(storage.getFollowedPlayers("222").contains(uuid));
     }
 }

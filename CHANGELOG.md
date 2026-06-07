@@ -7,6 +7,75 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `/profile [player]` Discord slash command that renders a rich
+  "player passport" embed: avatar, NameMC link, first/last seen
+  (relative Discord timestamps), session count, total playtime,
+  advancement count, link status, follower count, and online
+  indicator. A **Follow** / **Unfollow** button on the embed
+  subscribes the requester to DM notifications whenever the
+  player logs in.
+- `/seen <player>` Discord slash command for quick last-seen
+  lookups. Returns online/offline status, last-seen timestamp,
+  total tracked playtime, and session count.
+- `/following` Discord slash command listing the Minecraft
+  players the requester currently follows.
+- `/confess <message>` Discord slash command that posts an
+  anonymous confession to a configured `channels.confessions`
+  channel. Each confessor gets a stable "Confessor #XXXX" handle
+  derived from their user id hash. `&` colour codes in the
+  message are converted to Discord markdown.
+- Silent update check every 5 hours (was 6). When a new release
+  is detected, a single quiet embed is posted to
+  `misc.update-channel` (no pings, no looping) and a
+  `misc.update-silent` flag suppresses the in-game admin banner
+  for operators who want to keep console/Discord as the only
+  signal.
+- Achievement **rarity display**: the advancement announcement
+  embed now includes a "First of the day" badge when the player
+  is the first to unlock that advancement in the last 24 hours,
+  and a "Rare — only N% of players have this" badge when fewer
+  than 25% of active players have ever unlocked it.
+- Player activity storage (per-player `last_seen`, `first_join`,
+  `sessions`, advancement unlock ledger, follow relationships).
+  YAML uses new `player_activity.yml`, `advancement_unlocks.yml`,
+  and `player_follows.yml` files; MySQL uses three new tables.
+- `ColorUtil.toDiscordMarkdown(text)` converts Minecraft
+  formatting codes (`&l` bold, `&o` italic, `&n` underline,
+  `&m` strikethrough) to Discord markdown; colour codes (0-9,
+  a-f) are dropped. Applied to all player-visible embed text.
+- `FollowModule` keeps an in-memory cache of player→follower
+  sets and dispatches DM notifications on join via JDA's
+  `User.openPrivateChannel()` API. The cache is populated
+  lazily on the first join and refreshed on add/remove.
+- `LeaderboardModule.getStat(uuid, stat)` for cheap per-player
+  stat lookups (used by the profile card and `/seen`).
+- `PlayerProfileBuilder` util — single source of truth for the
+  profile-card embed.
+
+### Changed
+- `YamlStorage` and `MySQLStorage` grew three new files / three
+  new tables each, plus 12 new methods on the
+  `StorageManager` interface.
+- `AdvancementListener` now persists the unlock to storage and
+  reads the rarity stats in an async hop before posting the
+  embed on the main thread (so a slow disk can't stall the
+  event).
+- `UpdateChecker` interval is now 5 hours (was 6). The
+  `postSilentDiscordNotice(...)` helper only fires once per
+  detected release thanks to an `AtomicBoolean` guard.
+- `JoinQuitListener` writes `last_seen` and increments the
+  session counter on every join; the same on every quit, so
+  the timestamp stays fresh even if the player disconnects
+  abnormally.
+- `ColorUtil.stripColor` is now only used internally for
+  pre-processing before `toDiscordMarkdown` runs; the embed
+  fields use the new converter so formatting is preserved.
+
+### Fixed
+- `JoinQuitListener` no longer double-calls the in-game
+  welcome message on Paper (the `first-join-message` is now
+  also rendered through `toDiscordMarkdown` so it carries its
+  formatting into the events channel embed).
 - MockBukkit test framework with JUnit 5. The build workflow now runs
   the unit test suite in CI; new tests cover config loading, ticket
   category parsing, status embed structure, update-checker version

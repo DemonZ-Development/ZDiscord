@@ -18,19 +18,24 @@ package dev.demonz.zdiscord.discord;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.util.ColorUtil;
+import dev.demonz.zdiscord.util.HeadUtil;
 import dev.demonz.zdiscord.util.PlaceholderUtil;
+import dev.demonz.zdiscord.util.PlayerProfileBuilder;
 import dev.demonz.zdiscord.util.StatusEmbedBuilder;
 import dev.demonz.zdiscord.util.TPSUtil;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 
 import java.time.Instant;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -70,7 +75,17 @@ public class SlashCommandManager extends ListenerAdapter {
                                 "Quick setup: module name (chat, status, events, etc.)",
                                 false, true)
                         .addOption(OptionType.CHANNEL, "channel",
-                                "Quick setup: target channel", false))
+                                "Quick setup: target channel", false),
+                Commands.slash("profile", "View a Minecraft player's profile card")
+                        .addOption(OptionType.STRING, "player",
+                                "Player name (omit for yourself)", false),
+                Commands.slash("seen", "When was a player last online?")
+                        .addOption(OptionType.STRING, "player",
+                                "Player name", true),
+                Commands.slash("following", "List the Minecraft players you follow"),
+                Commands.slash("confess", "Post an anonymous confession to the confessions channel")
+                        .addOption(OptionType.STRING, "message",
+                                "What do you want to confess?", true))
                 .queue(
                         success -> plugin.getLogger().info("Registered "
                                 + success.size() + " slash commands."),
@@ -106,6 +121,18 @@ public class SlashCommandManager extends ListenerAdapter {
                 break;
             case "leaderboard":
                 handleLeaderboard(event);
+                break;
+            case "profile":
+                handleProfile(event);
+                break;
+            case "seen":
+                handleSeen(event);
+                break;
+            case "following":
+                handleFollowing(event);
+                break;
+            case "confess":
+                handleConfess(event);
                 break;
             default:
                 break;
@@ -241,5 +268,196 @@ public class SlashCommandManager extends ListenerAdapter {
         }
         String stat = event.getOption("stat").getAsString();
         plugin.getLeaderboardModule().sendLeaderboard(event, stat);
+    }
+
+    private void handleProfile(SlashCommandInteractionEvent event) {
+        // The work below does offline-player lookups + a few storage
+        // reads; we run it off the event handler thread to keep the
+        // JDA thread responsive even on a slow disk.
+        event.deferReply().queue();
+        String queryName = event.getOption("player") == null
+                ? null
+                : event.getOption("player").getAsString();
+        String discordTag = event.getUser().getAsTag();
+
+        plugin.getPlatformAdapter().runAsync(() -> {
+            OfflinePlayer target = resolveProfileTarget(queryName, event.getUser().getId());
+            if (target == null) {
+                String msg = queryName == null
+                        ? "You don't have a linked Minecraft account yet. "
+                                + "Run `/link <code>` after `/zdiscord link` in-game, "
+                                + "or pass `player:<name>` to look up someone else."
+                        : "No player named **" + queryName + "** has joined this server before.";
+                event.getHook().sendMessage(msg).setEphemeral(true).queue();
+                return;
+            }
+
+            PlayerProfileBuilder.Profile profile =
+                    PlayerProfileBuilder.build(plugin, target);
+            EmbedBuilder embed = PlayerProfileBuilder.toEmbed(plugin, profile, discordTag);
+
+            if (plugin.getFollowModule() != null) {
+                boolean following = plugin.getFollowModule()
+                        .isFollowing(profile.uuid, event.getUser().getId());
+                var rows = new java.util.ArrayList<net.dv8tion.jda.api.interactions.components.LayoutComponent>();
+                rows.add(net.dv8tion.jda.api.interactions.components.ActionRow.of(
+                        following
+                                ? plugin.getFollowModule().buildUnfollowButton(profile.uuid)
+                                : plugin.getFollowModule().buildFollowButton(profile.uuid)));
+                event.getHook().sendMessageEmbeds(embed.build())
+                        .addComponents(rows).queue();
+            } else {
+                event.getHook().sendMessageEmbeds(embed.build()).queue();
+            }
+        });
+    }
+
+    private OfflinePlayer resolveProfileTarget(String queryName, String requesterDiscordId) {
+        if (queryName != null && !queryName.isEmpty()) {
+            return PlayerProfileBuilder.findOfflineByName(queryName);
+        }
+        // No name → look up the requester's linked MC account.
+        if (plugin.getLinkModule() == null) {
+            return null;
+        }
+        UUID mcUuid = plugin.getLinkModule().getPlayerUUID(requesterDiscordId);
+        if (mcUuid == null) {
+            return null;
+        }
+        return Bukkit.getOfflinePlayer(mcUuid);
+    }
+
+    private void handleSeen(SlashCommandInteractionEvent event) {
+        event.deferReply().queue();
+        String queryName = event.getOption("player").getAsString();
+        plugin.getPlatformAdapter().runAsync(() -> {
+            OfflinePlayer target = PlayerProfileBuilder.findOfflineByName(queryName);
+            if (target == null) {
+                event.getHook().sendMessage("No player named **" + queryName
+                        + "** has joined this server before.")
+                        .setEphemeral(true).queue();
+                return;
+            }
+            UUID uuid = target.getUniqueId();
+            String name = target.getName() != null ? target.getName() : "Unknown";
+            long lastSeen = plugin.getStorageManager().getLastSeen(uuid);
+            long playtimeSec = plugin.getLeaderboardModule() != null
+                    ? plugin.getLeaderboardModule().getStat(uuid, "playtime")
+                    : 0L;
+
+            EmbedBuilder embed = new EmbedBuilder()
+                    .setAuthor(name + "  ·  Last seen",
+                            "https://namemc.com/profile/" + uuid,
+                            HeadUtil.crafatar(uuid))
+                    .setColor(ColorUtil.parseHex("#3498DB"))
+                    .setTimestamp(Instant.now());
+
+            if (target.isOnline()) {
+                embed.setDescription(":green_circle: **" + name + "** is online right now.");
+            } else if (lastSeen > 0) {
+                embed.setDescription("Last seen: <t:" + (lastSeen / 1000L) + ":R>.")
+                        .addField("Last seen", "<t:" + (lastSeen / 1000L) + ":F>", false)
+                        .addField("Total playtime",
+                                PlayerProfileBuilder.formatDuration(playtimeSec), true)
+                        .addField("Sessions", String.valueOf(
+                                plugin.getStorageManager().getSessions(uuid)), true);
+            } else {
+                embed.setDescription("No activity recorded for **" + name + "** yet.");
+            }
+            event.getHook().sendMessageEmbeds(embed.build()).queue();
+        });
+    }
+
+    private void handleFollowing(SlashCommandInteractionEvent event) {
+        event.deferReply().queue();
+        String discordId = event.getUser().getId();
+        plugin.getPlatformAdapter().runAsync(() -> {
+            if (plugin.getFollowModule() == null) {
+                event.getHook().sendMessage("The follow feature is disabled.")
+                        .setEphemeral(true).queue();
+                return;
+            }
+            java.util.Set<UUID> followed = plugin.getFollowModule().getFollowedPlayers(discordId);
+            if (followed.isEmpty()) {
+                event.getHook().sendMessage(
+                        "You aren't following any Minecraft players. "
+                                + "Use `/profile player:<name>` to find someone and hit **Follow**.")
+                        .setEphemeral(true).queue();
+                return;
+            }
+            StringBuilder sb = new StringBuilder();
+            for (UUID uuid : followed) {
+                OfflinePlayer op = Bukkit.getOfflinePlayer(uuid);
+                String name = op.getName() != null ? op.getName() : uuid.toString();
+                sb.append(":small_blue_diamond: **").append(name).append("**")
+                        .append("  (`").append(uuid).append("`)\n");
+            }
+            EmbedBuilder embed = new EmbedBuilder()
+                    .setTitle("Following " + followed.size() + " player"
+                            + (followed.size() == 1 ? "" : "s"))
+                    .setDescription(sb.toString())
+                    .setColor(ColorUtil.parseHex("#9B59B6"))
+                    .setTimestamp(Instant.now());
+            event.getHook().sendMessageEmbeds(embed.build()).queue();
+        });
+    }
+
+    @Override
+    public void onButtonInteraction(ButtonInteractionEvent event) {
+        String id = event.getComponentId();
+        if (id == null) {
+            return;
+        }
+        if (id.startsWith(dev.demonz.zdiscord.modules.FollowModule.FOLLOW_BUTTON_ID)
+                || id.startsWith(dev.demonz.zdiscord.modules.FollowModule.UNFOLLOW_BUTTON_ID)) {
+            if (plugin.getFollowModule() != null) {
+                plugin.getFollowModule().handleFollowButton(event);
+            } else {
+                event.reply("The follow feature is disabled.").setEphemeral(true).queue();
+            }
+        }
+    }
+
+    private void handleConfess(SlashCommandInteractionEvent event) {
+        String channelId = plugin.getConfigManager()
+                .getString("channels.confessions", "").trim();
+        if (channelId.isEmpty() || channelId.startsWith("YOUR_")) {
+            event.reply(":lock: Confessions are disabled on this server "
+                    + "(no `channels.confessions` is configured).")
+                    .setEphemeral(true).queue();
+            return;
+        }
+        var channel = plugin.getBotManager().getJda()
+                .getTextChannelById(channelId);
+        if (channel == null) {
+            event.reply(":lock: Confessions are disabled on this server "
+                    + "(the configured channel could not be found).")
+                    .setEphemeral(true).queue();
+            return;
+        }
+        String message = event.getOption("message").getAsString();
+        if (message.length() > 1500) {
+            event.reply(":lock: Your confession is too long (max 1500 characters).")
+                    .setEphemeral(true).queue();
+            return;
+        }
+        // Anonymise: a deterministic but unguessable handle based
+        // on the user id (so the same person keeps the same
+        // handle, which is nice for ongoing confessions, but the
+        // handle itself reveals nothing).
+        String handle = "Confessor #" + Math.abs(event.getUser().getId().hashCode() % 10000);
+
+        EmbedBuilder embed = new EmbedBuilder()
+                .setAuthor(":love_letter: A new confession", null, null)
+                .setDescription(ColorUtil.toDiscordMarkdown(message))
+                .setColor(0x9B59B6)
+                .setFooter(handle + "  ·  posted at", null)
+                .setTimestamp(Instant.now());
+
+        channel.sendMessageEmbeds(embed.build()).queue(
+                success -> event.reply(":white_check_mark: Your confession was posted anonymously.")
+                        .setEphemeral(true).queue(),
+                error -> event.reply(":x: Failed to post your confession: "
+                        + error.getMessage()).setEphemeral(true).queue());
     }
 }

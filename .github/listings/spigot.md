@@ -77,7 +77,7 @@ Apache License 2.0
 - `zdiscord.bypass.link` (op) — bypass link-to-join enforcement
 - `zdiscord.bypass.console` (op) — reserved (currently unused)
 
-[URL=https://bstats.org/plugin/bukkit/MyZDiscord/29652]bStats — live server and player graphs[/URL]
+[URL=https://bstats.org/plugin/bukkit/MyZDiscord/29652]bStats[/URL]
 
 ## External links
 

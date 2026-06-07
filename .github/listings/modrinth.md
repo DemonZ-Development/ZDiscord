@@ -68,7 +68,7 @@ All configuration lives in `plugins/ZDiscord/config.yml`. User-facing strings ar
 
 ### bStats
 
-[bStats — live server and player graphs](https://bstats.org/plugin/bukkit/MyZDiscord/29652)
+[bStats](https://bstats.org/plugin/bukkit/MyZDiscord/29652)
 
 ### License
 

@@ -60,7 +60,7 @@ ZDiscord bridges your Minecraft server and Discord guild. Chat flows both ways, 
 
 ### bStats
 
-[bStats — live server and player graphs](https://bstats.org/plugin/bukkit/MyZDiscord/29652)
+[bStats](https://bstats.org/plugin/bukkit/MyZDiscord/29652)
 
 ### License
 

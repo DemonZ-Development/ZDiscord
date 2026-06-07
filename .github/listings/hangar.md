@@ -14,7 +14,7 @@ ZDiscord
 
 ## Tagline
 
-Discord integration for Paper servers. Chat bridge, status, tickets, account linking, anti-raid.
+Discord integration for Paper servers. Chat bridge, status, tickets, account linking, anti-raid, player profiles, confessions.
 
 ## Description
 
@@ -22,9 +22,11 @@ ZDiscord is a Minecraft plugin that bridges your Minecraft server and Discord gu
 
 It supports Paper 1.20.4 or newer, Folia, and Spigot 1.20.4 or newer.
 
+It supports Paper 1.20.4 or newer, Folia, and Spigot 1.20.4 or newer.
+
 ### Features
 
-- **Chat bridge** — Two-way synchronisation between Minecraft and Discord. Webhooks are used to display player heads as avatars.
+- **Chat bridge** — Two-way synchronisation between Minecraft and Discord. Webhooks are used to display player heads as avatars. Linked players show their Discord name and avatar.
 - **Server status** — A single message in a Discord channel that auto-edits with player count, TPS, and memory.
 - **Console streaming** — Server log lines forwarded to a Discord channel.
 - **Account linking** — One-time codes link Discord and Minecraft accounts. Optionally enforced as link-to-join.
@@ -37,12 +39,15 @@ It supports Paper 1.20.4 or newer, Folia, and Spigot 1.20.4 or newer.
 - **Command logger** — Watched and critical commands posted to a staff channel.
 - **Voice status** — Linked players get a tab-list indicator while in a tracked Discord voice channel.
 - **Reaction roles** — Map message reactions to Discord roles and in-game permissions.
+- **Player profiles** — `/profile [player]` renders a rich embed with avatar, NameMC link, stats, and a follow button.
+- **Follow system** — Follow players to get DM notifications when they join. `/following` and `/unfollow` manage subscriptions.
+- **Anonymous confessions** — `/confess` posts to a dedicated channel with rate limiting and configurable appearance.
 - **Setup wizard** — `/setup` configures channels from Discord with dropdowns and buttons.
 
 ### Requirements
 
 - Java 17 or newer
-- Paper 1.20.4 or newer
+- Paper 1.20.4 or newer, Folia, or Spigot 1.20.4 or newer
 - A Discord application with a bot token. Enable the **Server Members** and **Message Content** intents on the bot.
 
 ### Installation

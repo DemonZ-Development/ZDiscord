@@ -157,6 +157,7 @@ public class UpdateChecker implements Listener {
      */
     private void postSilentDiscordNotice(String currentVersion) {
         if (!plugin.getBotManager().isConnected()) {
+            discordAnnouncedForCurrent.set(false);
             return;
         }
         String channelId = plugin.getConfigManager()
@@ -185,8 +186,11 @@ public class UpdateChecker implements Listener {
         channel.sendMessageEmbeds(embed.build()).queue(
                 success -> plugin.debug("Posted silent update notice to "
                         + channelId),
-                error -> plugin.debug("Failed to post silent update notice: "
-                        + error.getMessage()));
+                error -> {
+                    discordAnnouncedForCurrent.set(false);
+                    plugin.debug("Failed to post silent update notice: "
+                            + error.getMessage());
+                });
     }
 
     /**

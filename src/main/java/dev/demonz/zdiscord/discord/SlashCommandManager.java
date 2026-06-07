@@ -269,6 +269,11 @@ public class SlashCommandManager extends ListenerAdapter {
                     .setEphemeral(true).queue();
             return;
         }
+        if (event.getChannelType() != net.dv8tion.jda.api.entities.channel.ChannelType.TEXT) {
+            event.reply("The panel can only be posted in a text channel.")
+                    .setEphemeral(true).queue();
+            return;
+        }
         net.dv8tion.jda.api.entities.channel.concrete.TextChannel channel =
                 event.getChannel().asTextChannel();
         plugin.getTicketModule().postPanel(channel);
@@ -517,8 +522,6 @@ public class SlashCommandManager extends ListenerAdapter {
             return;
         }
 
-        confessionCooldowns.put(userId, now);
-
         // Anonymise: stable counter-based handle so the same
         // person always gets the same number, but the number
         // itself is meaningless and resets on plugin reload.
@@ -536,8 +539,11 @@ public class SlashCommandManager extends ListenerAdapter {
                 .setTimestamp(Instant.now());
 
         channel.sendMessageEmbeds(embed.build()).queue(
-                success -> event.reply(":white_check_mark: Your confession was posted anonymously.")
-                        .setEphemeral(true).queue(),
+                success -> {
+                    confessionCooldowns.put(userId, now);
+                    event.reply(":white_check_mark: Your confession was posted anonymously.")
+                            .setEphemeral(true).queue();
+                },
                 error -> event.reply(":x: Failed to post your confession: "
                         + error.getMessage()).setEphemeral(true).queue());
     }

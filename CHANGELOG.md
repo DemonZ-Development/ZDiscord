@@ -4,6 +4,77 @@ All notable changes to ZDiscord are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- MockBukkit test framework with JUnit 5. The build workflow now runs
+  the unit test suite in CI; new tests cover config loading, ticket
+  category parsing, status embed structure, update-checker version
+  comparison, head URL resolution, and the YAML storage backend.
+- Configurable ticket categories with a `categories` list in
+  `config.yml` (id, label, description, emoji, color). The panel
+  posted to Discord is rendered from this config so it can be
+  re-themed without rebuilding the plugin.
+- `tickets.panel.*` config block for title, description, color,
+  thumbnail, image, and footer of the ticket panel embed.
+- `/panel` Discord slash command and `/zdiscord panel` in-game
+  command to (re)post the ticket panel on demand.
+- `tickets.panel-channel` config option to pin the panel channel
+  for `/zdiscord panel`.
+- `/zdiscord update [check|dismiss]` admin subcommand. `check`
+  triggers a synchronous Modrinth lookup; `dismiss` suppresses the
+  join-banner for the current session.
+- Update notifications are now clickable: the URL is a real
+  ClickEvent (openUrl) with a HoverEvent, plus a clickable Dismiss
+  shortcut. Versions are compared semver-style so `1.2.3-beta` is
+  correctly treated as older than `1.2.3`.
+- UpdateChecker re-runs every 6 hours so long-running servers pick
+  up new releases without a restart.
+- Chat bridge now listens for Paper's modern `AsyncChatEvent` (via
+  the new `PaperChatListener`) and the legacy
+  `AsyncPlayerChatEvent`. On Paper, the modern listener consumes
+  the event and cancels the legacy one to avoid double-sends.
+
+### Changed
+- Ticket panel is now a beautiful, branded embed with a
+  StringSelectMenu (dropdown) of categories plus a "Quick Open"
+  button. The in-ticket message was redesigned to include
+  category, opener, and the close/claim/transcript actions.
+- Ticket button IDs were consolidated: panel actions now share the
+  `zdiscord_create_ticket:<action>` format. The button handler is
+  isolated in `TicketButtonListener` and handles close, claim,
+  transcript, quick-open, and the category dropdown.
+- Status embed layout was rebuilt: full-width memory row with a
+  block-character progress bar, color-coded health indicator
+  (green/amber/red), and a guild icon thumbnail.
+- Performance embed layout was rebuilt: Unicode block-character
+  sparklines replace the cramped ASCII art graphs; per-row
+  "TPS / Memory / Players+Threads" fields; healthy/warning/critical
+  title; alert fields for low TPS and high memory.
+- Join/quit embeds were rebuilt with title, thumbnail, fields
+  (player, online count, status), and a footer line driven by the
+  configured `events.join.message` / `events.quit.message` template.
+- `StatusModule` and `PerformanceModule` now persist their edited
+  message IDs to dedicated `status_data.yml` and
+  `performance_data.yml` files instead of writing them into
+  `config.yml`.
+- `ConfigManager` exposes a `getConfig()` accessor for tests and
+  other callers that need the raw Bukkit `FileConfiguration`.
+- `TicketModule` exposes a static `loadCategories(root)` helper so
+  the category parser can be unit-tested without JDA.
+
+### Fixed
+- `WebhookManager` no longer caches a `null` client when webhook
+  creation fails — subsequent messages will retry instead of
+  silently dropping.
+- Ticket creator count is decremented when the channel is closed
+  from Discord (the close handler resolves the requester from the
+  channel's member permission overrides).
+- `PlayerQuitEvent` no longer races the online-count update.
+- `PlaceholderUtil` strips both `&` and `\u00A7` colour codes.
+- `ColorUtil` correctly handles null/empty/malformed hex.
+- `HeadUtil` handles null names without NPE.
+
 ## [1.1.0] - 2026-06-06
 
 ### Changed

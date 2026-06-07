@@ -23,6 +23,8 @@ ticket-created: "%prefix%&aTicket created. See &b#%channel%"
 ticket-closed: "%prefix%&eTicket &b#%id% &ehas been closed."
 ticket-max-reached: "%prefix%&cYou have reached the maximum number of open tickets (%max%)."
 ticket-not-found: "%prefix%&cTicket not found."
+ticket-category-unknown: "%prefix%&cThat ticket category is no longer available."
+ticket-no-default: "%prefix%&cNo default ticket category is configured."
 
 # ── Anti-raid ─────────────────────────────────────────────
 lockdown-enabled: "%prefix%&c&lSERVER LOCKDOWN &8> &cPossible raid detected."

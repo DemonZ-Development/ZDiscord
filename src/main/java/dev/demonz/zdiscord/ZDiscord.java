@@ -30,6 +30,7 @@ import dev.demonz.zdiscord.minecraft.listeners.ChatListener;
 import dev.demonz.zdiscord.minecraft.listeners.DeathListener;
 import dev.demonz.zdiscord.minecraft.listeners.JoinQuitListener;
 import dev.demonz.zdiscord.minecraft.listeners.LinkEnforcementListener;
+import dev.demonz.zdiscord.minecraft.listeners.PaperChatListener;
 import dev.demonz.zdiscord.modules.AntiRaidModule;
 import dev.demonz.zdiscord.modules.CommandLoggerModule;
 import dev.demonz.zdiscord.modules.ConsoleModule;
@@ -72,6 +73,7 @@ public class ZDiscord extends JavaPlugin {
     private SlashCommandManager slashCommandManager;
     private SetupCommand setupCommand;
     private StorageManager storageManager;
+    private boolean paperModern;
 
     private StatusModule statusModule;
     private LeaderboardModule leaderboardModule;
@@ -158,6 +160,7 @@ public class ZDiscord extends JavaPlugin {
             try {
                 Class.forName("io.papermc.paper.event.player.AsyncChatEvent");
                 platformAdapter = new PaperAdapter(this);
+                paperModern = true;
             } catch (ClassNotFoundException e2) {
                 platformAdapter = new SpigotAdapter(this);
             }
@@ -249,6 +252,10 @@ public class ZDiscord extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new JoinQuitListener(this), this);
         getServer().getPluginManager().registerEvents(new DeathListener(this), this);
         getServer().getPluginManager().registerEvents(new AdvancementListener(this), this);
+
+        if (paperModern) {
+            getServer().getPluginManager().registerEvents(new PaperChatListener(this), this);
+        }
 
         if (configManager.getBoolean("linking.required", false) && linkModule != null) {
             getServer().getPluginManager().registerEvents(new LinkEnforcementListener(this), this);

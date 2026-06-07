@@ -1,7 +1,7 @@
 # ZDiscord configuration
 # Documentation: https://github.com/DemonZ-Development/ZDiscord/wiki
 
-config-version: 2
+config-version: 3
 
 # ── Storage ───────────────────────────────────────────────
 storage:
@@ -91,6 +91,43 @@ tickets:
     - "YOUR_SUPPORT_ROLE_ID"
   max-per-user: 3
   auto-close-hours: 48
+  # Optional Discord channel/category overrides for the ticket panel.
+  # If panel-channel is set, the panel is re-posted there on /setup
+  # even if you do not run the wizard.
+  panel-channel: ""
+  # Customise the panel embed posted to Discord.
+  panel:
+    title: "Support Center"
+    description: |
+      Need help? Pick a category below to open a private ticket.
+      Our support team will respond as soon as possible.
+    color: "#5865F2"
+    thumbnail: ""
+    image: ""
+    footer: "ZDiscord Ticket System"
+  # Categories shown in the panel dropdown. Add, remove, or edit
+  # freely. Each entry needs a unique id, label, description, and emoji.
+  categories:
+    - id: "general"
+      label: "General Support"
+      description: "Questions, account help, or anything else."
+      emoji: "💬"
+      color: "#5865F2"
+    - id: "bug"
+      label: "Bug Report"
+      description: "Something on the server is broken or behaving oddly."
+      emoji: "🐛"
+      color: "#E67E22"
+    - id: "player"
+      label: "Player Report"
+      description: "Report a player breaking the rules."
+      emoji: "🚨"
+      color: "#E74C3C"
+    - id: "purchase"
+      label: "Purchase Help"
+      description: "Need help with a store order or rank?"
+      emoji: "🛒"
+      color: "#2ECC71"
 
 # ── Account linking ───────────────────────────────────────
 linking:

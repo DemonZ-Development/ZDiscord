@@ -56,27 +56,31 @@ public class WebhookManager {
     }
 
     public WebhookClient getOrCreateWebhook(TextChannel channel) {
-        return webhookClients.computeIfAbsent(channel.getId(), id -> {
-            try {
-                var webhooks = channel.retrieveWebhooks().complete();
-                var existing = webhooks.stream()
-                        .filter(w -> "ZChat".equals(w.getName()))
-                        .findFirst();
+        WebhookClient existing = webhookClients.get(channel.getId());
+        if (existing != null) {
+            return existing;
+        }
+        try {
+            var webhooks = channel.retrieveWebhooks().complete();
+            var found = webhooks.stream()
+                    .filter(w -> "ZChat".equals(w.getName()))
+                    .findFirst();
 
-                String webhookUrl;
-                if (existing.isPresent()) {
-                    webhookUrl = existing.get().getUrl();
-                } else {
-                    var webhook = channel.createWebhook("ZChat").complete();
-                    webhookUrl = webhook.getUrl();
-                }
-                return WebhookClient.withUrl(webhookUrl);
-            } catch (Exception e) {
-                plugin.getLogger().warning("Failed to create webhook for #"
-                        + channel.getName() + ": " + e.getMessage());
-                return null;
+            String webhookUrl;
+            if (found.isPresent()) {
+                webhookUrl = found.get().getUrl();
+            } else {
+                var webhook = channel.createWebhook("ZChat").complete();
+                webhookUrl = webhook.getUrl();
             }
-        });
+            WebhookClient client = WebhookClient.withUrl(webhookUrl);
+            webhookClients.put(channel.getId(), client);
+            return client;
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to create webhook for #"
+                    + channel.getName() + ": " + e.getMessage());
+            return null;
+        }
     }
 
     /**

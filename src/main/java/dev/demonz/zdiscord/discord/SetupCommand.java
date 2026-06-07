@@ -56,7 +56,6 @@ public class SetupCommand extends ListenerAdapter {
 
     private final ZDiscord plugin;
 
-    private static final String PANEL_BUTTON_ID = "zdiscord_create_ticket";
     private static final String MODULE_MENU_ID = "zdiscord_setup_module";
     private static final String SUPPORT_ROLE_MENU_ID = "zdiscord_setup_support_role";
     private static final String CHANNEL_MENU_PREFIX = "zdiscord_setup_channel:";
@@ -355,33 +354,16 @@ public class SetupCommand extends ListenerAdapter {
     }
 
     private void postTicketPanel(TextChannel channel) {
-        EmbedBuilder ticket = new EmbedBuilder()
-                .setTitle("Support Center")
-                .setDescription(
-                        "Need help? Open a private support ticket by clicking the button below.\n\n"
-                                + "A private channel will be created for you and our support team "
-                                + "will be notified. Only you and staff can see the channel.")
-                .setColor(ColorUtil.parseHex("#5865F2"))
-                .setFooter("ZDiscord Ticket System")
-                .setTimestamp(Instant.now());
-
-        channel.sendMessageEmbeds(ticket.build())
-                .addActionRow(Button.success(PANEL_BUTTON_ID, "Create Ticket"))
-                .queue();
+        if (plugin.getTicketModule() == null) {
+            plugin.getLogger().warning("Ticket module is not enabled; skipping panel post.");
+            return;
+        }
+        plugin.getTicketModule().postPanel(channel);
     }
 
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
-        if (!PANEL_BUTTON_ID.equals(event.getComponentId())) {
-            return;
-        }
-        if (plugin.getTicketModule() == null) {
-            event.reply("The ticket system is disabled.").setEphemeral(true).queue();
-            return;
-        }
-        plugin.getTicketModule().createTicket(event.getUser(), "General Support", null);
-        event.reply("Your support ticket has been created. Check the new channel.")
-                .setEphemeral(true).queue();
+        // The ticket panel buttons are handled by TicketButtonListener.
     }
 
     private void quickSetup(SlashCommandInteractionEvent event, String module, TextChannel target) {

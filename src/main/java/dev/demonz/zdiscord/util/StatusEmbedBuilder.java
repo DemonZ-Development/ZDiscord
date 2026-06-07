@@ -29,43 +29,61 @@ import java.time.Instant;
  */
 public final class StatusEmbedBuilder {
 
-    private static final int BAR_LENGTH = 20;
-    private static final String THUMBNAIL_SIZE = "?size=128";
+    private static final int BAR_LENGTH = 14;
+    private static final String BAR_FULL = "\u2588";
+    private static final String BAR_EMPTY = "\u2591";
+
+    private static final int PLAYER_LIST_MAX = 12;
+    private static final String THUMBNAIL_SIZE = "?size=256";
 
     private StatusEmbedBuilder() {
     }
 
     public static EmbedBuilder builder(StatusContext ctx) {
         EmbedBuilder embed = new EmbedBuilder()
-                .setTitle(ctx.title)
-                .setColor(ctx.color)
-                .addField("Status", ctx.online ? "Online" : "Offline", true)
-                .addField("Server IP", "`" + ctx.serverIp + "`", true)
-                .addField("Players [" + ctx.onlineCount + "/" + ctx.maxCount + "]",
-                        "`" + playerBar(ctx.onlineCount, ctx.maxCount) + "`", false);
+                .setAuthor(ctx.serverIp == null || ctx.serverIp.isEmpty()
+                                ? "Minecraft Server" : ctx.serverIp,
+                        null,
+                        ctx.guildIconUrl)
+                .setTitle(ctx.online ? ":green_circle: Server Online" : ":red_circle: Server Offline")
+                .setColor(ctx.online ? healthyColor(ctx) : new java.awt.Color(0xE74C3C))
+                .setThumbnail(ctx.guildIconUrl);
 
-        if (ctx.showPlayers && ctx.onlineCount > 0) {
-            embed.addField("Online", ctx.playerList, false);
-        }
-        if (ctx.showTps) {
-            String tpsIndicator = ctx.tps >= ctx.tpsWarning ? ""
-                    : ctx.tps >= ctx.tpsCritical ? "!" : "!!";
-            embed.addField("TPS" + tpsIndicator,
-                    String.format("%.1f / 20.0", ctx.tps), true);
-        }
-        if (ctx.showMemory) {
+        embed.addField("Status",
+                (ctx.online ? ":white_check_mark: Online" : ":x: Offline"),
+                true);
+
+        if (ctx.online) {
             int memPercent = ctx.maxMemoryMb > 0
                     ? (int) ((ctx.usedMemoryMb * 100.0) / ctx.maxMemoryMb) : 0;
-            embed.addField("Memory",
-                    ctx.usedMemoryMb + "MB / " + ctx.maxMemoryMb + "MB (" + memPercent + "%)", true);
-        }
-        embed.setFooter("Auto-updates every " + ctx.updateIntervalSeconds + "s")
-                .setTimestamp(Instant.now());
 
-        String thumbnail = resolveThumbnail(ctx.guildIconUrl, ctx.botAvatarUrl);
-        if (thumbnail != null) {
-            embed.setThumbnail(thumbnail);
+            embed.addField("Players",
+                    "**" + ctx.onlineCount + "** / " + ctx.maxCount
+                            + "\n`" + playerBar(ctx.onlineCount, ctx.maxCount) + "`",
+                    true);
+
+            embed.addField("TPS",
+                    "`" + String.format("%.1f", ctx.tps) + "` / 20.0"
+                            + (ctx.tps >= ctx.tpsWarning ? "  :white_check_mark:"
+                                    : ctx.tps >= ctx.tpsCritical ? "  :warning:"
+                                            : "  :no_entry:"),
+                    true);
+
+            embed.addField("Memory",
+                    String.format("`%dMB` / `%dMB` (%d%%)\n`%s`",
+                            ctx.usedMemoryMb, ctx.maxMemoryMb, memPercent,
+                            memoryBar(memPercent)),
+                    false);
+
+            if (ctx.showPlayers && ctx.onlineCount > 0 && ctx.playerList != null) {
+                embed.addField(":busts_in_silhouette: Online Players",
+                        ctx.playerList, false);
+            }
         }
+
+        embed.setFooter("Auto-updates every " + ctx.updateIntervalSeconds
+                        + "s \u2022 ZDiscord")
+                .setTimestamp(Instant.now());
         return embed;
     }
 
@@ -75,22 +93,40 @@ public final class StatusEmbedBuilder {
 
     private static String playerBar(int online, int max) {
         if (max <= 0) {
-            return " ".repeat(BAR_LENGTH);
+            return BAR_EMPTY.repeat(BAR_LENGTH);
         }
-        int filled = (int) ((online / (double) max) * BAR_LENGTH);
+        int filled = (int) Math.round((online / (double) max) * BAR_LENGTH);
         if (filled < 0) {
             filled = 0;
         } else if (filled > BAR_LENGTH) {
             filled = BAR_LENGTH;
         }
-        return "#".repeat(filled) + "-".repeat(BAR_LENGTH - filled);
+        return BAR_FULL.repeat(filled) + BAR_EMPTY.repeat(BAR_LENGTH - filled);
     }
 
-    private static String resolveThumbnail(String guildIconUrl, String botAvatarUrl) {
-        if (guildIconUrl != null && !guildIconUrl.isEmpty()) {
-            return guildIconUrl + THUMBNAIL_SIZE;
+    private static String memoryBar(int percent) {
+        int clamped = Math.max(0, Math.min(100, percent));
+        int filled = (int) Math.round((clamped / 100.0) * BAR_LENGTH);
+        return BAR_FULL.repeat(filled) + BAR_EMPTY.repeat(BAR_LENGTH - filled);
+    }
+
+    private static java.awt.Color healthyColor(StatusContext ctx) {
+        if (ctx.tps < ctx.tpsCritical) {
+            return new java.awt.Color(0xE74C3C);
         }
-        return botAvatarUrl;
+        if (ctx.tps < ctx.tpsWarning) {
+            return new java.awt.Color(0xF39C12);
+        }
+        if (ctx.maxMemoryMb > 0) {
+            int memPercent = (int) ((ctx.usedMemoryMb * 100.0) / ctx.maxMemoryMb);
+            if (memPercent >= 90) {
+                return new java.awt.Color(0xE74C3C);
+            }
+            if (memPercent >= 75) {
+                return new java.awt.Color(0xF39C12);
+            }
+        }
+        return new java.awt.Color(0x2ECC71);
     }
 
     /**
@@ -139,7 +175,6 @@ public final class StatusEmbedBuilder {
 
             ctx.onlineCount = Bukkit.getOnlinePlayers().size();
             ctx.maxCount = Bukkit.getMaxPlayers();
-            // If the status module is running, the server is up.
             ctx.online = true;
 
             Runtime runtime = Runtime.getRuntime();
@@ -152,25 +187,31 @@ public final class StatusEmbedBuilder {
                 int shown = 0;
                 for (org.bukkit.entity.Player p : Bukkit.getOnlinePlayers()) {
                     if (shown > 0) {
-                        list.append(", ");
+                        list.append("\n");
                     }
-                    list.append(p.getName());
+                    list.append("`").append(p.getName()).append("`");
                     shown++;
-                    if (shown >= 20) {
+                    if (shown >= PLAYER_LIST_MAX) {
                         break;
                     }
                 }
-                if (ctx.onlineCount > 20) {
-                    list.append(" +").append(ctx.onlineCount - 20).append(" more");
+                if (ctx.onlineCount > PLAYER_LIST_MAX) {
+                    list.append("\n*...and ")
+                            .append(ctx.onlineCount - PLAYER_LIST_MAX)
+                            .append(" more*");
                 }
                 ctx.playerList = list.toString();
             } else {
-                ctx.playerList = "No players online";
+                ctx.playerList = null;
             }
 
             Guild guild = guildSupplier.get();
             if (guild != null && guild.getIconUrl() != null) {
-                ctx.guildIconUrl = guild.getIconUrl();
+                String url = guild.getIconUrl();
+                if (url.contains("?")) {
+                    url = url.substring(0, url.indexOf('?'));
+                }
+                ctx.guildIconUrl = url + THUMBNAIL_SIZE;
             }
             return ctx;
         }

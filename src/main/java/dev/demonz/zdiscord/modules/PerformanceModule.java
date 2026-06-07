@@ -21,23 +21,29 @@ import dev.demonz.zdiscord.util.TPSUtil;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import org.bukkit.Bukkit;
+import org.bukkit.configuration.file.YamlConfiguration;
 
+import java.io.File;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayDeque;
-import java.util.Arrays;
 import java.util.Deque;
+import java.util.logging.Level;
 
 /**
  * Periodically edits a single Discord message with the server's
- * current TPS, memory usage, and a small history graph.
+ * current TPS, memory usage, and a clean sparkline of recent values.
  */
 public class PerformanceModule {
 
     private static final int HISTORY_SIZE = 30;
 
+    private static final String SPARK_BLOCKS =
+            "\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588";
+
     private final ZDiscord plugin;
     private final Deque<Double> tpsHistory = new ArrayDeque<>(HISTORY_SIZE);
-    private final Deque<Long> memoryHistory = new ArrayDeque<>(HISTORY_SIZE);
+    private final Deque<Integer> memoryHistory = new ArrayDeque<>(HISTORY_SIZE);
     private String perfMessageId;
 
     public PerformanceModule(ZDiscord plugin) {
@@ -45,6 +51,7 @@ public class PerformanceModule {
     }
 
     public void init() {
+        perfMessageId = loadMessageId();
         int interval = plugin.getConfigManager().getInt("performance.update-interval", 60);
         plugin.getPlatformAdapter().runAsyncTimer(this::updatePerformance, 200L, interval * 20L);
     }
@@ -62,7 +69,7 @@ public class PerformanceModule {
         int memPercent = maxMb > 0 ? (int) ((usedMb * 100.0) / maxMb) : 0;
 
         tpsHistory.addLast(tps[0]);
-        memoryHistory.addLast((long) memPercent);
+        memoryHistory.addLast(memPercent);
         if (tpsHistory.size() > HISTORY_SIZE) tpsHistory.pollFirst();
         if (memoryHistory.size() > HISTORY_SIZE) memoryHistory.pollFirst();
 
@@ -70,41 +77,54 @@ public class PerformanceModule {
         double tpsCritical = plugin.getConfigManager().getDouble("performance.tps-critical", 15.0);
         int memWarning = plugin.getConfigManager().getInt("performance.memory-warning", 80);
 
-        String overall;
         int color;
+        String health;
+        String healthEmoji;
         if (tps[0] >= tpsWarning && memPercent < memWarning) {
-            overall = "Healthy";
             color = 0x2ECC71;
+            health = "Healthy";
+            healthEmoji = ":white_check_mark:";
         } else if (tps[0] >= tpsCritical && memPercent < 90) {
-            overall = "Warning";
             color = 0xF1C40F;
+            health = "Warning";
+            healthEmoji = ":warning:";
         } else {
-            overall = "Critical";
             color = 0xE74C3C;
+            health = "Critical";
+            healthEmoji = ":no_entry:";
         }
 
-        String tpsGraph = buildGraph(toArray(tpsHistory), 20.0);
-        String memGraph = buildGraph(memoryHistory.stream().mapToDouble(Long::doubleValue).toArray(), 100.0);
+        String tpsSpark = buildSparkline(toDoubleArray(tpsHistory), 20.0);
+        String memSpark = buildSparkline(toIntArray(memoryHistory), 100.0);
 
         EmbedBuilder embed = new EmbedBuilder()
-                .setTitle("Server Performance")
+                .setAuthor("Server Performance", null, plugin.getBotManager().getJda() != null
+                        ? plugin.getBotManager().getJda().getSelfUser().getEffectiveAvatarUrl()
+                        : null)
+                .setTitle(healthEmoji + " " + health)
                 .setColor(color)
-                .addField("Overall", overall, true)
-                .addField("Players", String.valueOf(Bukkit.getOnlinePlayers().size()), true)
-                .addField("Threads", String.valueOf(Thread.activeCount()), true)
                 .addField("TPS (1m / 5m / 15m)",
-                        String.format("`%.2f` / `%.2f` / `%.2f`", tps[0], tps[1], tps[2]), false)
-                .addField("TPS history", "```\n" + tpsGraph + "\n```", false)
+                        String.format("`%.2f` / `%.2f` / `%.2f`",
+                                tps[0], tps[1], tps[2]), true)
                 .addField("Memory",
-                        usedMb + "MB / " + maxMb + "MB (" + memPercent + "%)", false)
-                .addField("Memory history", "```\n" + memGraph + "\n```", false)
+                        String.format("`%dMB` / `%dMB` (%d%%)",
+                                usedMb, maxMb, memPercent), true)
+                .addField("Players / Threads",
+                        Bukkit.getOnlinePlayers().size() + " / " + Thread.activeCount(),
+                        true)
+                .addField("TPS History",
+                        tpsSpark.isEmpty() ? "*Collecting...*"
+                                : "`" + tpsSpark + "` *20.0*", false)
+                .addField("Memory History",
+                        memSpark.isEmpty() ? "*Collecting...*"
+                                : "`" + memSpark + "` *100%*", false)
                 .setTimestamp(Instant.now());
 
         if (tps[0] < tpsCritical) {
-            embed.addField("Alert", "TPS is critically low. Server may be lagging.", false);
+            embed.addField(":rotating_light: Alert", "TPS is critically low.", false);
         }
         if (memPercent >= 90) {
-            embed.addField("Alert", "Memory usage is critically high.", false);
+            embed.addField(":rotating_light: Alert", "Memory usage is critically high.", false);
         }
 
         if (perfMessageId != null) {
@@ -112,15 +132,57 @@ public class PerformanceModule {
                     success -> { },
                     error -> {
                         perfMessageId = null;
-                        channel.sendMessageEmbeds(embed.build()).queue(
-                                msg -> perfMessageId = msg.getId());
+                        channel.sendMessageEmbeds(embed.build()).queue(msg -> {
+                            if (msg != null) {
+                                perfMessageId = msg.getId();
+                                persistMessageId(perfMessageId);
+                            }
+                        });
                     });
         } else {
-            channel.sendMessageEmbeds(embed.build()).queue(msg -> perfMessageId = msg.getId());
+            channel.sendMessageEmbeds(embed.build()).queue(msg -> {
+                if (msg != null) {
+                    perfMessageId = msg.getId();
+                    persistMessageId(perfMessageId);
+                }
+            });
         }
     }
 
-    private static double[] toArray(Deque<Double> deque) {
+    private File dataFile() {
+        return new File(plugin.getDataFolder(), "performance_data.yml");
+    }
+
+    private void persistMessageId(String messageId) {
+        try {
+            File f = dataFile();
+            if (!f.exists()) {
+                f.getParentFile().mkdirs();
+                f.createNewFile();
+            }
+            YamlConfiguration cfg = YamlConfiguration.loadConfiguration(f);
+            cfg.set("performance-message-id", messageId);
+            cfg.save(f);
+        } catch (IOException e) {
+            plugin.getLogger().log(Level.WARNING,
+                    "Failed to save performance message ID: " + e.getMessage(), e);
+        }
+    }
+
+    private String loadMessageId() {
+        try {
+            File f = dataFile();
+            if (!f.exists()) {
+                return null;
+            }
+            YamlConfiguration cfg = YamlConfiguration.loadConfiguration(f);
+            return cfg.getString("performance-message-id", null);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static double[] toDoubleArray(Deque<Double> deque) {
         double[] out = new double[deque.size()];
         int i = 0;
         for (Double d : deque) {
@@ -129,46 +191,34 @@ public class PerformanceModule {
         return out;
     }
 
-    private String buildGraph(double[] values, double max) {
+    private static double[] toIntArray(Deque<Integer> deque) {
+        double[] out = new double[deque.size()];
+        int i = 0;
+        for (Integer v : deque) {
+            out[i++] = v;
+        }
+        return out;
+    }
+
+    /**
+     * Render a sparkline of the given values using unicode block
+     * characters. Returns an empty string when there is no data.
+     */
+    private String buildSparkline(double[] values, double max) {
         if (values.length == 0) {
-            return "No data";
+            return "";
         }
-        int height = 5;
-        int width = Math.min(values.length, HISTORY_SIZE);
-        char[][] grid = new char[height][width];
-        for (char[] row : grid) {
-            Arrays.fill(row, ' ');
+        StringBuilder sb = new StringBuilder(values.length);
+        for (double v : values) {
+            double ratio = max > 0 ? Math.max(0.0, Math.min(1.0, v / max)) : 0.0;
+            int idx = (int) Math.round(ratio * (SPARK_BLOCKS.length() - 1));
+            sb.append(SPARK_BLOCKS.charAt(idx));
         }
-        for (int i = 0; i < width; i++) {
-            int idx = values.length - width + i;
-            if (idx < 0) {
-                continue;
-            }
-            int bar = (int) ((values[idx] / max) * height);
-            if (bar > height) {
-                bar = height;
-            }
-            for (int j = height - bar; j < height; j++) {
-                grid[j][i] = '#';
-            }
-        }
-        StringBuilder sb = new StringBuilder();
-        for (int j = 0; j < height; j++) {
-            String label;
-            if (j == 0) {
-                label = String.format("%4.0f|", max);
-            } else if (j == height - 1) {
-                label = "   0|";
-            } else {
-                label = "    |";
-            }
-            sb.append(label).append(new String(grid[j])).append('\n');
-        }
-        sb.append("    +").append("-".repeat(width));
         return sb.toString();
     }
 
     public void reload() {
+        perfMessageId = loadMessageId();
     }
 
     public void shutdown() {

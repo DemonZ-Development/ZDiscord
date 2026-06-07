@@ -19,7 +19,6 @@ package dev.demonz.zdiscord.minecraft.listeners;
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.util.ColorUtil;
 import dev.demonz.zdiscord.util.HeadUtil;
-import dev.demonz.zdiscord.util.PlaceholderUtil;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import org.bukkit.entity.Player;
@@ -35,8 +34,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Forwards join/quit events to Discord and tracks per-player session
- * duration for the playtime leaderboard.
+ * Forwards join and quit events to Discord as polished embeds and
+ * tracks per-player session duration for the playtime leaderboard.
  */
 public class JoinQuitListener implements Listener {
 
@@ -47,56 +46,26 @@ public class JoinQuitListener implements Listener {
         this.plugin = plugin;
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onJoin(PlayerJoinEvent event) {
-        if (!plugin.getBotManager().isConnected()) {
-            return;
-        }
-        if (!plugin.getConfigManager().getBoolean("events.join.enabled", true)) {
-            return;
+        Player player = event.getPlayer();
+
+        if (plugin.getBotManager().isConnected()
+                && plugin.getConfigManager().getBoolean("events.join.enabled", true)) {
+            sendEmbed(player, true);
         }
 
-        Player player = event.getPlayer();
+        joinTimestamps.put(player.getUniqueId(), System.currentTimeMillis());
 
         if (plugin.getAntiRaidModule() != null) {
             plugin.getAntiRaidModule().onPlayerJoin(player);
         }
 
-        joinTimestamps.put(player.getUniqueId(), System.currentTimeMillis());
-
         plugin.getPlatformAdapter().runAsync(() -> plugin.getBotManager().updateActivity());
-
-        TextChannel channel = resolveEventChannel();
-        if (channel == null) {
-            return;
-        }
-
-        String template = plugin.getConfigManager().getString(
-                "events.join.message", "**%player%** joined the server");
-        String message = PlaceholderUtil.resolve(template, player);
-        String colorHex = plugin.getConfigManager().getString("events.join.color", "#2ECC71");
-        String avatarUrl = resolveAvatar(player);
-
-        EmbedBuilder embed = new EmbedBuilder()
-                .setAuthor(message, null, avatarUrl)
-                .setColor(ColorUtil.parseHex(colorHex))
-                .setFooter("Players online: "
-                        + plugin.getServer().getOnlinePlayers().size() + "/"
-                        + plugin.getServer().getMaxPlayers())
-                .setTimestamp(Instant.now());
-
-        channel.sendMessageEmbeds(embed.build()).queue();
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onQuit(PlayerQuitEvent event) {
-        if (!plugin.getBotManager().isConnected()) {
-            return;
-        }
-        if (!plugin.getConfigManager().getBoolean("events.quit.enabled", true)) {
-            return;
-        }
-
         Player player = event.getPlayer();
 
         // Defer the activity update and online count by one tick so the
@@ -115,23 +84,59 @@ public class JoinQuitListener implements Listener {
             }
         }
 
+        if (plugin.getBotManager().isConnected()
+                && plugin.getConfigManager().getBoolean("events.quit.enabled", true)) {
+            sendEmbed(player, false);
+        }
+    }
+
+    private void sendEmbed(Player player, boolean joined) {
         TextChannel channel = resolveEventChannel();
         if (channel == null) {
             return;
         }
 
+        String typeKey = joined ? "join" : "quit";
         String template = plugin.getConfigManager().getString(
-                "events.quit.message", "**%player%** left the server");
-        String message = PlaceholderUtil.resolve(template, player);
-        String colorHex = plugin.getConfigManager().getString("events.quit.color", "#E74C3C");
-        String avatarUrl = resolveAvatar(player);
+                "events." + typeKey + ".message",
+                joined ? "**%player%** joined the server"
+                       : "**%player%** left the server");
+        String colorHex = plugin.getConfigManager().getString(
+                "events." + typeKey + ".color",
+                joined ? "#2ECC71" : "#E74C3C");
+
+        String title = joined
+                ? "Player Joined"
+                : "Player Left";
+        String verb = joined ? "joined" : "left";
+
+        String avatar = resolveAvatar(player);
+        String resolvedMessage = ColorUtil.stripColor(
+                template
+                        .replace("%player%", player.getName())
+                        .replace("%displayname%", ColorUtil.stripColor(player.getDisplayName())));
 
         EmbedBuilder embed = new EmbedBuilder()
-                .setAuthor(message, null, avatarUrl)
+                .setAuthor(player.getName(), null, avatar)
+                .setTitle(title)
+                .setDescription("**" + player.getName() + "** " + verb + " the server")
                 .setColor(ColorUtil.parseHex(colorHex))
+                .setThumbnail(avatar)
+                .addField("Player", "`" + player.getName() + "`", true)
+                .addField("Online",
+                        plugin.getServer().getOnlinePlayers().size() + "/"
+                                + plugin.getServer().getMaxPlayers(), true)
+                .addField("Status",
+                        joined ? ":white_check_mark: Online" : ":x: Offline", true)
+                .setFooter(resolvedMessage,
+                        joined ? "https://i.imgur.com/6P4Y0QI.png"
+                               : "https://i.imgur.com/0Z7YxQS.png")
                 .setTimestamp(Instant.now());
 
-        channel.sendMessageEmbeds(embed.build()).queue();
+        channel.sendMessageEmbeds(embed.build()).queue(
+                success -> { },
+                error -> plugin.debug("Failed to send "
+                        + typeKey + " embed: " + error.getMessage()));
     }
 
     private TextChannel resolveEventChannel() {

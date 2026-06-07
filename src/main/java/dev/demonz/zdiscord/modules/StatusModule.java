@@ -19,6 +19,11 @@ package dev.demonz.zdiscord.modules;
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.util.StatusEmbedBuilder;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import org.bukkit.configuration.file.YamlConfiguration;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.logging.Level;
 
 /**
  * Periodically edits a single Discord message with the current
@@ -34,9 +39,10 @@ public class StatusModule {
     }
 
     public void init() {
+        statusMessageId = loadMessageId();
+
         int interval = plugin.getConfigManager().getInt("status.update-interval", 30);
         long ticks = interval * 20L;
-        statusMessageId = plugin.getConfigManager().getString("channels.status-message", null);
 
         plugin.getPlatformAdapter().runAsyncTimer(this::updateStatus, 100L, ticks);
     }
@@ -67,7 +73,6 @@ public class StatusModule {
             channel.editMessageEmbedsById(statusMessageId, StatusEmbedBuilder.build(ctx)).queue(
                     success -> { },
                     error -> {
-                        // Message was deleted or is unreachable; create a replacement.
                         plugin.debug("Status message " + statusMessageId
                                 + " is missing, creating a new one.");
                         statusMessageId = null;
@@ -81,27 +86,50 @@ public class StatusModule {
     private void sendNewStatus(TextChannel channel, StatusEmbedBuilder.StatusContext ctx) {
         channel.sendMessageEmbeds(StatusEmbedBuilder.build(ctx)).queue(
                 message -> {
-                    statusMessageId = message.getId();
-                    persistMessageId(statusMessageId);
+                    if (message != null) {
+                        statusMessageId = message.getId();
+                        persistMessageId(statusMessageId);
+                    }
                 },
                 error -> plugin.debug("Failed to send status embed: " + error.getMessage()));
     }
 
+    private File dataFile() {
+        return new File(plugin.getDataFolder(), "status_data.yml");
+    }
+
     private void persistMessageId(String messageId) {
         try {
-            java.io.File configFile = new java.io.File(plugin.getDataFolder(), "config.yml");
-            org.bukkit.configuration.file.YamlConfiguration config = org.bukkit.configuration.file.YamlConfiguration
-                    .loadConfiguration(configFile);
-            config.set("channels.status-message", messageId);
-            config.save(configFile);
-            plugin.getConfigManager().reload();
+            File f = dataFile();
+            if (!f.exists()) {
+                f.getParentFile().mkdirs();
+                f.createNewFile();
+            }
+            YamlConfiguration cfg = YamlConfiguration.loadConfiguration(f);
+            cfg.set("status-message-id", messageId);
+            cfg.save(f);
+        } catch (IOException e) {
+            plugin.getLogger().log(Level.WARNING,
+                    "Failed to save status message ID: " + e.getMessage(), e);
+        }
+    }
+
+    private String loadMessageId() {
+        try {
+            File f = dataFile();
+            if (!f.exists()) {
+                return null;
+            }
+            YamlConfiguration cfg = YamlConfiguration.loadConfiguration(f);
+            return cfg.getString("status-message-id", null);
         } catch (Exception e) {
-            plugin.getLogger().warning("Failed to save status message ID: " + e.getMessage());
+            plugin.debug("Failed to load status message ID: " + e.getMessage());
+            return null;
         }
     }
 
     public void reload() {
-        statusMessageId = plugin.getConfigManager().getString("channels.status-message", null);
+        statusMessageId = loadMessageId();
     }
 
     public void shutdown() {
@@ -126,12 +154,20 @@ public class StatusModule {
                 18.0, 15.0);
         ctx.online = false;
         ctx.onlineCount = 0;
-        ctx.maxCount = 0;
+        ctx.maxCount = BukkitMaxPlayers();
 
         try {
             channel.editMessageEmbedsById(statusMessageId, StatusEmbedBuilder.build(ctx)).complete();
         } catch (Exception e) {
             plugin.debug("Failed to send offline status: " + e.getMessage());
+        }
+    }
+
+    private static int BukkitMaxPlayers() {
+        try {
+            return org.bukkit.Bukkit.getMaxPlayers();
+        } catch (Exception e) {
+            return 0;
         }
     }
 }

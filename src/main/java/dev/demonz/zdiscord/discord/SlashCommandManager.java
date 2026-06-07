@@ -61,6 +61,7 @@ public class SlashCommandManager extends ListenerAdapter {
                                 "Your link code from /zdiscord link", true),
                 Commands.slash("ticket", "Create a support ticket")
                         .addOption(OptionType.STRING, "subject", "Ticket subject", true),
+                Commands.slash("panel", "(Re)post the ticket panel in this channel"),
                 Commands.slash("leaderboard", "View player leaderboards")
                         .addOption(OptionType.STRING, "stat",
                                 "Stat to view (kills, deaths, playtime)", true),
@@ -99,6 +100,9 @@ public class SlashCommandManager extends ListenerAdapter {
                 break;
             case "ticket":
                 handleTicket(event);
+                break;
+            case "panel":
+                handlePanel(event);
                 break;
             case "leaderboard":
                 handleLeaderboard(event);
@@ -208,6 +212,25 @@ public class SlashCommandManager extends ListenerAdapter {
         }
         String subject = event.getOption("subject").getAsString();
         plugin.getTicketModule().createTicket(event.getUser(), subject, event);
+    }
+
+    private void handlePanel(SlashCommandInteractionEvent event) {
+        if (event.getMember() == null
+                || !event.getMember().hasPermission(net.dv8tion.jda.api.Permission.ADMINISTRATOR)) {
+            event.reply("You need **Administrator** permission to post the panel.")
+                    .setEphemeral(true).queue();
+            return;
+        }
+        if (plugin.getTicketModule() == null) {
+            event.reply("The ticket system is disabled in config.yml.")
+                    .setEphemeral(true).queue();
+            return;
+        }
+        net.dv8tion.jda.api.entities.channel.concrete.TextChannel channel =
+                event.getChannel().asTextChannel();
+        plugin.getTicketModule().postPanel(channel);
+        event.reply("Ticket panel posted in " + channel.getAsMention() + ".")
+                .setEphemeral(true).queue();
     }
 
     private void handleLeaderboard(SlashCommandInteractionEvent event) {

@@ -67,8 +67,8 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build with Maven
-        run: mvn clean package -DskipTests -B -V --no-transfer-progress
+      - name: Build and test with Maven
+        run: mvn clean package -B -V --no-transfer-progress
         env:
           MAVEN_OPTS: ${{ env.MAVEN_OPTS }}
 

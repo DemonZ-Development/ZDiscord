@@ -43,7 +43,7 @@ public class ConfigManager {
      * The current config-version. Increment when the schema changes in a
      * non-additive way.
      */
-    public static final int CURRENT_VERSION = 2;
+    public static final int CURRENT_VERSION = 3;
 
     private final ZDiscord plugin;
     private final File configFile;

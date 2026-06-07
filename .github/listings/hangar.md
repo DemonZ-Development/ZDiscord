@@ -70,6 +70,10 @@ Apache License 2.0
 - Issues: https://github.com/DemonZ-Development/ZDiscord/issues
 - Wiki: https://github.com/DemonZ-Development/ZDiscord/wiki
 
+## bStats
+
+[![bStats Servers](https://bstats.org/signatures/bukkit/29652/server-count.svg)](https://bstats.org/plugin/bukkit/ZDiscord)
+
 ## Tags
 
 `discord` `chat` `utility` `admin` `linking` `tickets` `leaderboard` `anti-raid` `webhooks` `status` `staff`

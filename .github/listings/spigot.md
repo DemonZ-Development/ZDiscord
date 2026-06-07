@@ -77,6 +77,10 @@ Apache License 2.0
 - `zdiscord.bypass.link` (op) — bypass link-to-join enforcement
 - `zdiscord.bypass.console` (op) — reserved (currently unused)
 
+## bStats
+
+[IMG]https://bstats.org/signatures/bukkit/29652/server-count.svg[/IMG]
+
 ## External links
 
 - Source: https://github.com/DemonZ-Development/ZDiscord

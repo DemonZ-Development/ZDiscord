@@ -121,7 +121,7 @@ public class UpdateChecker implements Listener {
      * <p>A version with a pre-release suffix is considered older than
      * the same version without one ({@code 1.2.3-beta} &lt; {@code 1.2.3}).</p>
      */
-    static boolean isNewer(String candidate, String current) {
+    public static boolean isNewer(String candidate, String current) {
         if (candidate == null || current == null) {
             return false;
         }

@@ -82,7 +82,7 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
                 handleLockdown(sender);
                 break;
             case "update":
-                handleUpdate(sender);
+                handleUpdate(sender, args);
                 break;
             case "dump":
                 handleDump(sender);
@@ -258,7 +258,7 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
         plugin.getAntiRaidModule().toggleLockdown(sender);
     }
 
-    private void handleUpdate(CommandSender sender) {
+    private void handleUpdate(CommandSender sender, String[] args) {
         if (!sender.hasPermission("zdiscord.admin")) {
             sender.sendMessage(plugin.getMessageManager().get("no-permission"));
             return;

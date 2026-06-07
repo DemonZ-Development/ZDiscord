@@ -120,6 +120,7 @@ public final class BukkitStub {
                 @Override public double getHealth() { return 20.0; }
                 @Override public int getFoodLevel() { return 20; }
                 @Override public boolean isOnline() { return true; }
+                @Override public Spigot spigot() { return new Spigot() {}; }
             };
         }
 
@@ -130,6 +131,12 @@ public final class BukkitStub {
                 @Override public UUID getUID() { return id; }
                 @Override public org.bukkit.generator.ChunkGenerator getGenerator() { return null; }
                 @Override public List<Player> getPlayers() { return new ArrayList<>(); }
+                @Override
+                public Map<org.bukkit.generator.structure.Structure, org.bukkit.util.StructureSearchResult>
+                        getStructures(int x, int z,
+                                      org.bukkit.generator.structure.Structure structure) {
+                    return new HashMap<>();
+                }
             };
         }
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 DemonZ Development
+ * Copyright 2026 DemonZ Development
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ class PlaceholderUtilTest {
 
     @Test
     void resolvesOnlineAndMax() {
+        state.withMaxPlayers(0);
         String result = PlaceholderUtil.resolveServer(
                 "Online: %online%/%max%");
         assertEquals("Online: 0/0", result);

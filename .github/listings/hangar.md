@@ -62,7 +62,7 @@ It supports Paper 1.20.4 or newer, Folia, and Spigot 1.20.4 or newer.
 
 ### bStats
 
-[bStats](https://bstats.org/plugin/bukkit/MyZDiscord/29652)
+[![bStats Server Signature](https://bstats.org/signatures/bukkit/MyZDiscord.svg)](https://bstats.org/plugin/bukkit/MyZDiscord/29652)
 
 ### License
 

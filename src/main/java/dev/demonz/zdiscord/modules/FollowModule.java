@@ -132,6 +132,9 @@ public class FollowModule {
      * in parallel.
      */
     public void onPlayerJoin(Player player) {
+        if (!plugin.getConfigManager().getBoolean("follow.enabled", true)) {
+            return;
+        }
         UUID uuid = player.getUniqueId();
         Set<String> followerIds = loadFollowersFromStorage(uuid);
         if (followerIds.isEmpty()) {
@@ -147,22 +150,27 @@ public class FollowModule {
         for (String discordId : followerIds) {
             plugin.getPlatformAdapter().runAsync(() -> {
                 try {
-                    User user = plugin.getBotManager().getJda().retrieveUserById(discordId).complete();
-                    if (user == null) {
-                        return;
-                    }
-                    EmbedBuilder embed = new EmbedBuilder()
-                            .setTitle(":wave: " + name + " just logged in")
-                            .setDescription("**" + name + "** has just joined the Minecraft server.")
-                            .setColor(0x2ECC71)
-                            .setTimestamp(java.time.Instant.ofEpochMilli(now))
-                            .setFooter("You are following this player", null);
-                    user.openPrivateChannel().queue(
-                            ch -> ch.sendMessageEmbeds(embed.build()).queue(
-                                    null,
-                                    err -> plugin.debug("Failed to DM follower " + discordId
-                                            + ": " + err.getMessage())),
-                            err -> plugin.debug("Failed to open DM channel for " + discordId
+                    plugin.getBotManager().getJda().retrieveUserById(discordId).queue(
+                            user -> {
+                                if (user == null) return;
+                                EmbedBuilder embed = new EmbedBuilder()
+                                        .setTitle(":wave: " + name + " just logged in")
+                                        .setDescription("**" + name
+                                                + "** has just joined the Minecraft server.")
+                                        .setColor(0x2ECC71)
+                                        .addField("Joined at",
+                                                "<t:" + (now / 1000L) + ":F>", false)
+                                        .setTimestamp(java.time.Instant.ofEpochMilli(now))
+                                        .setFooter("You are following this player", null);
+                                user.openPrivateChannel().queue(
+                                        ch -> ch.sendMessageEmbeds(embed.build()).queue(
+                                                null,
+                                                err -> plugin.debug("Failed to DM follower "
+                                                        + discordId + ": " + err.getMessage())),
+                                        err -> plugin.debug("Failed to open DM channel for "
+                                                + discordId + ": " + err.getMessage()));
+                            },
+                            err -> plugin.debug("Failed to retrieve user " + discordId
                                     + ": " + err.getMessage()));
                 } catch (Exception e) {
                     plugin.getLogger().log(Level.WARNING,

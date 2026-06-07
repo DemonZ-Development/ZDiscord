@@ -60,6 +60,8 @@ public class AdvancementListener implements Listener {
         if (!plugin.getConfigManager().getBoolean("events.advancement.enabled", true)) {
             return;
         }
+        boolean showRarity = plugin.getConfigManager()
+                .getBoolean("events.advancement.show-rarity", true);
 
         Advancement advancement = event.getAdvancement();
         String key = advancement.getKey().getKey();
@@ -73,27 +75,42 @@ public class AdvancementListener implements Listener {
         // Persist the unlock into the ledger and pull the rarity
         // stats in the same async hop. Storage I/O is on the hot
         // path, so we defer the embed build by one tick.
+        //
+        // Guard against duplicate events: the same advancement
+        // can fire twice if the plugin is reloaded mid-session
+        // or a player re-joins immediately.  recordAdvancement-
+        // Unlock is idempotent, but we also skip the embed if
+        // the player already had this advancement in storage.
         String finalKey = key;
         String finalName = advancementName;
         plugin.getPlatformAdapter().runAsync(() -> {
+            int existingCount = plugin.getStorageManager()
+                    .getPlayerAdvancementCount(player.getUniqueId());
             plugin.getStorageManager().recordAdvancementUnlock(
                     player.getUniqueId(), finalKey);
+            // Re-read: the count may have increased by 1 if the
+            // unlock was truly new.
+            int newCount = plugin.getStorageManager()
+                    .getPlayerAdvancementCount(player.getUniqueId());
+            boolean genuinelyNew = newCount > existingCount;
             int unlockers = plugin.getStorageManager()
                     .getAdvancementUnlockerCount(finalKey);
             int active = plugin.getStorageManager()
                     .getAdvancementActivePlayerCount();
-            boolean firstOfDay = unlockers <= 1;
-            boolean rare = active >= 5
-                    && ((double) unlockers / (double) active) < RARITY_THRESHOLD;
+            double rarityThreshold = plugin.getConfigManager()
+                    .getDouble("events.advancement.rarity-threshold", 0.25);
+            boolean firstOfDay = showRarity && unlockers <= 1;
+            boolean rare = showRarity && active >= 5
+                    && ((double) unlockers / (double) active) < rarityThreshold;
             plugin.getPlatformAdapter().runForEntity(player,
                     () -> sendEmbed(player, finalName, unlockers, active,
-                            firstOfDay, rare));
+                            firstOfDay, rare, genuinelyNew));
         });
     }
 
     private void sendEmbed(Player player, String advancementName,
                            int unlockers, int active, boolean firstOfDay,
-                           boolean rare) {
+                           boolean rare, boolean genuinelyNew) {
         TextChannel channel = plugin.getBotManager().getTextChannel("channels.achievements");
         if (channel == null) {
             channel = plugin.getBotManager().getTextChannel("channels.events");
@@ -142,7 +159,10 @@ public class AdvancementListener implements Listener {
                     false);
         }
 
-        if (active > 0 && !rare && !firstOfDay) {
+        // Only show the generic "Unlocked by" field for genuinely
+        // new unlocks.  A duplicate event (e.g. from a reload)
+        // would confuse players if it posted a redundant embed.
+        if (genuinelyNew && active > 0 && !rare && !firstOfDay) {
             int pct = (int) Math.round((unlockers * 100.0) / active);
             embed.addField("Unlocked by", pct + "% of players ("
                     + unlockers + " of " + active + ")", true);

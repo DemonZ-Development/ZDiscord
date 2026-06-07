@@ -130,8 +130,11 @@ public class UpdateChecker implements Listener {
             }
 
             // Silent Discord broadcast. The flag prevents
-            // re-posts on every periodic tick.
+            // re-posts on every periodic tick. Respects
+            // misc.update-silent so operators who only want the
+            // in-game banner can disable the Discord post.
             if (updateAvailable
+                    && !plugin.getConfigManager().getBoolean("misc.update-silent", false)
                     && discordAnnouncedForCurrent.compareAndSet(false, true)) {
                 postSilentDiscordNotice(currentVersion);
             }

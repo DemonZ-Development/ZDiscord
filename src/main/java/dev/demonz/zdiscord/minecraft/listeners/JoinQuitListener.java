@@ -50,8 +50,20 @@ public class JoinQuitListener implements Listener {
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
-        boolean firstJoin = !player.hasPlayedBefore();
         long now = System.currentTimeMillis();
+
+        // Use storage to detect first join — hasPlayedBefore()
+        // is unreliable after /reload because Bukkit clears its
+        // offline-player cache.  If storage has no firstJoin
+        // record yet, this is genuinely the first time we've
+        // seen the player.
+        final boolean firstJoin;
+        long existingFirstJoin = plugin.getStorageManager().getFirstJoin(uuid);
+        if (existingFirstJoin == 0) {
+            firstJoin = true;
+        } else {
+            firstJoin = false;
+        }
 
         // Persist activity timestamps + increment session counter
         // off the main thread so a slow disk can't stall the join.

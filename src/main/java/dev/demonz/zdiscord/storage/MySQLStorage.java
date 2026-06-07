@@ -537,6 +537,18 @@ public class MySQLStorage implements StorageManager {
 
     @Override
     public boolean isFollowing(UUID playerUUID, String discordId) {
-        return getFollowers(playerUUID).contains(discordId);
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(
+                        "SELECT COUNT(*) FROM zdiscord_player_follows " +
+                                "WHERE player_uuid = ? AND discord_id = ?")) {
+            ps.setString(1, playerUUID.toString());
+            ps.setString(2, discordId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt(1) > 0;
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().warning("Failed to isFollowing from MySQL: " + e.getMessage());
+        }
+        return false;
     }
 }

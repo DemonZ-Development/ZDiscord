@@ -82,6 +82,11 @@ events:
   advancement:
     enabled: true
     color: "#F1C40F"
+    # Show rarity badge when fewer than this fraction of players
+    # have the advancement (0.0–1.0). 0.25 = bottom 25%.
+    rarity-threshold: 0.25
+    # Set to false to suppress rarity and first-of-day badges.
+    show-rarity: true
 
 # ── Status module ─────────────────────────────────────────
 status:
@@ -237,5 +242,11 @@ profile:
     color: "#9B59B6"
 
 # ── Follow (used by /profile Follow button) ──────────────
-# No per-key config — the feature is always on and persists
-# follows in player_follows.yml (or the MySQL equivalent).
+follow:
+  enabled: true
+
+# ── Confessions (used by /confess) ───────────────────────
+confessions:
+  color: "#9B59B6"
+  # Cooldown in seconds between confessions per player.
+  cooldown: 300

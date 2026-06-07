@@ -36,6 +36,8 @@ import org.bukkit.entity.Player;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
@@ -44,7 +46,15 @@ import java.util.stream.Collectors;
  */
 public class SlashCommandManager extends ListenerAdapter {
 
+    private static final long CONFESSION_COOLDOWN_MS = 5 * 60 * 1000L;
+
     private final ZDiscord plugin;
+
+    /** discord user id → last confession epoch ms (rate-limit). */
+    private final ConcurrentHashMap<String, Long> confessionCooldowns = new ConcurrentHashMap<>();
+
+    /** Global monotonic confession counter for stable handles. */
+    private final AtomicInteger confessionCounter = new AtomicInteger(0);
 
     public SlashCommandManager(ZDiscord plugin) {
         this.plugin = plugin;
@@ -85,7 +95,10 @@ public class SlashCommandManager extends ListenerAdapter {
                 Commands.slash("following", "List the Minecraft players you follow"),
                 Commands.slash("confess", "Post an anonymous confession to the confessions channel")
                         .addOption(OptionType.STRING, "message",
-                                "What do you want to confess?", true))
+                                "What do you want to confess?", true),
+                Commands.slash("unfollow", "Stop following a Minecraft player")
+                        .addOption(OptionType.STRING, "player",
+                                "Player name to unfollow", true))
                 .queue(
                         success -> plugin.getLogger().info("Registered "
                                 + success.size() + " slash commands."),
@@ -133,6 +146,9 @@ public class SlashCommandManager extends ListenerAdapter {
                 break;
             case "confess":
                 handleConfess(event);
+                break;
+            case "unfollow":
+                handleUnfollow(event);
                 break;
             default:
                 break;
@@ -294,6 +310,22 @@ public class SlashCommandManager extends ListenerAdapter {
 
             PlayerProfileBuilder.Profile profile =
                     PlayerProfileBuilder.build(plugin, target);
+
+            // Resolve the Discord username if the player is linked.
+            if (profile.discordId != null && plugin.getBotManager().isConnected()) {
+                try {
+                    net.dv8tion.jda.api.entities.User jdaUser =
+                            plugin.getBotManager().getJda()
+                                    .retrieveUserById(profile.discordId).complete();
+                    if (jdaUser != null) {
+                        profile.discordUsername = jdaUser.getAsTag();
+                    }
+                } catch (Exception e) {
+                    plugin.debug("Failed to resolve Discord user for profile: "
+                            + e.getMessage());
+                }
+            }
+
             EmbedBuilder embed = PlayerProfileBuilder.toEmbed(plugin, profile, discordTag);
 
             if (plugin.getFollowModule() != null) {
@@ -362,7 +394,8 @@ public class SlashCommandManager extends ListenerAdapter {
                         .addField("Sessions", String.valueOf(
                                 plugin.getStorageManager().getSessions(uuid)), true);
             } else {
-                embed.setDescription("No activity recorded for **" + name + "** yet.");
+                embed.setDescription("No activity recorded for **" + name + "** yet. "
+                        + "This player has never joined the server.");
             }
             event.getHook().sendMessageEmbeds(embed.build()).queue();
         });
@@ -418,6 +451,34 @@ public class SlashCommandManager extends ListenerAdapter {
         }
     }
 
+    private void handleUnfollow(SlashCommandInteractionEvent event) {
+        event.deferReply().queue();
+        String queryName = event.getOption("player").getAsString();
+        String discordId = event.getUser().getId();
+        plugin.getPlatformAdapter().runAsync(() -> {
+            if (plugin.getFollowModule() == null) {
+                event.getHook().sendMessage("The follow feature is disabled.")
+                        .setEphemeral(true).queue();
+                return;
+            }
+            OfflinePlayer target = PlayerProfileBuilder.findOfflineByName(queryName);
+            if (target == null) {
+                event.getHook().sendMessage("No player named **" + queryName
+                        + "** has joined this server before.")
+                        .setEphemeral(true).queue();
+                return;
+            }
+            if (!plugin.getFollowModule().isFollowing(target.getUniqueId(), discordId)) {
+                event.getHook().sendMessage("You aren't following **" + queryName + "**.")
+                        .setEphemeral(true).queue();
+                return;
+            }
+            plugin.getFollowModule().unfollow(target.getUniqueId(), discordId);
+            event.getHook().sendMessage(":no_bell: You are no longer following **"
+                    + queryName + "**.").setEphemeral(true).queue();
+        });
+    }
+
     private void handleConfess(SlashCommandInteractionEvent event) {
         String channelId = plugin.getConfigManager()
                 .getString("channels.confessions", "").trim();
@@ -435,22 +496,42 @@ public class SlashCommandManager extends ListenerAdapter {
                     .setEphemeral(true).queue();
             return;
         }
+
+        // Rate limit: configurable cooldown per player.
+        long cooldownMs = plugin.getConfigManager()
+                .getInt("confessions.cooldown", 300) * 1000L;
+        String userId = event.getUser().getId();
+        long now = System.currentTimeMillis();
+        Long lastConfession = confessionCooldowns.get(userId);
+        if (lastConfession != null && (now - lastConfession) < cooldownMs) {
+            long remaining = (cooldownMs - (now - lastConfession)) / 1000;
+            event.reply(":clock1: You can confess again in " + remaining + " seconds.")
+                    .setEphemeral(true).queue();
+            return;
+        }
+
         String message = event.getOption("message").getAsString();
         if (message.length() > 1500) {
             event.reply(":lock: Your confession is too long (max 1500 characters).")
                     .setEphemeral(true).queue();
             return;
         }
-        // Anonymise: a deterministic but unguessable handle based
-        // on the user id (so the same person keeps the same
-        // handle, which is nice for ongoing confessions, but the
-        // handle itself reveals nothing).
-        String handle = "Confessor #" + Math.abs(event.getUser().getId().hashCode() % 10000);
+
+        confessionCooldowns.put(userId, now);
+
+        // Anonymise: stable counter-based handle so the same
+        // person always gets the same number, but the number
+        // itself is meaningless and resets on plugin reload.
+        int handleNum = confessionCounter.incrementAndGet();
+        String handle = "Confessor #" + handleNum;
+
+        String colorHex = plugin.getConfigManager()
+                .getString("confessions.color", "#9B59B6");
 
         EmbedBuilder embed = new EmbedBuilder()
                 .setAuthor(":love_letter: A new confession", null, null)
                 .setDescription(ColorUtil.toDiscordMarkdown(message))
-                .setColor(0x9B59B6)
+                .setColor(ColorUtil.parseHex(colorHex))
                 .setFooter(handle + "  ·  posted at", null)
                 .setTimestamp(Instant.now());
 

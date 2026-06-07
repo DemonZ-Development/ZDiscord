@@ -110,9 +110,13 @@ public final class PlayerProfileBuilder {
                 true);
 
         if (profile.discordId != null) {
+            // Try to resolve the Discord username. The caller
+            // should have set this; if not, fall back to the raw ID.
+            String label = profile.discordUsername != null
+                    ? profile.discordUsername + "  (`" + profile.discordId + "`)"
+                    : "`" + profile.discordId + "`";
             embed.addField(":globe_with_meridians: Discord",
-                    "ID: `" + profile.discordId + "`",
-                    false);
+                    label, false);
         }
         return embed;
     }
@@ -172,5 +176,6 @@ public final class PlayerProfileBuilder {
         public int followerCount;
         public long playtimeSeconds;
         public String discordId;
+        public String discordUsername;
     }
 }

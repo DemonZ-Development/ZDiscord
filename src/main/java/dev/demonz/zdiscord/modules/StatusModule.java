@@ -1,20 +1,4 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord.modules;
+﻿package dev.demonz.zdiscord.modules;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.util.StatusEmbedBuilder;
@@ -25,14 +9,12 @@ import java.io.File;
 import java.io.IOException;
 import java.util.logging.Level;
 
-/**
- * Periodically edits a single Discord message with the current
- * server status.
- */
+
 public class StatusModule {
 
     private final ZDiscord plugin;
     private String statusMessageId;
+    private volatile boolean running = true;
 
     public StatusModule(ZDiscord plugin) {
         this.plugin = plugin;
@@ -48,6 +30,7 @@ public class StatusModule {
     }
 
     private void updateStatus() {
+        if (!running) return;
         String channelId = plugin.getConfigManager().getString("channels.status", "");
         if (channelId.isEmpty() || channelId.startsWith("YOUR_")) {
             return;
@@ -133,6 +116,7 @@ public class StatusModule {
     }
 
     public void shutdown() {
+        running = false;
         if (statusMessageId == null || statusMessageId.isEmpty()) {
             return;
         }

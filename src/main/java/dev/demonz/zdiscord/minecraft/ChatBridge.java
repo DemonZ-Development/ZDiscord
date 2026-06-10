@@ -1,20 +1,4 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord.minecraft;
+﻿package dev.demonz.zdiscord.minecraft;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.util.ColorUtil;
@@ -23,12 +7,7 @@ import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import org.bukkit.entity.Player;
 
-/**
- * Shared logic for forwarding a Minecraft chat message to Discord.
- * Used by both the legacy {@code AsyncPlayerChatEvent} listener and
- * the modern Paper {@code AsyncChatEvent} listener so the behaviour
- * stays consistent across platforms.
- */
+
 public final class ChatBridge {
 
     private ChatBridge() {
@@ -66,9 +45,9 @@ public final class ChatBridge {
         boolean preferLinkedName = plugin.getConfigManager()
                 .getBoolean("chat.prefer-linked-name", true);
 
-        // Resolve a linked Discord identity (if any) so the webhook
-        // can show the player's real Discord name and avatar instead
-        // of their Minecraft head and username.
+
+
+
         Member linkedMember = resolveLinkedMember(plugin, player);
 
         if (useWebhooks && plugin.getWebhookManager() != null) {
@@ -77,7 +56,7 @@ public final class ChatBridge {
             String resolvedAvatar;
             if (preferLinkedAvatar && linkedMember != null
                     && linkedMember.getUser().getEffectiveAvatarUrl() != null) {
-                // Discord CDN URL — needs a size hint for Discord to render it.
+
                 resolvedAvatar = linkedMember.getUser().getEffectiveAvatarUrl()
                         + (linkedMember.getUser().getEffectiveAvatarUrl().contains("?")
                                 ? "&size=128"
@@ -90,21 +69,21 @@ public final class ChatBridge {
                     .getString("chat.webhook-name", "%displayname%");
             String webhookName;
             if (preferLinkedName && linkedMember != null) {
-                // Show the linked Discord identity. If the player has a
-                // server nickname that differs from their global name,
-                // prefer the effective (server) name; otherwise the
-                // global username. Tag with the MC name in brackets so
-                // the channel can still tell who it is.
+
+
+
+
+
                 String discordName = linkedMember.getEffectiveName();
                 webhookName = nameFormat
                         .replace("%player%", player.getName())
                         .replace("%displayname%", discordName)
                         .replace("%uuid%", player.getUniqueId().toString())
                         .replace("%discord_name%", discordName);
-                // The default nameFormat is "%displayname%"; with
-                // linked identity we want to fall back to the
-                // Discord name so the resolved string is meaningful
-                // even when the operator didn't customise it.
+
+
+
+
                 if ("%displayname%".equals(nameFormat)) {
                     webhookName = discordName + " (" + player.getName() + ")";
                 }
@@ -117,9 +96,9 @@ public final class ChatBridge {
 
             plugin.getWebhookManager().sendWebhookMessage(chatChannel, webhookName, resolvedAvatar, message);
         } else {
-            // Non-webhook path — also resolve the linked name when
-            // configured, so the message body reads "DiscordName (MCName): hi"
-            // instead of just "MCName: hi".
+
+
+
             String name;
             if (preferLinkedName && linkedMember != null) {
                 name = linkedMember.getEffectiveName() + " (" + player.getName() + ")";

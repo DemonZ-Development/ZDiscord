@@ -1,20 +1,4 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord.modules;
+﻿package dev.demonz.zdiscord.modules;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.util.ColorUtil;
@@ -33,7 +17,7 @@ import org.bukkit.entity.Player;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
+
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -42,12 +26,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Support ticket system. Each ticket is a private Discord channel
- * accessible to the requester and configured support roles. The
- * panel embed is rendered from {@code config.yml} so the categories,
- * title, and colour can be customised without rebuilding the plugin.
- */
+
 public class TicketModule {
 
     public static final String PANEL_BUTTON_ID = "zdiscord_create_ticket";
@@ -87,7 +66,7 @@ public class TicketModule {
     public void reload() {
     }
 
-    // ─── Public API ─────────────────────────────────────────
+
 
     public void createTicketFromMC(Player player, String subject) {
         if (plugin.getLinkModule() == null) {
@@ -180,7 +159,7 @@ public class TicketModule {
         }
     }
 
-    // ─── Category helpers ───────────────────────────────────
+
 
     public static final class TicketCategory {
         public final String id;
@@ -203,11 +182,7 @@ public class TicketModule {
         return loadCategories(plugin.getConfigManager().getConfig());
     }
 
-    /**
-     * Parse the {@code tickets.categories} configuration section into a
-     * map of {@link TicketCategory} keyed by category id. The order
-     * from the config file is preserved.
-     */
+
     public static Map<String, TicketCategory> loadCategories(
             org.bukkit.configuration.ConfigurationSection root) {
         Map<String, TicketCategory> out = new LinkedHashMap<>();
@@ -215,19 +190,36 @@ public class TicketModule {
             return out;
         }
         ConfigurationSection sec = root.getConfigurationSection("tickets.categories");
-        if (sec == null) {
+        if (sec != null) {
+            for (String id : sec.getKeys(false)) {
+                ConfigurationSection c = sec.getConfigurationSection(id);
+                if (c == null) {
+                    continue;
+                }
+                String label = c.getString("label", id);
+                String description = c.getString("description", "");
+                String emoji = c.getString("emoji", "");
+                String color = c.getString("color", "#5865F2");
+                out.put(id, new TicketCategory(id, label, description, emoji, color));
+            }
             return out;
         }
-        for (String id : sec.getKeys(false)) {
-            ConfigurationSection c = sec.getConfigurationSection(id);
-            if (c == null) {
-                continue;
-            }
-            String label = c.getString("label", id);
-            String description = c.getString("description", "");
-            String emoji = c.getString("emoji", "");
-            String color = c.getString("color", "#5865F2");
-            out.put(id, new TicketCategory(id, label, description, emoji, color));
+
+        List<Map<?, ?>> rawList = root.getMapList("tickets.categories");
+        for (Map<?, ?> entry : rawList) {
+            Object idObj = entry.get("id");
+            if (idObj == null) continue;
+            String id = idObj.toString();
+            Object label = entry.get("label");
+            Object description = entry.get("description");
+            Object emoji = entry.get("emoji");
+            Object color = entry.get("color");
+            out.put(id, new TicketCategory(
+                    id,
+                    label != null ? label.toString() : id,
+                    description != null ? description.toString() : "",
+                    emoji != null ? emoji.toString() : "",
+                    color != null ? color.toString() : "#5865F2"));
         }
         return out;
     }
@@ -247,7 +239,15 @@ public class TicketModule {
         return cats.keySet().iterator().next();
     }
 
-    // ─── Channel creation ───────────────────────────────────
+    private int safeParseHex(String hex, int fallback) {
+        try {
+            return ColorUtil.parseHex(hex).getRGB() & 0xFFFFFF;
+        } catch (Exception e) {
+            return fallback;
+        }
+    }
+
+
 
     private boolean canCreate(String mcKey, String discordId) {
         int max = plugin.getConfigManager().getInt("tickets.max-per-user", 3);
@@ -341,7 +341,7 @@ public class TicketModule {
                 .addField("Subject", subject != null ? subject : categoryLabel, false)
                 .addField("Category", categoryLabel, true)
                 .addField("Opened by", "`" + username + "`", true)
-                .setColor(ColorUtil.parseHex(color))
+                .setColor(safeParseHex(color, 0x5865F2))
                 .setFooter("Ticket #" + ticketCounter.get() + " \u2022 Use the buttons below to manage")
                 .setTimestamp(Instant.now());
 
@@ -353,12 +353,9 @@ public class TicketModule {
                 .queue();
     }
 
-    // ─── Panel posting ──────────────────────────────────────
 
-    /**
-     * Post a fresh panel embed to {@code channel}. Used by the
-     * {@code /setup} wizard and by the {@code /zdiscord panel} command.
-     */
+
+
     public void postPanel(TextChannel channel) {
         if (channel == null) {
             return;
@@ -393,7 +390,7 @@ public class TicketModule {
                 .setAuthor(guild.getName(), null, iconUrl)
                 .setTitle(":ticket: " + title)
                 .setDescription(description)
-                .setColor(ColorUtil.parseHex(colorHex))
+                .setColor(safeParseHex(colorHex, 0x5865F2))
                 .addField(":busts_in_silhouette: Members", String.valueOf(guild.getMemberCount()), true)
                 .addField(":hash: Channels", String.valueOf(guild.getTextChannels().size()), true)
                 .addField(":closed_lock_with_key: Privacy",
@@ -439,7 +436,7 @@ public class TicketModule {
         channel.sendMessageEmbeds(embed.build()).setComponents(rows).queue();
     }
 
-    // ─── Bookkeeping ────────────────────────────────────────
+
 
     public void onTicketClose(String userId) {
         decrementCount(userId);
@@ -481,6 +478,16 @@ public class TicketModule {
     }
 
     public List<UUID> getOpenTicketCreators() {
-        return Collections.emptyList();
+        List<UUID> result = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : openTicketsByUser.entrySet()) {
+            if (entry.getValue() <= 0) {
+                continue;
+            }
+            try {
+                result.add(UUID.fromString(entry.getKey()));
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        return result;
     }
 }

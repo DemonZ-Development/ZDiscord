@@ -1,20 +1,4 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord.util;
+﻿package dev.demonz.zdiscord.util;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Guild;
@@ -22,10 +6,7 @@ import net.dv8tion.jda.api.entities.MessageEmbed;
 
 import java.time.Instant;
 
-/**
- * Builds the standard server status embed that is used by the
- * status module, the /setup wizard, and the /status slash command.
- */
+
 public final class StatusEmbedBuilder {
 
     private static final int BAR_LENGTH = 14;
@@ -134,9 +115,7 @@ public final class StatusEmbedBuilder {
         return new java.awt.Color(0x2ECC71);
     }
 
-    /**
-     * Inputs needed to build a status embed. Constructed via {@link #capture}.
-     */
+
     public static final class StatusContext {
         public String title;
         public java.awt.Color color;

@@ -1,37 +1,22 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord.discord.listeners;
+﻿package dev.demonz.zdiscord.discord.listeners;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.modules.TicketModule;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
+import net.dv8tion.jda.api.utils.FileUpload;
 
+import java.nio.charset.StandardCharsets;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-/**
- * Handles ticket panel interactions: panel button, category dropdown,
- * and the in-ticket management buttons (close / claim / transcript).
- */
+
 public class TicketButtonListener extends ListenerAdapter {
 
     private static final long DELETE_DELAY_TICKS = 100L;
@@ -158,8 +143,54 @@ public class TicketButtonListener extends ListenerAdapter {
     }
 
     private void handleTranscript(ButtonInteractionEvent event) {
-        event.reply(":hourglass: Transcript generation is not implemented yet.")
-                .setEphemeral(true).queue();
+        if (event.getMember() == null) {
+            return;
+        }
+        TextChannel channel = event.getChannel().asTextChannel();
+        if (!isTicketChannel(channel)) {
+            event.reply(plugin.getMessageManager().getRaw("ticket-not-ticket-channel"))
+                    .setEphemeral(true).queue();
+            return;
+        }
+        if (!isSupport(event.getMember())) {
+            event.reply(plugin.getMessageManager().getRaw("ticket-only-staff"))
+                    .setEphemeral(true).queue();
+            return;
+        }
+
+        event.deferReply().setEphemeral(true).queue();
+        channel.getHistoryBefore(channel.getLatestMessageId(), 100).queue(
+                history -> {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("# Ticket Transcript - ").append(channel.getName()).append("\n\n");
+                    List<Message> messages = history.getRetrievedHistory();
+                    for (int i = messages.size() - 1; i >= 0; i--) {
+                        Message msg = messages.get(i);
+                        String timestamp = msg.getTimeCreated()
+                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                        String author = msg.getAuthor().getEffectiveName();
+                        String content = msg.getContentDisplay();
+                        sb.append("**").append(author).append("** (").append(timestamp).append("):\n")
+                                .append(content).append("\n\n");
+                    }
+                    byte[] bytes = sb.toString().getBytes(StandardCharsets.UTF_8);
+                    channel.sendFiles(FileUpload.fromData(bytes,
+                            "transcript-" + channel.getName() + ".md"))
+                            .queue(msg -> {
+                                String url = msg.getAttachments().isEmpty()
+                                        ? "No attachment URL"
+                                        : msg.getAttachments().get(0).getUrl();
+                                event.getHook().sendMessage(
+                                        "Transcript generated: " + url)
+                                        .setEphemeral(true).queue();
+                            },
+                            err -> event.getHook().sendMessage(
+                                    "Failed to upload transcript: " + err.getMessage())
+                                    .setEphemeral(true).queue());
+                },
+                err -> event.getHook().sendMessage(
+                        "Failed to fetch message history: " + err.getMessage())
+                        .setEphemeral(true).queue());
     }
 
     private boolean isTicketChannel(TextChannel channel) {
@@ -180,10 +211,7 @@ public class TicketButtonListener extends ListenerAdapter {
         return false;
     }
 
-    /**
-     * Walk the channel's permission overrides to find the user the
-     * ticket was created for and decrement their open-ticket count.
-     */
+
     private void decrementForTicketCreator(TextChannel channel) {
         for (var override : channel.getMemberPermissionOverrides()) {
             Member member = override.getMember();
@@ -194,10 +222,7 @@ public class TicketButtonListener extends ListenerAdapter {
         }
     }
 
-    /**
-     * Re-export of the legacy close button ID so older messages
-     * created before the rewrite still work.
-     */
+
     @SuppressWarnings("unused")
     private static final Button LEGACY_CLOSE = Button.danger(
             "zdiscord_ticket_close", "Close");

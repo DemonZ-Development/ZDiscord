@@ -1,20 +1,4 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord.discord;
+﻿package dev.demonz.zdiscord.discord;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.util.ColorUtil;
@@ -43,9 +27,7 @@ import net.dv8tion.jda.api.interactions.components.text.TextInput;
 import net.dv8tion.jda.api.interactions.components.text.TextInputStyle;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.file.YamlConfiguration;
 
-import java.io.File;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -54,23 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * Implements the {@code /setup} slash command — an interactive wizard
- * that configures channel IDs and posts setup panels without requiring
- * manual file editing.
- *
- * <p>The wizard is multi-step:</p>
- * <ol>
- *   <li>Module selection (dropdown)</li>
- *   <li>Channel selection (channel dropdown)</li>
- *   <li>Module-specific extras (e.g. support role for tickets)</li>
- *   <li><b>For tickets:</b> interactive category management — add,
- *       edit, remove, and reorder ticket categories via modals and
- *       button-driven actions. This replaces manual {@code config.yml}
- *       editing for the most-tweaked ticket section.</li>
- *   <li>Post the panel and show a confirmation embed.</li>
- * </ol>
- */
+
 public class SetupCommand extends ListenerAdapter {
 
     private final ZDiscord plugin;
@@ -79,7 +45,7 @@ public class SetupCommand extends ListenerAdapter {
     private static final String SUPPORT_ROLE_MENU_ID = "zdiscord_setup_support_role";
     private static final String CHANNEL_MENU_PREFIX = "zdiscord_setup_channel:";
 
-    // Ticket-category management IDs
+
     private static final String TICKET_CATEGORY_MENU_ID = "zdiscord_setup_ticket_cat_menu";
     private static final String TICKET_CATEGORY_PREFIX = "zdiscord_setup_ticket_cat:";
     private static final String TICKET_CATEGORY_MODAL_PREFIX = "zdiscord_setup_ticket_modal:";
@@ -188,7 +154,7 @@ public class SetupCommand extends ListenerAdapter {
                 statusLines.append(":black_square_for_button: ").append(entry.getKey()).append("\n");
             }
         }
-        // Also count ticket categories as part of progress.
+
         int catCount = getCategoriesFromConfig().size();
         String catLine = catCount == 0
                 ? ":black_square_for_button: ticket categories (none yet)"
@@ -350,6 +316,7 @@ public class SetupCommand extends ListenerAdapter {
     }
 
     private void handleTicketSetup(EntitySelectInteractionEvent event, TextChannel channel) {
+        saveToConfig("tickets.panel-channel", channel.getId());
         if (channel.getParentCategory() != null) {
             saveToConfig("channels.ticket-category", channel.getParentCategory().getId());
         }
@@ -384,17 +351,13 @@ public class SetupCommand extends ListenerAdapter {
         var role = event.getMentions().getRoles().get(0);
         saveToConfig("tickets.support-roles", Collections.singletonList(role.getId()));
 
-        // Proceed to the new ticket-category management step.
+
         showTicketCategoryManager(event, role.getAsMention());
     }
 
-    // ─── Ticket-category manager ─────────────────────────────────────
 
-    /**
-     * Show the interactive ticket-category manager: a list of the
-     * current categories and buttons for Add / Edit / Remove / Done.
-     * Reorder uses the up/down chevrons next to the select menu.
-     */
+
+
     private void showTicketCategoryManager(net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent event, String supportRoleMention) {
         Map<String, CategoryDraft> cats = getCategoriesFromConfig();
         EmbedBuilder embed = new EmbedBuilder()
@@ -416,7 +379,7 @@ public class SetupCommand extends ListenerAdapter {
                 Button.secondary(BTN_DOWN, ":arrow_down_small: Move down")));
 
         if (!cats.isEmpty()) {
-            // Dropdown to pick a category for edit/remove/reorder.
+
             StringSelectMenu.Builder select = StringSelectMenu.create(TICKET_CATEGORY_MENU_ID)
                     .setPlaceholder("Pick a category for the action")
                     .setMinValues(1)
@@ -433,7 +396,7 @@ public class SetupCommand extends ListenerAdapter {
                 if (label.length() > 100) {
                     label = label.substring(0, 97) + "...";
                 }
-                select.addOption(entry.getKey(), label, desc);
+                select.addOption(label, entry.getKey(), desc);
             }
             rows.add(ActionRow.of(select.build()));
         }
@@ -460,7 +423,7 @@ public class SetupCommand extends ListenerAdapter {
                     .setEphemeral(true)
                     .queue();
         } else if (event instanceof ModalInteractionEvent) {
-            // After a modal submission, edit the message via the hook.
+
             ((ModalInteractionEvent) event).getHook()
                     .editOriginalEmbeds(embed.build())
                     .setComponents(rows)
@@ -469,15 +432,19 @@ public class SetupCommand extends ListenerAdapter {
     }
 
     private void handleTicketCategorySelect(StringSelectInteractionEvent event) {
-        // The action button (Edit / Remove / Move up / Move down) hasn't
-        // been pressed yet — store the selected id and ask the user to
-        // press the action button. To keep the UX simple, we just
-        // remember the most-recent selection in the message and act
-        // when a button is pressed.
+
+
+
+
+
         String picked = event.getValues().get(0);
-        // Update the embed footer to confirm selection.
+
         Map<String, CategoryDraft> cats = getCategoriesFromConfig();
         CategoryDraft pickedCat = cats.get(picked);
+        if (pickedCat == null) {
+            event.reply("That category no longer exists.").setEphemeral(true).queue();
+            return;
+        }
         EmbedBuilder embed = new EmbedBuilder()
                 .setTitle(":ticket: Ticket Categories  \u2014  Step 3 of 3")
                 .setDescription(buildCategoryListText(cats)
@@ -513,7 +480,7 @@ public class SetupCommand extends ListenerAdapter {
             if (label.length() > 100) {
                 label = label.substring(0, 97) + "...";
             }
-            select.addOption(entry.getKey(), label, desc);
+            select.addOption(label, entry.getKey(), desc);
         }
         rows.add(ActionRow.of(select.build()));
         rows.add(ActionRow.of(Button.success(BTN_DONE, ":white_check_mark: Done & post panel")));
@@ -524,7 +491,7 @@ public class SetupCommand extends ListenerAdapter {
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
         String id = event.getComponentId();
-        // Ticket panel buttons are handled by TicketButtonListener.
+
         if (id.startsWith("zdiscord_create_ticket")) {
             return;
         }
@@ -580,12 +547,7 @@ public class SetupCommand extends ListenerAdapter {
         }
     }
 
-    /**
-     * The select-menu value is encoded in the embed footer as
-     * "category id: <id>". This is a small workaround for the lack of
-     * a server-side session store — for a production plugin you'd
-     * back this with a {@code Map<User, String>}.
-     */
+
     private String lastSelectedCategory(List<net.dv8tion.jda.api.entities.MessageEmbed> embeds) {
         if (embeds.isEmpty()) {
             return null;
@@ -637,7 +599,7 @@ public class SetupCommand extends ListenerAdapter {
         modal.addActionRow(TextInput.create("emoji", "Emoji (optional)",
                 TextInputStyle.SHORT)
                 .setValue(existing == null || existing.emoji == null ? "" : existing.emoji)
-                .setPlaceholder("❓  ⚡  🐛  (single emoji)")
+                .setPlaceholder("â“  âš¡  ðŸ›  (single emoji)")
                 .setRequired(false)
                 .setMaxLength(8)
                 .build());
@@ -697,11 +659,11 @@ public class SetupCommand extends ListenerAdapter {
         cats.put(newId, new CategoryDraft(newId, label, description, emoji, color));
         saveCategoriesToConfig(cats);
 
-        // Reopen the manager with the new state.
+
         showTicketCategoryManager(event, supportRoleMention(event));
     }
 
-    /** Build the support-role mention string from the current config. */
+
     private String supportRoleMention(net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent event) {
         String roleId = null;
         var list = plugin.getConfigManager().getStringList("tickets.support-roles");
@@ -843,74 +805,67 @@ public class SetupCommand extends ListenerAdapter {
                 .queue(s -> { }, err -> plugin.debug("Activation notice failed: " + err.getMessage()));
     }
 
-    // ─── config.yml read/write helpers ──────────────────────────────
+
 
     private void saveToConfig(String path, String value) {
-        try {
-            File configFile = new File(plugin.getDataFolder(), "config.yml");
-            YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
-            config.set(path, value);
-            config.save(configFile);
-            plugin.getConfigManager().reload();
-        } catch (Exception e) {
-            plugin.getLogger().warning("Failed to save config: " + e.getMessage());
-        }
+        plugin.getConfigManager().getConfig().set(path, value);
+        plugin.getConfigManager().save();
     }
 
     private void saveToConfig(String path, List<String> values) {
-        try {
-            File configFile = new File(plugin.getDataFolder(), "config.yml");
-            YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
-            config.set(path, values);
-            config.save(configFile);
-            plugin.getConfigManager().reload();
-        } catch (Exception e) {
-            plugin.getLogger().warning("Failed to save config: " + e.getMessage());
-        }
+        plugin.getConfigManager().getConfig().set(path, values);
+        plugin.getConfigManager().save();
     }
 
     private Map<String, CategoryDraft> getCategoriesFromConfig() {
-        File configFile = new File(plugin.getDataFolder(), "config.yml");
-        YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
+        var config = plugin.getConfigManager().getConfig();
         ConfigurationSection sec = config.getConfigurationSection("tickets.categories");
         Map<String, CategoryDraft> out = new LinkedHashMap<>();
-        if (sec == null) {
+        if (sec != null) {
+            for (String id : sec.getKeys(false)) {
+                ConfigurationSection c = sec.getConfigurationSection(id);
+                if (c == null) continue;
+                out.put(id, new CategoryDraft(
+                        id,
+                        c.getString("label", id),
+                        c.getString("description", ""),
+                        c.getString("emoji", ""),
+                        c.getString("color", "#5865F2")));
+            }
             return out;
         }
-        for (String id : sec.getKeys(false)) {
-            ConfigurationSection c = sec.getConfigurationSection(id);
-            if (c == null) {
-                continue;
-            }
+
+        List<Map<?, ?>> rawList = config.getMapList("tickets.categories");
+        for (Map<?, ?> entry : rawList) {
+            Object idObj = entry.get("id");
+            if (idObj == null) continue;
+            String id = idObj.toString();
+            Object label = entry.get("label");
+            Object description = entry.get("description");
+            Object emoji = entry.get("emoji");
+            Object color = entry.get("color");
             out.put(id, new CategoryDraft(
                     id,
-                    c.getString("label", id),
-                    c.getString("description", ""),
-                    c.getString("emoji", ""),
-                    c.getString("color", "#5865F2")));
+                    label != null ? label.toString() : id,
+                    description != null ? description.toString() : "",
+                    emoji != null ? emoji.toString() : "",
+                    color != null ? color.toString() : "#5865F2"));
         }
         return out;
     }
 
     private void saveCategoriesToConfig(Map<String, CategoryDraft> cats) {
-        try {
-            File configFile = new File(plugin.getDataFolder(), "config.yml");
-            YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
-            // Wipe existing then write the new map in order.
-            config.set("tickets.categories", null);
-            for (Map.Entry<String, CategoryDraft> entry : cats.entrySet()) {
-                CategoryDraft c = entry.getValue();
-                String base = "tickets.categories." + entry.getKey();
-                config.set(base + ".label", c.label);
-                config.set(base + ".description", c.description);
-                config.set(base + ".emoji", c.emoji);
-                config.set(base + ".color", c.color);
-            }
-            config.save(configFile);
-            plugin.getConfigManager().reload();
-        } catch (Exception e) {
-            plugin.getLogger().warning("Failed to save ticket categories: " + e.getMessage());
+        var cfg = plugin.getConfigManager().getConfig();
+        cfg.set("tickets.categories", null);
+        for (Map.Entry<String, CategoryDraft> entry : cats.entrySet()) {
+            CategoryDraft c = entry.getValue();
+            String base = "tickets.categories." + entry.getKey();
+            cfg.set(base + ".label", c.label);
+            cfg.set(base + ".description", c.description);
+            cfg.set(base + ".emoji", c.emoji);
+            cfg.set(base + ".color", c.color);
         }
+        plugin.getConfigManager().save();
     }
 
     private String buildCategoryListText(Map<String, CategoryDraft> cats) {
@@ -966,7 +921,7 @@ public class SetupCommand extends ListenerAdapter {
         }
     }
 
-    /** Snapshot of a single category row, in the order defined by config. */
+
     private static final class CategoryDraft {
         final String id;
         final String label;

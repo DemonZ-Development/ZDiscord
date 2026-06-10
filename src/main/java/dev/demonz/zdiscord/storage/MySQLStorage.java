@@ -1,20 +1,4 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord.storage;
+﻿package dev.demonz.zdiscord.storage;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -23,19 +7,29 @@ import dev.demonz.zdiscord.ZDiscord;
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
+import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * MySQL-based storage implementation using HikariCP connection pool.
- * Falls back to YamlStorage if connection fails.
- */
+
 public class MySQLStorage implements StorageManager {
 
     private final ZDiscord plugin;
     private HikariDataSource dataSource;
+    private final AtomicInteger pendingOps = new AtomicInteger(0);
+    private volatile boolean shuttingDown = false;
 
     public MySQLStorage(ZDiscord plugin) {
         this.plugin = plugin;
+    }
+
+    private void runTrackedAsync(Runnable task) {
+        pendingOps.incrementAndGet();
+        plugin.getPlatformAdapter().runAsync(() -> {
+            try {
+                task.run();
+            } finally {
+                pendingOps.decrementAndGet();
+            }
+        });
     }
 
     @Override
@@ -46,9 +40,14 @@ public class MySQLStorage implements StorageManager {
         String username = plugin.getConfigManager().getString("storage.mysql.username", "root");
         String password = plugin.getConfigManager().getString("storage.mysql.password", "");
 
+        boolean useSsl = plugin.getConfigManager().getBoolean("storage.mysql.use-ssl", true);
+        String jdbcUrl = "jdbc:mysql://" + host + ":" + port + "/" + database
+                + "?autoReconnect=true"
+                + (useSsl ? "&useSSL=true&requireSSL=true&verifyServerCertificate=true"
+                          : "&useSSL=false&allowPublicKeyRetrieval=true");
+
         HikariConfig config = new HikariConfig();
-        config.setJdbcUrl("jdbc:mysql://" + host + ":" + port + "/" + database
-                + "?useSSL=false&autoReconnect=true&allowPublicKeyRetrieval=true");
+        config.setJdbcUrl(jdbcUrl);
         config.setUsername(username);
         config.setPassword(password);
         config.setMaximumPoolSize(10);
@@ -58,12 +57,12 @@ public class MySQLStorage implements StorageManager {
         config.setMaxLifetime(600000);
         config.setPoolName("ZDiscord-HikariPool");
 
-        // Performance optimizations
+
         config.addDataSourceProperty("cachePrepStmts", "true");
         config.addDataSourceProperty("prepStmtCacheSize", "250");
         config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
 
-        // Connection health checks
+
         config.setConnectionTestQuery("SELECT 1");
         config.setValidationTimeout(5000);
         config.setLeakDetectionThreshold(60000);
@@ -127,6 +126,21 @@ public class MySQLStorage implements StorageManager {
 
     @Override
     public void shutdown() {
+        shuttingDown = true;
+        try {
+            if (!pendingOps.compareAndSet(0, 0)) {
+                plugin.getLogger().info("Waiting for " + pendingOps.get() + " pending MySQL operations...");
+                long deadline = System.currentTimeMillis() + 5000;
+                while (pendingOps.get() > 0 && System.currentTimeMillis() < deadline) {
+                    Thread.sleep(50);
+                }
+                if (pendingOps.get() > 0) {
+                    plugin.getLogger().warning(pendingOps.get() + " MySQL ops did not complete within 5s");
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
         if (dataSource != null && !dataSource.isClosed()) {
             dataSource.close();
             plugin.getLogger().info("MySQL connection pool closed.");
@@ -138,7 +152,7 @@ public class MySQLStorage implements StorageManager {
         return "MySQL";
     }
 
-    // ─── Links ──────────────────────────────────────
+
 
     @Override
     public Map<UUID, String> loadLinks() {
@@ -161,7 +175,7 @@ public class MySQLStorage implements StorageManager {
 
     @Override
     public void saveLink(UUID playerUUID, String discordId) {
-        plugin.getPlatformAdapter().runAsync(() -> {
+        runTrackedAsync(() -> {
             try (Connection conn = dataSource.getConnection();
                     PreparedStatement ps = conn.prepareStatement(
                             "INSERT INTO zdiscord_links (player_uuid, discord_id) VALUES (?, ?) " +
@@ -177,7 +191,7 @@ public class MySQLStorage implements StorageManager {
 
     @Override
     public void removeLink(UUID playerUUID) {
-        plugin.getPlatformAdapter().runAsync(() -> {
+        runTrackedAsync(() -> {
             try (Connection conn = dataSource.getConnection();
                     PreparedStatement ps = conn.prepareStatement(
                             "DELETE FROM zdiscord_links WHERE player_uuid = ?")) {
@@ -189,7 +203,7 @@ public class MySQLStorage implements StorageManager {
         });
     }
 
-    // ─── Stats ──────────────────────────────────────
+
 
     @Override
     public Map<UUID, Map<String, Long>> loadStats() {
@@ -215,7 +229,7 @@ public class MySQLStorage implements StorageManager {
 
     @Override
     public void saveStat(UUID playerUUID, String stat, long value) {
-        plugin.getPlatformAdapter().runAsync(() -> {
+        runTrackedAsync(() -> {
             try (Connection conn = dataSource.getConnection();
                     PreparedStatement ps = conn.prepareStatement(
                             "INSERT INTO zdiscord_stats (player_uuid, stat_name, stat_value) VALUES (?, ?, ?) " +
@@ -244,7 +258,7 @@ public class MySQLStorage implements StorageManager {
                     try {
                         top.add(Map.entry(UUID.fromString(rs.getString("player_uuid")), rs.getLong("stat_value")));
                     } catch (IllegalArgumentException e) {
-                        // skip invalid UUIDs
+
                     }
                 }
             }
@@ -254,7 +268,7 @@ public class MySQLStorage implements StorageManager {
         return top;
     }
 
-    // ─── Key-Value Data ─────────────────────────────
+
 
     @Override
     public String getData(String key) {
@@ -292,7 +306,7 @@ public class MySQLStorage implements StorageManager {
 
     @Override
     public void setData(String key, String value) {
-        plugin.getPlatformAdapter().runAsync(() -> {
+        runTrackedAsync(() -> {
             try (Connection conn = dataSource.getConnection();
                     PreparedStatement ps = conn.prepareStatement(
                             "INSERT INTO zdiscord_data (data_key, data_value) VALUES (?, ?) " +
@@ -311,11 +325,11 @@ public class MySQLStorage implements StorageManager {
         setData(key, String.valueOf(value));
     }
 
-    // ─── Player Activity ─────────────────────────────────────
+
 
     @Override
     public void setLastSeen(UUID playerUUID, long millis) {
-        plugin.getPlatformAdapter().runAsync(() -> {
+        runTrackedAsync(() -> {
             try (Connection conn = dataSource.getConnection();
                     PreparedStatement ps = conn.prepareStatement(
                             "INSERT INTO zdiscord_player_activity (player_uuid, last_seen) VALUES (?, ?) " +
@@ -346,7 +360,7 @@ public class MySQLStorage implements StorageManager {
 
     @Override
     public void setFirstJoin(UUID playerUUID, long millis) {
-        plugin.getPlatformAdapter().runAsync(() -> {
+        runTrackedAsync(() -> {
             try (Connection conn = dataSource.getConnection();
                     PreparedStatement ps = conn.prepareStatement(
                             "INSERT IGNORE INTO zdiscord_player_activity (player_uuid, first_join) VALUES (?, ?)")) {
@@ -376,7 +390,7 @@ public class MySQLStorage implements StorageManager {
 
     @Override
     public void incrementSessions(UUID playerUUID) {
-        plugin.getPlatformAdapter().runAsync(() -> {
+        runTrackedAsync(() -> {
             try (Connection conn = dataSource.getConnection();
                     PreparedStatement ps = conn.prepareStatement(
                             "INSERT INTO zdiscord_player_activity (player_uuid, sessions) VALUES (?, 1) " +
@@ -404,11 +418,11 @@ public class MySQLStorage implements StorageManager {
         return 0L;
     }
 
-    // ─── Advancement Unlocks ─────────────────────────────────
+
 
     @Override
     public void recordAdvancementUnlock(UUID playerUUID, String advancementKey) {
-        plugin.getPlatformAdapter().runAsync(() -> {
+        runTrackedAsync(() -> {
             try (Connection conn = dataSource.getConnection();
                     PreparedStatement ps = conn.prepareStatement(
                             "INSERT IGNORE INTO zdiscord_advancement_unlocks " +
@@ -420,6 +434,21 @@ public class MySQLStorage implements StorageManager {
                 plugin.getLogger().severe("Failed to recordAdvancementUnlock in MySQL: " + e.getMessage());
             }
         });
+    }
+
+    @Override
+    public boolean recordAdvancementUnlockIfNew(UUID playerUUID, String advancementKey) {
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(
+                        "INSERT IGNORE INTO zdiscord_advancement_unlocks " +
+                                "(player_uuid, advancement_key) VALUES (?, ?)")) {
+            ps.setString(1, playerUUID.toString());
+            ps.setString(2, advancementKey);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Failed to recordAdvancementUnlockIfNew in MySQL: " + e.getMessage());
+            return false;
+        }
     }
 
     @Override
@@ -466,11 +495,11 @@ public class MySQLStorage implements StorageManager {
         return 0;
     }
 
-    // ─── Player Followers ────────────────────────────────────
+
 
     @Override
     public void addFollower(UUID playerUUID, String discordId) {
-        plugin.getPlatformAdapter().runAsync(() -> {
+        runTrackedAsync(() -> {
             try (Connection conn = dataSource.getConnection();
                     PreparedStatement ps = conn.prepareStatement(
                             "INSERT IGNORE INTO zdiscord_player_follows (player_uuid, discord_id) VALUES (?, ?)")) {
@@ -485,7 +514,7 @@ public class MySQLStorage implements StorageManager {
 
     @Override
     public void removeFollower(UUID playerUUID, String discordId) {
-        plugin.getPlatformAdapter().runAsync(() -> {
+        runTrackedAsync(() -> {
             try (Connection conn = dataSource.getConnection();
                     PreparedStatement ps = conn.prepareStatement(
                             "DELETE FROM zdiscord_player_follows WHERE player_uuid = ? AND discord_id = ?")) {

@@ -1,20 +1,4 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord.discord.listeners;
+﻿package dev.demonz.zdiscord.discord.listeners;
 
 import dev.demonz.zdiscord.ZDiscord;
 import net.dv8tion.jda.api.Permission;
@@ -26,12 +10,10 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 
+import java.util.Locale;
 import java.util.stream.Collectors;
 
-/**
- * Bridges Discord messages to Minecraft and routes console-channel
- * messages to the server command dispatcher.
- */
+
 public class DiscordChatListener extends ListenerAdapter {
 
     private final ZDiscord plugin;
@@ -119,14 +101,25 @@ public class DiscordChatListener extends ListenerAdapter {
             return;
         }
 
-        // Reject commands that would be unsafe to run as console. The console
-        // sender has full op-level permissions, so the whitelist is conservative.
-        String lc = command.toLowerCase();
+
+
+        String lc = command.toLowerCase(Locale.ROOT);
         if (lc.startsWith("op ")
                 || lc.startsWith("deop ")
                 || lc.startsWith("stop")
                 || lc.startsWith("restart")
-                || lc.startsWith("reload confirm")
+                || lc.equals("reload")
+                || lc.startsWith("reload ")
+                || lc.startsWith("bukkit:op")
+                || lc.startsWith("minecraft:op")
+                || lc.startsWith("bukkit:deop")
+                || lc.startsWith("minecraft:deop")
+                || lc.startsWith("bukkit:stop")
+                || lc.startsWith("minecraft:stop")
+                || lc.startsWith("bukkit:restart")
+                || lc.startsWith("minecraft:restart")
+                || lc.startsWith("bukkit:reload")
+                || lc.startsWith("minecraft:reload")
                 || lc.startsWith("whitelist remove ")) {
             event.getMessage().reply("That command is not allowed via Discord console.")
                     .queue();

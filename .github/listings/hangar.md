@@ -20,7 +20,7 @@ Discord integration for Paper servers. Chat bridge, status, tickets, account lin
 
 ZDiscord bridges your Minecraft server and Discord guild. Chat flows both ways, players see server status from Discord, and staff manage tickets from a dropdown panel.
 
-It supports Paper 1.20.4 or newer, Folia, and Spigot 1.20.4 or newer.
+Uses JDA 5 with real slash commands and button interactions. Works on Paper 1.20.4+, Folia, and Spigot 1.20.4+ with no per-platform config. Pick from 15+ modules — turn off the ones you're not using.
 
 ### Features
 
@@ -50,7 +50,7 @@ It supports Paper 1.20.4 or newer, Folia, and Spigot 1.20.4 or newer.
 
 ### Installation
 
-1. Download `ZDiscord-1.1.0.jar` from the versions tab.
+1. Download `ZDiscord-1.2.0.jar` from the versions tab.
 2. Place the JAR in your server's `plugins/` directory.
 3. Start the server to generate the default `config.yml` and `messages.yml`.
 4. Open `plugins/ZDiscord/config.yml` and set:
@@ -59,10 +59,6 @@ It supports Paper 1.20.4 or newer, Folia, and Spigot 1.20.4 or newer.
    - `channels.chat` — the channel ID for chat bridge
 5. Restart the server.
 6. Run `/setup` in Discord to configure the remaining channels.
-
-### bStats
-
-[![bStats Server Signature](https://bstats.org/signatures/bukkit/MyZDiscord.svg)](https://bstats.org/plugin/bukkit/MyZDiscord/29652)
 
 ### License
 

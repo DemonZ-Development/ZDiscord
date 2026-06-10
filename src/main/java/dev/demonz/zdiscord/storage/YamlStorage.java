@@ -1,20 +1,4 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord.storage;
+﻿package dev.demonz.zdiscord.storage;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.platform.PlatformAdapter;
@@ -32,17 +16,7 @@ import java.util.function.BooleanSupplier;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-/**
- * File-based implementation of {@link StorageManager}.
- *
- * <p>All reads take the read lock briefly; all writes take the write
- * lock and then synchronously persist to disk so that a write
- * followed immediately by a shutdown cannot lose data. Callers that
- * want a deferred write should still take the write lock, perform the
- * mutation, release, and then schedule the actual file save on the
- * async executor without holding the lock — see
- * {@link #scheduleFlush}.</p>
- */
+
 public class YamlStorage implements StorageManager {
 
     private final File dataFolder;
@@ -71,23 +45,15 @@ public class YamlStorage implements StorageManager {
     private final ReentrantReadWriteLock advancementsLock = new ReentrantReadWriteLock();
     private final ReentrantReadWriteLock followsLock = new ReentrantReadWriteLock();
 
+    private volatile boolean running = true;
+    private volatile boolean linksDirty, statsDirty, dataDirty, activityDirty, advancementsDirty, followsDirty;
+
     public YamlStorage(ZDiscord plugin) {
         this(plugin.getDataFolder(), plugin.getLogger(), plugin.getPlatformAdapter(),
                 () -> plugin.isEnabled());
     }
 
-    /**
-     * Test-friendly constructor. Production code uses the
-     * {@link ZDiscord}-accepting variant; tests can supply a temporary
-     * directory, a no-op logger, and a stub platform adapter that
-     * runs tasks synchronously on the caller thread. The
-     * {@code enabledSupplier} is consulted on every async flush so
-     * that writes made from a module's {@code shutdown()} method
-     * (which run after Bukkit has set the plugin to disabled) take
-     * the synchronous path instead of trying to register a task on
-     * a disabled plugin — which throws
-     * {@link IllegalPluginAccessException}.
-     */
+
     public YamlStorage(File dataFolder, Logger logger, PlatformAdapter platform,
                        BooleanSupplier enabledSupplier) {
         this.dataFolder = dataFolder;
@@ -96,11 +62,7 @@ public class YamlStorage implements StorageManager {
         this.enabledSupplier = enabledSupplier != null ? enabledSupplier : () -> true;
     }
 
-    /**
-     * Test-only convenience overload — assumes the plugin is always
-     * enabled, so all writes go through the async path (or the
-     * synchronous path if {@code platform} is null).
-     */
+
     public YamlStorage(File dataFolder, Logger logger, PlatformAdapter platform) {
         this(dataFolder, logger, platform, () -> true);
     }
@@ -128,19 +90,32 @@ public class YamlStorage implements StorageManager {
         advancementsConfig = YamlConfiguration.loadConfiguration(advancementsFile);
         followsConfig = YamlConfiguration.loadConfiguration(followsFile);
 
+        platform.runAsyncTimer(this::flushDirtyFiles, 100L, 100L);
+
         logger.info("Storage: YAML file storage");
+    }
+
+    private void flushDirtyFiles() {
+        if (!running) return;
+        if (linksDirty && saveFileLocked(linksConfig, linksFile, linksLock, "linked accounts")) linksDirty = false;
+        if (statsDirty && saveFileLocked(statsConfig, statsFile, statsLock, "leaderboard data")) statsDirty = false;
+        if (dataDirty && saveFileLocked(dataConfig, dataFile, dataLock, "plugin data")) dataDirty = false;
+        if (activityDirty && saveFileLocked(activityConfig, activityFile, activityLock, "player activity")) activityDirty = false;
+        if (advancementsDirty && saveFileLocked(advancementsConfig, advancementsFile, advancementsLock, "advancement unlocks")) advancementsDirty = false;
+        if (followsDirty && saveFileLocked(followsConfig, followsFile, followsLock, "player follows")) followsDirty = false;
     }
 
     @Override
     public void shutdown() {
-        // Synchronous flushes — these run on the calling thread, which
-        // is the main thread during plugin disable, so the lock is safe.
-        saveFileLocked(linksConfig, linksFile, linksLock, "linked accounts");
-        saveFileLocked(statsConfig, statsFile, statsLock, "leaderboard data");
-        saveFileLocked(dataConfig, dataFile, dataLock, "plugin data");
-        saveFileLocked(activityConfig, activityFile, activityLock, "player activity");
-        saveFileLocked(advancementsConfig, advancementsFile, advancementsLock, "advancement unlocks");
-        saveFileLocked(followsConfig, followsFile, followsLock, "player follows");
+        running = false;
+
+
+        if (linksDirty) saveFileLocked(linksConfig, linksFile, linksLock, "linked accounts");
+        if (statsDirty) saveFileLocked(statsConfig, statsFile, statsLock, "leaderboard data");
+        if (dataDirty) saveFileLocked(dataConfig, dataFile, dataLock, "plugin data");
+        if (activityDirty) saveFileLocked(activityConfig, activityFile, activityLock, "player activity");
+        if (advancementsDirty) saveFileLocked(advancementsConfig, advancementsFile, advancementsLock, "advancement unlocks");
+        if (followsDirty) saveFileLocked(followsConfig, followsFile, followsLock, "player follows");
     }
 
     @Override
@@ -287,9 +262,9 @@ public class YamlStorage implements StorageManager {
     public void setData(String key, int value) {
         dataLock.writeLock().lock();
         try {
-            // Set as Integer (not String) so getInt returns the value
-            // without relying on YamlConfiguration's string-to-int
-            // coercion, which is brittle across versions.
+
+
+
             dataConfig.set("data." + key, value);
         } finally {
             dataLock.writeLock().unlock();
@@ -297,7 +272,7 @@ public class YamlStorage implements StorageManager {
         scheduleFlush(dataConfig, dataFile, dataLock, "plugin data");
     }
 
-    // ─── Player Activity ─────────────────────────────────────
+
 
     @Override
     public void setLastSeen(UUID playerUUID, long millis) {
@@ -371,7 +346,7 @@ public class YamlStorage implements StorageManager {
         }
     }
 
-    // ─── Advancement Unlocks ─────────────────────────────────
+
 
     @Override
     public void recordAdvancementUnlock(UUID playerUUID, String advancementKey) {
@@ -387,6 +362,24 @@ public class YamlStorage implements StorageManager {
         }
         scheduleFlush(advancementsConfig, advancementsFile, advancementsLock,
                 "advancement unlocks");
+    }
+
+    @Override
+    public boolean recordAdvancementUnlockIfNew(UUID playerUUID, String advancementKey) {
+        String player = playerUUID.toString();
+        advancementsLock.writeLock().lock();
+        try {
+            String path = "players." + player + ".advancements." + advancementKey;
+            if (advancementsConfig.contains(path)) {
+                return false;
+            }
+            advancementsConfig.set(path, System.currentTimeMillis());
+            scheduleFlush(advancementsConfig, advancementsFile, advancementsLock,
+                    "advancement unlocks");
+            return true;
+        } finally {
+            advancementsLock.writeLock().unlock();
+        }
     }
 
     @Override
@@ -431,7 +424,7 @@ public class YamlStorage implements StorageManager {
         }
     }
 
-    // ─── Player Followers ────────────────────────────────────
+
 
     @Override
     public void addFollower(UUID playerUUID, String discordId) {
@@ -520,41 +513,33 @@ public class YamlStorage implements StorageManager {
         }
     }
 
-    /**
-     * Save the config under the write lock. Used for synchronous
-     * flushes (e.g. on shutdown).
-     */
-    private void saveFileLocked(FileConfiguration config, File file,
-                                ReentrantReadWriteLock lock, String label) {
+
+    private boolean saveFileLocked(FileConfiguration config, File file,
+                                 ReentrantReadWriteLock lock, String label) {
         lock.writeLock().lock();
         try {
             config.save(file);
+            return true;
         } catch (IOException e) {
             logger.severe("Failed to save " + label + ": " + e.getMessage());
+            return false;
         } finally {
             lock.writeLock().unlock();
         }
     }
 
-    /**
-     * Schedule an asynchronous file write. The lock is taken inside the
-     * scheduled task so that the in-memory config and the on-disk file
-     * cannot diverge.
-     *
-     * <p>If the owning plugin is already disabled (which happens when
-     * module {@code shutdown()} methods call {@code setData} after
-     * Bukkit has flipped the enabled flag), the write is performed
-     * synchronously on the calling thread. Otherwise the
-     * {@code BukkitScheduler} would throw
-     * {@link IllegalPluginAccessException} when asked to register a
-     * task on a disabled plugin.</p>
-     */
+
     private void scheduleFlush(FileConfiguration config, File file,
                                ReentrantReadWriteLock lock, String label) {
         if (platform == null || !enabledSupplier.getAsBoolean()) {
             saveFileLocked(config, file, lock, label);
             return;
         }
-        platform.runAsync(() -> saveFileLocked(config, file, lock, label));
+        if (config == linksConfig) linksDirty = true;
+        else if (config == statsConfig) statsDirty = true;
+        else if (config == dataConfig) dataDirty = true;
+        else if (config == activityConfig) activityDirty = true;
+        else if (config == advancementsConfig) advancementsDirty = true;
+        else if (config == followsConfig) followsDirty = true;
     }
 }

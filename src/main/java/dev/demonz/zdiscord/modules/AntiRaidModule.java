@@ -1,23 +1,6 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord.modules;
+﻿package dev.demonz.zdiscord.modules;
 
 import dev.demonz.zdiscord.ZDiscord;
-import dev.demonz.zdiscord.util.ColorUtil;
 import dev.demonz.zdiscord.util.EmbedUtil;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import org.bukkit.Bukkit;
@@ -28,14 +11,13 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Detects mass-join events and toggles a server lockdown.
- */
+
 public class AntiRaidModule {
 
     private final ZDiscord plugin;
     private final Deque<Long> recentJoins = new ArrayDeque<>();
     private final AtomicBoolean lockdownActive = new AtomicBoolean(false);
+    private volatile boolean running = true;
 
     public AntiRaidModule(ZDiscord plugin) {
         this.plugin = plugin;
@@ -43,6 +25,7 @@ public class AntiRaidModule {
 
     public void init() {
         plugin.getPlatformAdapter().runAsyncTimer(() -> {
+            if (!running) return;
             long windowMs = plugin.getConfigManager().getInt("anti-raid.time-window", 30) * 1000L;
             long cutoff = System.currentTimeMillis() - windowMs;
             synchronized (recentJoins) {
@@ -152,6 +135,7 @@ public class AntiRaidModule {
     }
 
     public void shutdown() {
+        running = false;
     }
 
     private TextChannel resolveEventChannel() {

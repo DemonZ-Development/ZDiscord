@@ -1,20 +1,4 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord.minecraft.listeners;
+﻿package dev.demonz.zdiscord.minecraft.listeners;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.util.ColorUtil;
@@ -29,10 +13,7 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 
 import java.time.Instant;
 
-/**
- * Forwards player death messages to Discord and increments kill/death
- * statistics for the leaderboard.
- */
+
 public class DeathListener implements Listener {
 
     private final ZDiscord plugin;
@@ -43,6 +24,16 @@ public class DeathListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onDeath(PlayerDeathEvent event) {
+        Player player = event.getEntity();
+
+        if (plugin.getLeaderboardModule() != null) {
+            plugin.getLeaderboardModule().incrementStat(player.getUniqueId(), "deaths");
+            if (player.getKiller() != null) {
+                plugin.getLeaderboardModule().incrementStat(
+                        player.getKiller().getUniqueId(), "kills");
+            }
+        }
+
         if (!plugin.getBotManager().isConnected()) {
             return;
         }
@@ -50,7 +41,6 @@ public class DeathListener implements Listener {
             return;
         }
 
-        Player player = event.getEntity();
         String deathMessage = event.getDeathMessage();
         if (deathMessage == null) {
             deathMessage = player.getName() + " died";
@@ -73,14 +63,6 @@ public class DeathListener implements Listener {
                 .setTimestamp(Instant.now());
 
         channel.sendMessageEmbeds(embed.build()).queue();
-
-        if (plugin.getLeaderboardModule() != null) {
-            plugin.getLeaderboardModule().incrementStat(player.getUniqueId(), "deaths");
-            if (player.getKiller() != null) {
-                plugin.getLeaderboardModule().incrementStat(
-                        player.getKiller().getUniqueId(), "kills");
-            }
-        }
     }
 
     private TextChannel resolveEventChannel() {

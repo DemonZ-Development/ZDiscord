@@ -1,20 +1,4 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord.minecraft.listeners;
+﻿package dev.demonz.zdiscord.minecraft.listeners;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.util.ColorUtil;
@@ -30,13 +14,7 @@ import org.bukkit.event.player.PlayerAdvancementDoneEvent;
 
 import java.time.Instant;
 
-/**
- * Forwards advancement completions to a Discord channel. Recipe
- * advancements are skipped. Each announcement is enriched with
- * a rarity badge ("first of the day" or "rare — only N% of
- * players have this") computed from the persistent
- * advancement-unlock ledger in storage.
- */
+
 public class AdvancementListener implements Listener {
 
 
@@ -66,44 +44,37 @@ public class AdvancementListener implements Listener {
         Player player = event.getPlayer();
         String advancementName = formatAdvancementName(key);
 
-        // Persist the unlock into the ledger and pull the rarity
-        // stats in the same async hop. Storage I/O is on the hot
-        // path, so we defer the embed build by one tick.
-        //
-        // Guard against duplicate events: the same advancement
-        // can fire twice if the plugin is reloaded mid-session
-        // or a player re-joins immediately.  recordAdvancement-
-        // Unlock is idempotent, but we also skip the embed if
-        // the player already had this advancement in storage.
+
+
+
+
+
+
+
+
+
         String finalKey = key;
         String finalName = advancementName;
         plugin.getPlatformAdapter().runAsync(() -> {
-            int existingCount = plugin.getStorageManager()
-                    .getPlayerAdvancementCount(player.getUniqueId());
-            plugin.getStorageManager().recordAdvancementUnlock(
-                    player.getUniqueId(), finalKey);
-            // Re-read: the count may have increased by 1 if the
-            // unlock was truly new.
-            int newCount = plugin.getStorageManager()
-                    .getPlayerAdvancementCount(player.getUniqueId());
-            boolean genuinelyNew = newCount > existingCount;
+            boolean genuinelyNew = plugin.getStorageManager()
+                    .recordAdvancementUnlockIfNew(player.getUniqueId(), finalKey);
             int unlockers = plugin.getStorageManager()
                     .getAdvancementUnlockerCount(finalKey);
             int active = plugin.getStorageManager()
                     .getAdvancementActivePlayerCount();
             double rarityThreshold = plugin.getConfigManager()
                     .getDouble("events.advancement.rarity-threshold", 0.25);
-            boolean firstOfDay = showRarity && unlockers <= 1;
+            boolean serverFirst = showRarity && unlockers <= 1;
             boolean rare = showRarity && active >= 5
                     && ((double) unlockers / (double) active) < rarityThreshold;
             plugin.getPlatformAdapter().runForEntity(player,
                     () -> sendEmbed(player, finalName, unlockers, active,
-                            firstOfDay, rare, genuinelyNew));
+                            serverFirst, rare, genuinelyNew));
         });
     }
 
     private void sendEmbed(Player player, String advancementName,
-                           int unlockers, int active, boolean firstOfDay,
+                           int unlockers, int active, boolean serverFirst,
                            boolean rare, boolean genuinelyNew) {
         TextChannel channel = plugin.getBotManager().getTextChannel("channels.achievements");
         if (channel == null) {
@@ -124,12 +95,17 @@ public class AdvancementListener implements Listener {
         String avatarUrl = HeadUtil.resolve(avatarFormat,
                 player.getUniqueId(), player.getName());
 
-        int colorInt = ColorUtil.parseHex(colorHex).getRGB() & 0xFFFFFF;
-        // Rare overrides the configured colour with a saturated
-        // gold; first-of-day is allowed to keep the default.
+        int colorInt;
+        try {
+            colorInt = ColorUtil.parseHex(colorHex).getRGB() & 0xFFFFFF;
+        } catch (Exception e) {
+            colorInt = 0xF1C40F;
+        }
+
+
         if (rare) {
             colorInt = 0xF1C40F;
-        } else if (firstOfDay) {
+        } else if (serverFirst) {
             colorInt = 0x2ECC71;
         }
 
@@ -139,10 +115,10 @@ public class AdvancementListener implements Listener {
                 .setColor(colorInt)
                 .setTimestamp(Instant.now());
 
-        if (firstOfDay) {
-            embed.addField(":1st_place_medal: First of the day",
+        if (serverFirst) {
+            embed.addField(":1st_place_medal: Server First",
                     "**" + player.getName() + "** is the first player "
-                            + "to unlock this advancement in the last 24 hours.",
+                            + "to unlock this advancement on the server.",
                     false);
         } else if (rare && active > 0) {
             int pct = (int) Math.round((unlockers * 100.0) / active);
@@ -153,10 +129,10 @@ public class AdvancementListener implements Listener {
                     false);
         }
 
-        // Only show the generic "Unlocked by" field for genuinely
-        // new unlocks.  A duplicate event (e.g. from a reload)
-        // would confuse players if it posted a redundant embed.
-        if (genuinelyNew && active > 0 && !rare && !firstOfDay) {
+
+
+
+        if (genuinelyNew && active > 0 && !rare && !serverFirst) {
             int pct = (int) Math.round((unlockers * 100.0) / active);
             embed.addField("Unlocked by", pct + "% of players ("
                     + unlockers + " of " + active + ")", true);

@@ -26,7 +26,7 @@ What actually happens. Include the exact error message or screenshot if relevant
 
 ## Environment
 
-- ZDiscord version: (e.g. 1.1.0)
+- ZDiscord version: (e.g. 1.2.0)
 - Server software and version: (e.g. Paper 1.20.4, Folia, Spigot 1.20.4)
 - Java version: (`java -version`)
 - Storage backend: (YAML or MySQL)
@@ -42,3 +42,7 @@ What actually happens. Include the exact error message or screenshot if relevant
 ```
 # Paste the relevant log output from plugins/ZDiscord/ or the server console
 ```
+
+## Additional context
+
+Add any other context about the problem here (e.g., other plugins installed, Discord bot permissions, etc.).

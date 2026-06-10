@@ -1,20 +1,4 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord.storage;
+﻿package dev.demonz.zdiscord.storage;
 
 import dev.demonz.zdiscord.testsupport.SyncPlatformAdapter;
 import org.junit.jupiter.api.Test;
@@ -134,9 +118,9 @@ class YamlStorageTest {
         YamlStorage storage = newStorage(tmp.toFile());
         UUID uuid = UUID.randomUUID();
         storage.setLastSeen(uuid, 1_000L);
-        storage.setLastSeen(uuid, 500L); // smaller — should NOT roll back
+        storage.setLastSeen(uuid, 500L);
         assertEquals(1_000L, storage.getLastSeen(uuid));
-        storage.setLastSeen(uuid, 2_000L); // larger — should update
+        storage.setLastSeen(uuid, 2_000L);
         assertEquals(2_000L, storage.getLastSeen(uuid));
     }
 
@@ -145,7 +129,7 @@ class YamlStorageTest {
         YamlStorage storage = newStorage(tmp.toFile());
         UUID uuid = UUID.randomUUID();
         storage.setFirstJoin(uuid, 1_000L);
-        storage.setFirstJoin(uuid, 9_000L); // ignored
+        storage.setFirstJoin(uuid, 9_000L);
         assertEquals(1_000L, storage.getFirstJoin(uuid));
     }
 
@@ -166,7 +150,7 @@ class YamlStorageTest {
         UUID a = UUID.randomUUID();
         UUID b = UUID.randomUUID();
         storage.recordAdvancementUnlock(a, "story/root");
-        storage.recordAdvancementUnlock(a, "story/root"); // duplicate
+        storage.recordAdvancementUnlock(a, "story/root");
         storage.recordAdvancementUnlock(b, "story/root");
         storage.recordAdvancementUnlock(b, "story/mine_stone");
 
@@ -184,7 +168,7 @@ class YamlStorageTest {
         UUID uuid = UUID.randomUUID();
         storage.addFollower(uuid, "111");
         storage.addFollower(uuid, "222");
-        storage.addFollower(uuid, "111"); // duplicate
+        storage.addFollower(uuid, "111");
 
         assertEquals(2, storage.getFollowers(uuid).size());
         assertTrue(storage.isFollowing(uuid, "111"));

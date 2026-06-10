@@ -1,38 +1,13 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord.modules;
+﻿package dev.demonz.zdiscord.modules;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.util.ColorUtil;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import org.bukkit.command.CommandSender;
-
 import java.time.Instant;
-import java.util.List;
 
-/**
- * Sends custom embeds to Discord channels from in-game.
- *
- * <p>The {@code /zdiscord embed} admin command supports a basic
- * title/description form. The richer {@link #createRichEmbed} overload
- * is exposed for the developer API but is not yet bound to a user
- * command.</p>
- */
+
 public class EmbedBuilderModule {
 
     private final ZDiscord plugin;

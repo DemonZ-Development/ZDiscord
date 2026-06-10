@@ -1,20 +1,4 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord.util;
+﻿package dev.demonz.zdiscord.util;
 
 import org.junit.jupiter.api.Test;
 
@@ -103,16 +87,16 @@ class ColorUtilTest {
 
     @Test
     void toDiscordMarkdownClosesNestedRuns() {
-        // Italic is opened inside bold and both are closed
-        // by &r (reset). Discord renders this as bold text
-        // containing a single italic span, terminated by a
-        // bold-italic boundary marker.
+
+
+
+
         assertEquals("**a *b***", ColorUtil.toDiscordMarkdown("&la &ob&r"));
     }
 
     @Test
     void toDiscordMarkdownTogglesBold() {
-        // The second &l toggles bold off.
+
         assertEquals("**hi**", ColorUtil.toDiscordMarkdown("&lhi&l"));
     }
 

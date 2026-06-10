@@ -1,20 +1,4 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord;
+﻿package dev.demonz.zdiscord;
 
 import dev.demonz.zdiscord.config.ConfigManager;
 import dev.demonz.zdiscord.config.MessageManager;
@@ -22,6 +6,8 @@ import dev.demonz.zdiscord.discord.BotManager;
 import dev.demonz.zdiscord.discord.SetupCommand;
 import dev.demonz.zdiscord.discord.SlashCommandManager;
 import dev.demonz.zdiscord.discord.WebhookManager;
+import dev.demonz.zdiscord.api.ZDiscordAPIImpl;
+import dev.demonz.zdiscord.api.ZDiscordProvider;
 import dev.demonz.zdiscord.minecraft.commands.DiscordCommand;
 import dev.demonz.zdiscord.minecraft.commands.StaffChatCommand;
 import dev.demonz.zdiscord.minecraft.commands.ZDiscordCommand;
@@ -31,6 +17,7 @@ import dev.demonz.zdiscord.minecraft.listeners.DeathListener;
 import dev.demonz.zdiscord.minecraft.listeners.JoinQuitListener;
 import dev.demonz.zdiscord.minecraft.listeners.LinkEnforcementListener;
 import dev.demonz.zdiscord.minecraft.listeners.PaperChatListener;
+import dev.demonz.zdiscord.minecraft.listeners.PaperStaffChatListener;
 import dev.demonz.zdiscord.modules.AntiRaidModule;
 import dev.demonz.zdiscord.modules.CommandLoggerModule;
 import dev.demonz.zdiscord.modules.ConsoleModule;
@@ -51,19 +38,13 @@ import dev.demonz.zdiscord.platform.SpigotAdapter;
 import dev.demonz.zdiscord.storage.MySQLStorage;
 import dev.demonz.zdiscord.storage.StorageManager;
 import dev.demonz.zdiscord.storage.YamlStorage;
+import dev.demonz.zdiscord.util.StartupBanner;
 import dev.demonz.zdiscord.util.UpdateChecker;
+import dev.demonz.zdiscord.util.ZLogger;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.logging.Level;
 
-/**
- * ZDiscord entry point.
- *
- * <p>Supports Paper, Folia, and Spigot via the {@link PlatformAdapter}
- * abstraction. Module behaviour is opt-in via {@code config.yml} flags.</p>
- */
 public class ZDiscord extends JavaPlugin {
-
     private static ZDiscord instance;
 
     private PlatformAdapter platformAdapter;
@@ -97,11 +78,15 @@ public class ZDiscord extends JavaPlugin {
 
         detectPlatform();
 
-        getLogger().info("Starting ZDiscord v" + getDescription().getVersion()
-                + " on " + platformAdapter.getPlatformName());
 
         configManager = new ConfigManager(this);
         messageManager = new MessageManager(this);
+
+
+        ZLogger.init(getLogger(), configManager.getConfig());
+        ZLogger.info(ZLogger.Category.SYSTEM,
+                "Starting ZDiscord v" + getDescription().getVersion()
+                + " on " + platformAdapter.getPlatformName());
 
         initStorage();
 
@@ -111,8 +96,10 @@ public class ZDiscord extends JavaPlugin {
         slashCommandManager = new SlashCommandManager(this);
         setupCommand = new SetupCommand(this);
         if (!botManager.connect()) {
-            getLogger().severe("Failed to connect to Discord. Check bot.token and bot.guild-id in config.yml.");
-            getLogger().severe("The plugin will continue to load, but Discord features are disabled.");
+            ZLogger.error(ZLogger.Category.BOT,
+                    "Failed to connect to Discord. Check bot.token and bot.guild-id in config.yml.");
+            ZLogger.warn(ZLogger.Category.BOT,
+                    "The plugin will continue to load, but Discord features are disabled.");
         } else {
             webhookManager = new WebhookManager(this);
             slashCommandManager.registerCommands();
@@ -122,18 +109,29 @@ public class ZDiscord extends JavaPlugin {
         registerListeners();
         registerCommands();
 
+
+        ZDiscordProvider.register(new ZDiscordAPIImpl(this));
+        getServer().getServicesManager().register(
+                dev.demonz.zdiscord.api.ZDiscordAPI.class,
+                ZDiscordProvider.get(),
+                this,
+                org.bukkit.plugin.ServicePriority.Normal);
+
         if (configManager.getBoolean("misc.update-checker", true)) {
             new UpdateChecker(this);
         }
 
         long elapsed = System.currentTimeMillis() - start;
-        getLogger().info("ZDiscord v" + getDescription().getVersion()
-                + " enabled in " + elapsed + "ms on " + platformAdapter.getPlatformName());
+        StartupBanner.print(this, elapsed);
     }
 
     @Override
     public void onDisable() {
-        getLogger().info("Shutting down ZDiscord...");
+        ZLogger.info(ZLogger.Category.SYSTEM, "Shutting down ZDiscord...");
+
+
+        ZDiscordProvider.unregister();
+        getServer().getServicesManager().unregisterAll(this);
 
         if (statusModule != null) statusModule.shutdown();
         if (leaderboardModule != null) leaderboardModule.shutdown();
@@ -250,7 +248,7 @@ public class ZDiscord extends JavaPlugin {
         followModule = new FollowModule(this);
         followModule.init();
 
-        getLogger().info("Modules initialised.");
+        ZLogger.info(ZLogger.Category.MODULES, "Modules initialised.");
     }
 
     private void registerListeners() {
@@ -263,6 +261,8 @@ public class ZDiscord extends JavaPlugin {
 
         if (paperModern) {
             getServer().getPluginManager().registerEvents(new PaperChatListener(this), this);
+            getServer().getPluginManager().registerEvents(
+                    new PaperStaffChatListener(this), this);
         }
 
         if (configManager.getBoolean("linking.required", false) && linkModule != null) {
@@ -306,7 +306,7 @@ public class ZDiscord extends JavaPlugin {
         if (botManager != null && botManager.isConnected()) {
             botManager.updateActivity();
         }
-        getLogger().info("Configuration reloaded.");
+        ZLogger.info(ZLogger.Category.SYSTEM, "Configuration reloaded.");
     }
 
     public static ZDiscord getInstance() {
@@ -398,8 +398,6 @@ public class ZDiscord extends JavaPlugin {
     }
 
     public void debug(String message) {
-        if (configManager.getBoolean("misc.debug", false)) {
-            getLogger().log(Level.INFO, "[debug] " + message);
-        }
+        ZLogger.debug(ZLogger.Category.SYSTEM, message);
     }
 }

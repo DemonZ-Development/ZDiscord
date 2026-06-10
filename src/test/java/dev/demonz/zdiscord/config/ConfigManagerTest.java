@@ -1,20 +1,4 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord.config;
+﻿package dev.demonz.zdiscord.config;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -32,12 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Tests {@link ConfigManager} against the bundled {@code config.yml}.
- * The plugin's own constructor needs a {@code JavaPlugin} instance,
- * so we use the test-friendly constructor that takes a data folder,
- * a logger, and a supplier of the default config resource.
- */
+
 class ConfigManagerTest {
 
     private static InputStream defaultConfig() {
@@ -89,8 +68,8 @@ class ConfigManagerTest {
     @Test
     void readsTicketCategories(@TempDir Path tmp) {
         ConfigManager mgr = newManager(tmp.toFile());
-        // Categories is a YAML list (each entry has id/label/...),
-        // not a section, so use getMapList and check the size.
+
+
         var categories = mgr.getConfig().getMapList("tickets.categories");
         assertFalse(categories.isEmpty(),
                 "Default config should include ticket categories");
@@ -108,14 +87,14 @@ class ConfigManagerTest {
 
     @Test
     void migrationIsIdempotent(@TempDir Path tmp) throws IOException {
-        // Create a config file that is older than the bundled default.
+
         Path cfg = Paths.get(tmp.toString(), "config.yml");
         Files.writeString(cfg, "config-version: 0\nbot:\n  token: old-token\n");
 
         ConfigManager mgr = newManager(tmp.toFile());
         assertEquals("old-token", mgr.getString("bot.token"),
                 "Existing values must be preserved across migration");
-        // After migration, version is bumped to CURRENT_VERSION.
+
         assertEquals(ConfigManager.CURRENT_VERSION, mgr.getInt("config-version", 0));
     }
 }

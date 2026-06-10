@@ -1,32 +1,17 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord.discord;
+﻿package dev.demonz.zdiscord.discord;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.util.ColorUtil;
 import dev.demonz.zdiscord.util.HeadUtil;
-import dev.demonz.zdiscord.util.PlaceholderUtil;
 import dev.demonz.zdiscord.util.PlayerProfileBuilder;
 import dev.demonz.zdiscord.util.StatusEmbedBuilder;
 import dev.demonz.zdiscord.util.TPSUtil;
+import dev.demonz.zdiscord.util.ZLogger;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
@@ -40,18 +25,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
-/**
- * Registers the Discord slash commands and dispatches them to the
- * appropriate handlers / modules.
- */
+
 public class SlashCommandManager extends ListenerAdapter {
 
     private final ZDiscord plugin;
 
-    /** discord user id → last confession epoch ms (rate-limit). */
+
     private final ConcurrentHashMap<String, Long> confessionCooldowns = new ConcurrentHashMap<>();
 
-    /** Global monotonic confession counter for stable handles. */
+
     private final AtomicInteger confessionCounter = new AtomicInteger(0);
 
     public SlashCommandManager(ZDiscord plugin) {
@@ -98,16 +80,16 @@ public class SlashCommandManager extends ListenerAdapter {
                         .addOption(OptionType.STRING, "player",
                                 "Player name to unfollow", true))
                 .queue(
-                        success -> plugin.getLogger().info("Registered "
-                                + success.size() + " slash commands."),
-                        error -> plugin.getLogger().warning("Failed to register slash commands: "
-                                + error.getMessage()));
+                        success -> ZLogger.info(ZLogger.Category.COMMANDS,
+                                "Registered " + success.size() + " slash commands."),
+                        error -> ZLogger.warn(ZLogger.Category.COMMANDS,
+                                "Failed to register slash commands: " + error.getMessage()));
     }
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        // "setup" is handled by the dedicated SetupCommand listener to keep
-        // the wizard's interaction tree (selects, buttons) in one place.
+
+
         if ("setup".equals(event.getName())) {
             return;
         }
@@ -290,9 +272,9 @@ public class SlashCommandManager extends ListenerAdapter {
     }
 
     private void handleProfile(SlashCommandInteractionEvent event) {
-        // The work below does offline-player lookups + a few storage
-        // reads; we run it off the event handler thread to keep the
-        // JDA thread responsive even on a slow disk.
+
+
+
         event.deferReply().queue();
         String queryName = event.getOption("player") == null
                 ? null
@@ -314,7 +296,7 @@ public class SlashCommandManager extends ListenerAdapter {
             PlayerProfileBuilder.Profile profile =
                     PlayerProfileBuilder.build(plugin, target);
 
-            // Resolve the Discord username if the player is linked.
+
             if (profile.discordId != null && plugin.getBotManager().isConnected()) {
                 try {
                     net.dv8tion.jda.api.entities.User jdaUser =
@@ -351,7 +333,7 @@ public class SlashCommandManager extends ListenerAdapter {
         if (queryName != null && !queryName.isEmpty()) {
             return PlayerProfileBuilder.findOfflineByName(queryName);
         }
-        // No name → look up the requester's linked MC account.
+
         if (plugin.getLinkModule() == null) {
             return null;
         }
@@ -381,9 +363,9 @@ public class SlashCommandManager extends ListenerAdapter {
                     : 0L;
 
             EmbedBuilder embed = new EmbedBuilder()
-                    .setAuthor(name + "  ·  Last seen",
+                    .setAuthor(name + "  Â·  Last seen",
                             "https://namemc.com/profile/" + uuid,
-                            HeadUtil.crafatar(uuid))
+                            HeadUtil.avatar(uuid, HeadUtil.SIZE_SMALL))
                     .setColor(ColorUtil.parseHex("#3498DB"))
                     .setTimestamp(Instant.now());
 
@@ -444,6 +426,12 @@ public class SlashCommandManager extends ListenerAdapter {
         if (id == null) {
             return;
         }
+
+        if (plugin.getLeaderboardModule() != null
+                && plugin.getLeaderboardModule().handleButtonInteraction(event)) {
+            return;
+        }
+
         if (id.startsWith(dev.demonz.zdiscord.modules.FollowModule.FOLLOW_BUTTON_ID)
                 || id.startsWith(dev.demonz.zdiscord.modules.FollowModule.UNFOLLOW_BUTTON_ID)) {
             if (plugin.getFollowModule() != null) {
@@ -451,6 +439,15 @@ public class SlashCommandManager extends ListenerAdapter {
             } else {
                 event.reply("The follow feature is disabled.").setEphemeral(true).queue();
             }
+        }
+    }
+
+    @Override
+    public void onStringSelectInteraction(StringSelectInteractionEvent event) {
+
+        if (plugin.getLeaderboardModule() != null
+                && plugin.getLeaderboardModule().handleSelectInteraction(event)) {
+            return;
         }
     }
 
@@ -500,7 +497,7 @@ public class SlashCommandManager extends ListenerAdapter {
             return;
         }
 
-        // Rate limit: configurable cooldown per player.
+
         long cooldownMs = plugin.getConfigManager()
                 .getInt("confessions.cooldown", 300) * 1000L;
         String userId = event.getUser().getId();
@@ -520,9 +517,9 @@ public class SlashCommandManager extends ListenerAdapter {
             return;
         }
 
-        // Anonymise: stable counter-based handle so the same
-        // person always gets the same number, but the number
-        // itself is meaningless and resets on plugin reload.
+
+
+
         int handleNum = confessionCounter.incrementAndGet();
         String handle = "Confessor #" + handleNum;
 
@@ -533,7 +530,7 @@ public class SlashCommandManager extends ListenerAdapter {
                 .setAuthor(":love_letter: A new confession", null, null)
                 .setDescription(ColorUtil.toDiscordMarkdown(message))
                 .setColor(ColorUtil.parseHex(colorHex))
-                .setFooter(handle + "  ·  posted at", null)
+                .setFooter(handle + "  Â·  posted at", null)
                 .setTimestamp(Instant.now());
 
         channel.sendMessageEmbeds(embed.build()).queue(

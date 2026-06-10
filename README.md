@@ -6,7 +6,7 @@
 
 Discord integration for Minecraft servers.
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue)](https://github.com/DemonZ-Development/ZDiscord/releases)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue)](https://github.com/DemonZ-Development/ZDiscord/releases)
 [![Minecraft](https://img.shields.io/badge/Minecraft-1.20.4%2B-green)](https://papermc.io)
 [![Platform](https://img.shields.io/badge/Paper%20%7C%20Folia%20%7C%20Spigot-orange)](https://papermc.io)
 [![Java](https://img.shields.io/badge/Java-17%2B-red)](https://adoptium.net)
@@ -21,6 +21,19 @@ Discord integration for Minecraft servers.
 ## What it does
 
 ZDiscord connects your Minecraft server to Discord. Chat flows both ways, players see server status without leaving Discord, and staff manage tickets from a dropdown panel.
+
+## Why ZDiscord?
+
+| | ZDiscord | DiscordSRV |
+|---|---|---|
+| **Slash commands** | Native JDA 5 slash commands + buttons | Bolted-on text commands |
+| **Folia support** | Built-in regionized multithreading | No Folia support |
+| **Modular design** | 15+ toggleable modules | Chat bridge only |
+| **Account linking** | One-time codes + role grants | Clunky multi-step process |
+| **Ticket system** | Built-in dropdown panel with categories | Requires separate plugin |
+| **Config migration** | Automatic schema upgrades | Manual editing |
+| **Webhook handling** | Rate-limited queue with retry | Rate limit issues under load |
+| **Message delivery** | Async with guaranteed delivery | Can drop messages |
 
 ## Features
 
@@ -50,7 +63,7 @@ ZDiscord connects your Minecraft server to Discord. Chat flows both ways, player
 
 ## Installation
 
-1. Download `ZDiscord-1.1.0.jar` from the [Releases](https://github.com/DemonZ-Development/ZDiscord/releases) page.
+1. Download `ZDiscord-1.2.0.jar` from the [Releases](https://github.com/DemonZ-Development/ZDiscord/releases) page.
 2. Place the JAR in your server's `plugins/` directory.
 3. Start the server to generate the default `config.yml` and `messages.yml`.
 4. Open `plugins/ZDiscord/config.yml` and set:
@@ -129,7 +142,7 @@ cd ZDiscord
 mvn clean package
 ```
 
-The shaded JAR is written to `target/ZDiscord-1.1.0.jar`.
+The shaded JAR is written to `target/ZDiscord-1.2.0.jar`.
 
 ## License
 

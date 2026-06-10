@@ -6,11 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-06-16
+
 ### Added
-- `/profile [player]` — renders a player card embed with avatar, NameMC link, first/last seen (Discord timestamps), sessions, playtime, advancement count, link status, follower count, and online indicator. Follow/Unfollow button on the embed subscribes the requester to DM notifications.
-- `/seen <player]` — quick last-seen lookup. Returns online/offline status, last-seen timestamp, playtime, and session count.
+- **Developer API**: Clean public interface for third-party plugins (`ZDiscordAPI`, `ZDiscordProvider`, models, and Bukkit events like `ZDiscordPlayerLinkEvent`, `ZDiscordFollowEvent`, `ZDiscordStatUpdateEvent`).
+- **Interactive Leaderboards**: `LeaderboardModule` completely rewritten with 🥇🥈🥉 medals, player head thumbnails, stat-specific styling, progress bars, pagination buttons, and a stat-switcher dropdown.
+- **Persistent Leaderboard Panel**: Auto-updating leaderboard panel in a configurable channel, including a new "Most Followed Players" leaderboard.
+- **Centralized Logger (`ZLogger`)**: 9 categories, 6 levels, compact format, and zero-cost debug via `Supplier`. Added a professional boxed `StartupBanner`.
+- `/profile [player]` — renders a player card embed with avatar, NameMC link, first/last seen (Discord timestamps), sessions, playtime, advancement count, link status, follower count, online indicator, kills, deaths, and K/D ratio. Follow/Unfollow button on the embed subscribes the requester to DM notifications.
+- `/seen <player>` — quick last-seen lookup. Returns online/offline status, last-seen timestamp, playtime, and session count.
 - `/following` — lists the Minecraft players the requester follows.
-- `/unfollow <player]` — stops following a player (previously only the button on `/profile`).
+- `/unfollow <player>` — stops following a player (previously only the button on `/profile`).
 - `/confess <message>` — posts an anonymous confession to `channels.confessions`. Rate-limited (configurable via `confessions.cooldown`, default 300s). Stable monotonic handle per confessor. `&` colour codes convert to Discord markdown.
 - Silent update check every 5 hours (was 6). One quiet embed to `misc.update-channel`, no pings. `misc.update-silent` suppresses both the in-game banner and Discord notice.
 - Achievement rarity display — "First of the day" badge when the player is the first to unlock that advancement in 24 hours, and "Rare — only N% of players have this" badge below a configurable threshold (default 25%).
@@ -25,6 +31,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - MySQL `isFollowing` uses `SELECT COUNT(*) > 0` instead of fetching all followers.
 
 ### Changed
+- `config-version` bumped to 4. Default `avatar-url` changed to `mc-heads.net` for higher reliability and uptime compared to `crafatar.com`.
+- `HeadUtil` rewritten to support `mc-heads.net` with `avatar()`, `body()`, and `combo()` methods and various size constants.
 - `YamlStorage` and `MySQLStorage` gained three new files / three new tables each, plus 12 new `StorageManager` methods.
 - `AdvancementListener` persists the unlock to storage, reads rarity stats asynchronously, and guards against duplicate events (e.g. from `/reload`). Duplicate events suppress the generic "Unlocked by" field.
 - `UpdateChecker` interval changed from 6 to 5 hours. `postSilentDiscordNotice()` fires once per detected release via `AtomicBoolean` guard and respects `misc.update-silent`.
@@ -33,6 +41,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `ColorUtil.stripColor` used only internally for pre-processing before `toDiscordMarkdown`.
 
 ### Fixed
+- `SetupCommand` bug causing "Loading options failed" fixed (StringSelectMenu `addOption` parameter order corrected).
+- `SetupCommand` NPE when a selected ticket category was removed from config fixed.
+- `JoinQuitListener` null-safe bot connection checks added to prevent NPEs when the bot is disconnected. Playtime session tracking now records join timestamp before checking bot status.
+- `/seen` avatar resolution fixed to use the new `HeadUtil.avatar()`.
 - `FollowModule.onPlayerJoin` no longer blocks the scheduler thread — `retrieveUserById().complete()` replaced with `.queue()`.
 - `MySQLStorage.isFollowing` uses `SELECT COUNT(*)` instead of fetching all followers.
 - `/seen` shows "This player has never joined the server" instead of "No activity recorded yet."

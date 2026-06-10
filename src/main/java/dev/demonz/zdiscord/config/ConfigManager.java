@@ -1,20 +1,4 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord.config;
+﻿package dev.demonz.zdiscord.config;
 
 import dev.demonz.zdiscord.ZDiscord;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -30,22 +14,11 @@ import java.util.List;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 
-/**
- * Loads and provides typed accessors for {@code config.yml}.
- *
- * <p>If the existing config file is older than the version bundled with the
- * plugin, the user's existing values are merged into the new defaults. The
- * user's file is not deleted; instead, missing keys are filled in and the
- * version stamp is updated. This avoids the data loss that a destructive
- * "rename old, copy new" migration would cause.</p>
- */
+
 public class ConfigManager {
 
-    /**
-     * The current config-version. Increment when the schema changes in a
-     * non-additive way.
-     */
-    public static final int CURRENT_VERSION = 3;
+
+    public static final int CURRENT_VERSION = 4;
 
     private final File dataFolder;
     private final Logger logger;
@@ -53,10 +26,7 @@ public class ConfigManager {
     private final File configFile;
     private FileConfiguration config;
 
-    /**
-     * Production constructor. Sources the default config from the
-     * plugin's JAR.
-     */
+
     public ConfigManager(ZDiscord plugin) {
         this(
                 plugin.getDataFolder(),
@@ -64,12 +34,7 @@ public class ConfigManager {
                 () -> plugin.getResource("config.yml"));
     }
 
-    /**
-     * Test-friendly constructor. The {@code defaultResource} supplier
-     * is called each time the file needs to be (re-)read from defaults
-     * — it can return a fresh stream to the bundled resource, or null
-     * to skip default loading.
-     */
+
     public ConfigManager(File dataFolder,
                          Logger logger,
                          Supplier<InputStream> defaultResource) {
@@ -142,8 +107,8 @@ public class ConfigManager {
     public void reload() {
         config = YamlConfiguration.loadConfiguration(configFile);
 
-        // Also merge in defaults from the JAR so that newly added keys are
-        // visible via getX(path, defaultValue) even if the on-disk file is older.
+
+
         try (InputStream defStream = defaultResource == null ? null : defaultResource.get()) {
             if (defStream != null) {
                 YamlConfiguration defaults = YamlConfiguration.loadConfiguration(new InputStreamReader(defStream));
@@ -193,5 +158,14 @@ public class ConfigManager {
 
     public List<String> getStringList(String path) {
         return config.getStringList(path);
+    }
+
+
+    public void save() {
+        try {
+            config.save(configFile);
+        } catch (IOException e) {
+            logger.severe("Failed to save config: " + e.getMessage());
+        }
     }
 }

@@ -1,20 +1,4 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord.modules;
+﻿package dev.demonz.zdiscord.modules;
 
 import dev.demonz.zdiscord.ZDiscord;
 import net.dv8tion.jda.api.entities.Guild;
@@ -28,21 +12,19 @@ import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
-/**
- * Maps Discord reactions to Discord roles and (optionally) to
- * in-game permissions granted through LuckPerms.
- */
+
 public class ReactionRoleModule {
 
     private final ZDiscord plugin;
     private final File dataFile;
     private FileConfiguration data;
     private final Map<String, Map<String, RoleMapping>> mappings = new ConcurrentHashMap<>();
+    private static final Pattern PERMISSION_PATTERN = Pattern.compile("^[a-z0-9._-]+$");
 
     public ReactionRoleModule(ZDiscord plugin) {
         this.plugin = plugin;
@@ -56,6 +38,7 @@ public class ReactionRoleModule {
     private void loadData() {
         if (!dataFile.exists()) {
             try {
+                dataFile.getParentFile().mkdirs();
                 dataFile.createNewFile();
             } catch (IOException e) {
                 plugin.getLogger().warning("Failed to create reaction roles file: "
@@ -70,7 +53,7 @@ public class ReactionRoleModule {
             return;
         }
         for (String messageId : data.getConfigurationSection("messages").getKeys(false)) {
-            Map<String, RoleMapping> emojiMap = new HashMap<>();
+            Map<String, RoleMapping> emojiMap = new ConcurrentHashMap<>();
             for (String emoji : data.getConfigurationSection("messages." + messageId).getKeys(false)) {
                 String roleId = data.getString("messages." + messageId + "." + emoji + ".role-id");
                 String permission = data.getString(
@@ -82,7 +65,11 @@ public class ReactionRoleModule {
     }
 
     public void addMapping(String messageId, String emoji, String roleId, String permission) {
-        mappings.computeIfAbsent(messageId, k -> new HashMap<>())
+        if (permission != null && !permission.isEmpty() && !PERMISSION_PATTERN.matcher(permission).matches()) {
+            plugin.getLogger().warning("Invalid permission format rejected: " + permission);
+            return;
+        }
+        mappings.computeIfAbsent(messageId, k -> new ConcurrentHashMap<>())
                 .put(emoji, new RoleMapping(roleId, permission));
         saveData();
     }

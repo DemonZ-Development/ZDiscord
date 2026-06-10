@@ -1,20 +1,4 @@
-/*
- * Copyright 2026 DemonZ Development
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package dev.demonz.zdiscord.modules;
+﻿package dev.demonz.zdiscord.modules;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.util.ColorUtil;
@@ -24,23 +8,22 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
-/**
- * Streams server log output to a Discord channel. Lines are batched
- * every two seconds to stay within Discord rate limits. Only the
- * server's root logger is hooked; the Bukkit plugin logger is left
- * alone to avoid double-reporting.
- */
+
 public class ConsoleModule {
 
     private static final long FLUSH_INTERVAL_TICKS = 40L;
     private static final int MAX_BATCH_CHARS = 1900;
     private static final int MAX_LINE_CHARS = 200;
+    private static final Pattern SENSITIVE_PATTERN = Pattern.compile(
+            "(?i)(password|token|secret|key|credential|auth)[=: ]+\\S+");
 
     private final ZDiscord plugin;
     private final ConcurrentLinkedQueue<String> buffer = new ConcurrentLinkedQueue<>();
     private ConsoleHandler handler;
     private Logger registeredLogger;
+    private volatile boolean running = true;
 
     public ConsoleModule(ZDiscord plugin) {
         this.plugin = plugin;
@@ -55,6 +38,12 @@ public class ConsoleModule {
         handler = new ConsoleHandler();
         registeredLogger = plugin.getServer().getLogger();
         if (registeredLogger != null) {
+
+            for (Handler h : registeredLogger.getHandlers()) {
+                if (h instanceof ConsoleHandler) {
+                    registeredLogger.removeHandler(h);
+                }
+            }
             registeredLogger.addHandler(handler);
         }
 
@@ -63,6 +52,7 @@ public class ConsoleModule {
     }
 
     private void flushBuffer() {
+        if (!running) return;
         if (buffer.isEmpty()) {
             return;
         }
@@ -99,6 +89,7 @@ public class ConsoleModule {
     }
 
     public void shutdown() {
+        running = false;
         if (handler != null && registeredLogger != null) {
             registeredLogger.removeHandler(handler);
         }
@@ -117,6 +108,9 @@ public class ConsoleModule {
             }
             String msg = "[" + record.getLevel().getName() + "] " + record.getMessage();
             msg = ColorUtil.stripColor(msg);
+            if (SENSITIVE_PATTERN.matcher(msg).find()) {
+                return;
+            }
             buffer.add(msg);
         }
 

@@ -1,11 +1,7 @@
-# ZDiscord configuration
-# Documentation: https://github.com/DemonZ-Development/ZDiscord/wiki
+config-version: 4
 
-config-version: 3
-
-# ── Storage ───────────────────────────────────────────────
 storage:
-  # "yaml" (default, file-based) or "mysql"
+  # yaml = flatfile. mysql = requires a MySQL server running.
   type: "yaml"
   mysql:
     host: "localhost"
@@ -13,19 +9,22 @@ storage:
     database: "zdiscord"
     username: "root"
     password: ""
+    use-ssl: true
 
-# ── Bot ───────────────────────────────────────────────────
 bot:
-  # Discord bot token from https://discord.com/developers/applications
+  # Create an app at https://discord.com/developers/applications,
+  # give it Gateway Intents (Server Members, Message Content), then
+  # copy the token here.
   token: "YOUR_BOT_TOKEN_HERE"
   activity:
-    # PLAYING, WATCHING, LISTENING, COMPETING
+    # PLAYING / WATCHING / LISTENING / COMPETING
     type: "WATCHING"
     text: "%online% players online"
-  # Guild (server) ID for slash command registration
+  # Right-click your server in Discord > Copy ID (Developer Mode).
   guild-id: "YOUR_GUILD_ID_HERE"
 
-# ── Channels ──────────────────────────────────────────────
+# Right-click a channel in Discord > Copy ID, paste into the
+# channel fields below. Leave blank ("") to disable that channel.
 channels:
   chat: "YOUR_CHAT_CHANNEL_ID"
   console: ""
@@ -34,41 +33,34 @@ channels:
   performance: ""
   achievements: ""
   ticket-category: ""
-  # Channel for /confess submissions. Leave empty to disable the
-  # /confess slash command entirely.
+  # /confess posts anonymously here. Disabled if left blank.
   confessions: ""
 
-# ── Chat bridge ───────────────────────────────────────────
 chat:
   use-webhooks: true
-  # When the player has linked their Minecraft account, use the
-  # Discord identity (avatar + display name) for the webhook instead
-  # of their Minecraft skin/username. Unlinked players always use
-  # the Minecraft identity.
+  # When true, linked players show as their Discord avatar/name
+  # in the bridge. Unlinked players always use Minecraft skins.
   prefer-linked-avatar: true
   prefer-linked-name: true
   webhook-name: "%displayname%"
-  # %uuid% is replaced with the player's UUID (no dashes)
-  avatar-url: "https://crafatar.com/avatars/%uuid%?overlay=true"
+  # %uuid% = with dashes, %uuid_nodashes% = without, %name% = player name
+  avatar-url: "https://mc-heads.net/avatar/%uuid%/128"
+  # Format for messages that appear in Minecraft. Use & color codes.
   minecraft-format: "&9[Discord] &b%name% &8> &f%message%"
   show-attachments: true
   attachment-text: "&e[Attachment] &7(Click to open)"
 
-# ── Event messages ────────────────────────────────────────
 events:
-  # Optional default footer icon for all event embeds. Falls back to
-  # the guild icon if empty. Per-event override below (events.join.footer-icon,
-  # events.quit.footer-icon, ...). Use a public https URL.
+  # Channel set in channels.events above. Controls join/quit/death/advancement
+  # embeds. Each sub-event can be individually disabled.
   footer-icon: ""
   join:
     enabled: true
     message: "**%player%** joined the server"
     color: "#2ECC71"
-    # Optional override; leave empty to use events.footer-icon or the guild icon.
     footer-icon: ""
-    # Send a private welcome message to the player the first time they join.
+    # Shown to the player the first time they ever join.
     first-join-message: "&aWelcome to the server, &e%player%&a! Type &e/help&a to get started."
-    # Mark new players in the join embed with a :sparkles: indicator.
     show-first-join-indicator: true
   quit:
     enabled: true
@@ -82,13 +74,11 @@ events:
   advancement:
     enabled: true
     color: "#F1C40F"
-    # Show rarity badge when fewer than this fraction of players
-    # have the advancement (0.0–1.0). 0.25 = bottom 25%.
+    # 0.25 = badge appears if fewer than 25% of players unlocked it.
     rarity-threshold: 0.25
-    # Set to false to suppress rarity and first-of-day badges.
     show-rarity: true
 
-# ── Status module ─────────────────────────────────────────
+# Auto-updating embed. Use /setup or config channels.status.
 status:
   enabled: true
   update-interval: 30
@@ -100,7 +90,8 @@ status:
     show-memory: true
     server-ip: "play.yourserver.com"
 
-# ── Leaderboard module ────────────────────────────────────
+# Tracks kills/deaths/playtime. Stats are stored per-player and
+# can be viewed with /leaderboard on Discord.
 leaderboard:
   enabled: true
   tracked-stats:
@@ -108,19 +99,24 @@ leaderboard:
     - DEATHS
     - PLAYTIME
   top-count: 10
+  per-page: 10
+  panel-channel: ""
+  panel-update-interval: 120
+  panel-stats:
+    - "kills"
+    - "deaths"
+    - "playtime"
 
-# ── Ticket module ─────────────────────────────────────────
+# Creates private Discord channels for support tickets.
 tickets:
   enabled: true
+  # Staff roles that can see all tickets. Paste role IDs here.
   support-roles:
     - "YOUR_SUPPORT_ROLE_ID"
   max-per-user: 3
+  # Tickets auto-close after this many hours of inactivity. 0 = never.
   auto-close-hours: 48
-  # Optional Discord channel/category overrides for the ticket panel.
-  # If panel-channel is set, the panel is re-posted there on /setup
-  # even if you do not run the wizard.
   panel-channel: ""
-  # Customise the panel embed posted to Discord.
   panel:
     title: "Support Center"
     description: |
@@ -130,8 +126,7 @@ tickets:
     thumbnail: ""
     image: ""
     footer: "ZDiscord Ticket System"
-  # Categories shown in the panel dropdown. Add, remove, or edit
-  # freely. Each entry needs a unique id, label, description, and emoji.
+  # Add or remove categories freely. Each needs a unique id.
   categories:
     - id: "general"
       label: "General Support"
@@ -154,99 +149,112 @@ tickets:
       emoji: "🛒"
       color: "#2ECC71"
 
-# ── Account linking ───────────────────────────────────────
+# Players can link their Discord and Minecraft accounts via
+# /zdiscord link in-game then /link on Discord.
 linking:
   enabled: true
+  # If true, players must link before they can join the server.
   required: false
+  # Role ID to auto-assign on Discord when a player links.
   linked-role: ""
-  # Commands run as console on the server when a player links.
-  # Use %player% to substitute the player's name.
+  # Console commands to run when a player links. Use %player%.
   rewards: []
-  # Example: rewards: ["give %player% diamond 5"]
 
-# ── Anti-raid module ──────────────────────────────────────
 anti-raid:
   enabled: true
+  # Kicks new joins if >max-joins arrive within time-window (seconds).
   max-joins: 10
   time-window: 30
   lockdown:
     kick-new-joins: true
     kick-message: "&cServer is in lockdown mode. Please try again later."
     notify-staff: true
+    # Seconds until lockdown auto-lifts. 0 = manual only.
     auto-lift: 300
 
-# ── Performance monitor ───────────────────────────────────
 performance:
   enabled: true
   update-interval: 60
+  # Posts to channels.performance when thresholds are crossed.
   tps-warning: 18.0
   tps-critical: 15.0
+  # Percentage of max memory.
   memory-warning: 80
 
-# ── Reaction roles ────────────────────────────────────────
 reaction-roles:
   enabled: true
-  # Mappings are stored in reaction_roles.yml — see wiki for setup.
+  # Add mappings via /zdiscord reactionrole. See wiki for setup.
   mappings: []
 
-# ── Miscellaneous ─────────────────────────────────────────
 misc:
   invite-link: "https://discord.gg/yourserver"
+  # Prefix for console commands sent from the console channel.
   console-prefix: "!"
-  # Discord role ID required to run console commands from Discord.
-  # Leave empty to disable Discord console commands entirely.
   console-role: ""
   debug: false
-  # Update-checker behaviour.
   update-checker: true
-  # Set to true to suppress the in-game "Update available" banner
-  # sent to admins on join. The check still runs every 5 hours
-  # and still posts a silent embed to misc.update-channel.
   update-silent: false
-  # Optional channel that receives a single quiet embed whenever
-  # a new plugin release is detected. Leave empty to disable.
   update-channel: ""
 
-# ── Command logger ────────────────────────────────────────
 command-logger:
   enabled: true
   channel: ""
-  # Commands that trigger a WATCHED log (yellow)
+  # Logged in yellow. These are matched as prefixes.
   watched-commands:
     - "ban"
     - "kick"
     - "mute"
     - "whitelist"
     - "gamemode"
-  # Commands that trigger a CRITICAL log (red)
+  # Logged in red.
   critical-commands:
     - "op"
     - "deop"
     - "stop"
     - "restart"
 
-# ── Staff chat ────────────────────────────────────────────
+# Staff messages are sent from Minecraft with /sc and replied
+# to from the Discord staff-chat channel.
 staff-chat:
   enabled: true
   channel: "YOUR_STAFF_CHAT_CHANNEL_ID"
 
-# ── Voice status ──────────────────────────────────────────
 voice-status:
   enabled: true
-  # Discord voice channel ID to track
+  # Tracks how many people are in a voice channel and posts
+  # live updates to the channels.status embed.
   channel: ""
 
-# ── Player profile card (used by /profile) ───────────────
 profile:
   embed:
     color: "#9B59B6"
 
-# ── Follow (used by /profile Follow button) ──────────────
+# /profile has a Follow button. When the player joins the
+# server, followers get a DM notification.
 follow:
   enabled: true
+  join-notification-cooldown: 300
 
-# ── Confessions (used by /confess) ───────────────────────
 confessions:
   color: "#9B59B6"
-  # Cooldown in seconds between confessions per player.
+  # Seconds between confessions per user.
   cooldown: 300
+
+api:
+  # Enables the Bukkit API other plugins can hook into.
+  enabled: true
+
+logging:
+  level: INFO
+  compact: true
+  categories:
+    bot: INFO
+    storage: WARN
+    modules: INFO
+    events: INFO
+    api: INFO
+    setup: INFO
+    commands: INFO
+    webhook: WARN
+  suppress-jda: true
+  suppress-hikari: true

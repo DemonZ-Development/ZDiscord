@@ -8,9 +8,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 - `/profile [player]` — renders a player card embed with avatar, NameMC link, first/last seen (Discord timestamps), sessions, playtime, advancement count, link status, follower count, and online indicator. Follow/Unfollow button on the embed subscribes the requester to DM notifications.
-- `/seen <player]` — quick last-seen lookup. Returns online/offline status, last-seen timestamp, playtime, and session count.
+- `/seen <player>` — quick last-seen lookup. Returns online/offline status, last-seen timestamp, playtime, and session count.
 - `/following` — lists the Minecraft players the requester follows.
-- `/unfollow <player]` — stops following a player (previously only the button on `/profile`).
+- `/unfollow <player>` — stops following a player (previously only the button on `/profile`).
 - `/confess <message>` — posts an anonymous confession to `channels.confessions`. Rate-limited (configurable via `confessions.cooldown`, default 300s). Stable monotonic handle per confessor. `&` colour codes convert to Discord markdown.
 - Silent update check every 5 hours (was 6). One quiet embed to `misc.update-channel`, no pings. `misc.update-silent` suppresses both the in-game banner and Discord notice.
 - Achievement rarity display — "First of the day" badge when the player is the first to unlock that advancement in 24 hours, and "Rare — only N% of players have this" badge below a configurable threshold (default 25%).

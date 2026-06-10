@@ -19,3 +19,10 @@ Steps you have already attempted.
 - ZDiscord version:
 - Server software and version:
 - Storage backend:
+- Java version: (`java -version`)
+
+## Logs
+
+```
+# If applicable, paste relevant log output from plugins/ZDiscord/ or the server console
+```

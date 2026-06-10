@@ -16,6 +16,8 @@ Chat bridge, tickets, status, account linking, anti-raid, player profiles, confe
 
 ZDiscord bridges your Minecraft server and Discord guild. Chat flows both ways, players see server status from Discord, and staff manage tickets from a dropdown panel.
 
+Built with modern JDA 5 for native slash commands and button interactions. Supports Paper, Folia, and Spigot out of the box. 15+ toggleable modules — use what you need, disable what you don't.
+
 ### Features
 
 - **Chat bridge** — Two-way chat between Minecraft and Discord. Webhooks display player heads as avatars. Linked players show their Discord name and avatar.
@@ -76,8 +78,6 @@ Apache License 2.0
 - `zdiscord.bypass.antiraid` (op) — bypass anti-raid checks
 - `zdiscord.bypass.link` (op) — bypass link-to-join enforcement
 - `zdiscord.bypass.console` (op) — reserved (currently unused)
-
-[URL=https://bstats.org/plugin/bukkit/MyZDiscord/29652][IMG]https://bstats.org/signatures/bukkit/MyZDiscord.svg[/IMG][/URL]
 
 ## External links
 

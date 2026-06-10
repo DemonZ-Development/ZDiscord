@@ -18,11 +18,15 @@ Server-side
 
 ## Short description (max 100 chars)
 
-Discord integration for Paper, Folia, and Spigot servers. Chat bridge, tickets, leaderboards, anti-raid, player profiles, confessions.
+Discord integration for Paper, Folia, and Spigot. Chat bridge, tickets, leaderboards, anti-raid, player profiles, confessions.
 
 ## Long description
 
 ZDiscord bridges your Minecraft server and Discord guild. Chat flows both ways, players see server status from Discord, and staff manage tickets from a dropdown panel.
+
+### Why ZDiscord?
+
+Built with modern JDA 5 for native slash commands and button interactions. Supports Paper, Folia, and Spigot out of the box. 15+ toggleable modules — use what you need, disable what you don't.
 
 ### Features
 
@@ -66,10 +70,6 @@ ZDiscord bridges your Minecraft server and Discord guild. Chat flows both ways, 
 
 All configuration lives in `plugins/ZDiscord/config.yml`. User-facing strings are in `messages.yml`. See the wiki for a full reference.
 
-### bStats
-
-[![bStats Server Signature](https://bstats.org/signatures/bukkit/MyZDiscord.svg)](https://bstats.org/plugin/bukkit/MyZDiscord/29652)
-
 ### License
 
 Apache License 2.0
@@ -79,8 +79,6 @@ Apache License 2.0
 - Source: https://github.com/DemonZ-Development/ZDiscord
 - Issues: https://github.com/DemonZ-Development/ZDiscord/issues
 - Wiki: https://github.com/DemonZ-Development/ZDiscord/wiki
-
-
 
 ## Tags
 

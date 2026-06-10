@@ -20,6 +20,8 @@ Discord integration for Paper, Folia, and Spigot. Chat bridge with player heads,
 
 ZDiscord bridges your Minecraft server and Discord guild. Chat flows both ways, players see server status from Discord, and staff manage tickets from a dropdown panel.
 
+Built with modern JDA 5 for native slash commands and button interactions. Supports Paper, Folia, and Spigot out of the box. 15+ toggleable modules — use what you need, disable what you don't.
+
 ### Features
 
 - **Chat bridge** — Two-way chat between Minecraft and Discord. Webhooks display player heads as avatars. Linked players show their Discord name and avatar.
@@ -57,10 +59,6 @@ ZDiscord bridges your Minecraft server and Discord guild. Chat flows both ways, 
    - `channels.chat` — the channel ID for chat bridge
 5. Restart the server.
 6. Run `/setup` in Discord to configure the remaining channels.
-
-### bStats
-
-[![bStats Server Signature](https://bstats.org/signatures/bukkit/MyZDiscord.svg)](https://bstats.org/plugin/bukkit/MyZDiscord/29652)
 
 ### License
 

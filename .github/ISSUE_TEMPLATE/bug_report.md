@@ -42,3 +42,7 @@ What actually happens. Include the exact error message or screenshot if relevant
 ```
 # Paste the relevant log output from plugins/ZDiscord/ or the server console
 ```
+
+## Additional context
+
+Add any other context about the problem here (e.g., other plugins installed, Discord bot permissions, etc.).

@@ -24,4 +24,4 @@ Any other approaches you considered.
 
 ## Additional context
 
-Anything else relevant.
+Anything else relevant (e.g., similar features in other plugins, Discord API capabilities, etc.).

@@ -22,6 +22,19 @@ Discord integration for Minecraft servers.
 
 ZDiscord connects your Minecraft server to Discord. Chat flows both ways, players see server status without leaving Discord, and staff manage tickets from a dropdown panel.
 
+## Why ZDiscord?
+
+| | ZDiscord | DiscordSRV |
+|---|---|---|
+| **Slash commands** | Native JDA 5 slash commands + buttons | Bolted-on text commands |
+| **Folia support** | Built-in regionized multithreading | No Folia support |
+| **Modular design** | 15+ toggleable modules | Chat bridge only |
+| **Account linking** | One-time codes + role grants | Clunky multi-step process |
+| **Ticket system** | Built-in dropdown panel with categories | Requires separate plugin |
+| **Config migration** | Automatic schema upgrades | Manual editing |
+| **Webhook handling** | Rate-limited queue with retry | Rate limit issues under load |
+| **Message delivery** | Async with guaranteed delivery | Can drop messages |
+
 ## Features
 
 - **Chat bridge** — Two-way chat between Minecraft and Discord. Webhooks display player heads as avatars. Linked players show their Discord name and avatar.

@@ -62,6 +62,7 @@ public final class PlaceholderUtil {
         if (text == null) {
             return "";
         }
-        return text.replaceAll("Â§[0-9a-fk-or]", "").replaceAll("&[0-9a-fk-or]", "");
+        return text.replaceAll("\u00A7[0-9a-fk-orA-FK-OR]", "")
+                .replaceAll("&[0-9a-fk-orA-FK-OR]", "");
     }
 }

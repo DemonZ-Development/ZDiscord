@@ -8,7 +8,10 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 
 public class CommandLoggerModule implements Listener {
@@ -17,6 +20,10 @@ public class CommandLoggerModule implements Listener {
     private List<String> watchedCommands;
     private List<String> criticalCommands;
     private String channelId;
+
+    private static final Set<String> SENSITIVE_COMMANDS = new HashSet<>(Arrays.asList(
+            "login", "register", "changepassword", "password", "lpc", "lac",
+            "authme", "premium", "license", "token", "secret"));
 
     public CommandLoggerModule(ZDiscord plugin) {
         this.plugin = plugin;
@@ -58,12 +65,17 @@ public class CommandLoggerModule implements Listener {
         int color = isCritical ? 0xE74C3C : 0xF39C12;
         String severity = isCritical ? "CRITICAL" : "WATCHED";
 
+        String display = fullCommand;
+        if (space != -1 && SENSITIVE_COMMANDS.contains(baseCommand)) {
+            display = baseCommand + " <redacted>";
+        }
+
         EmbedBuilder embed = new EmbedBuilder()
                 .setTitle("Command Log")
                 .setColor(color)
                 .addField("Player", playerName, true)
                 .addField("Severity", severity, true)
-                .addField("Command", "`/" + fullCommand + "`", false)
+                .addField("Command", "`/" + display + "`", false)
                 .setFooter("ZDiscord security")
                 .setTimestamp(Instant.now());
 

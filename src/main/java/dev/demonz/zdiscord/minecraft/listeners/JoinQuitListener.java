@@ -15,6 +15,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -22,6 +23,7 @@ public class JoinQuitListener implements Listener {
 
     private final ZDiscord plugin;
     private final Map<UUID, Long> joinTimestamps = new ConcurrentHashMap<>();
+    private final Set<UUID> knownPlayers = ConcurrentHashMap.newKeySet();
 
     public JoinQuitListener(ZDiscord plugin) {
         this.plugin = plugin;
@@ -33,14 +35,14 @@ public class JoinQuitListener implements Listener {
         UUID uuid = player.getUniqueId();
         long now = System.currentTimeMillis();
 
-
-
-
         final boolean firstJoin;
-        long existingFirstJoin = plugin.getStorageManager().getFirstJoin(uuid);
-        firstJoin = (existingFirstJoin == 0);
-
-
+        if (knownPlayers.contains(uuid)) {
+            firstJoin = false;
+        } else {
+            long existingFirstJoin = plugin.getStorageManager().getFirstJoin(uuid);
+            firstJoin = (existingFirstJoin == 0);
+            knownPlayers.add(uuid);
+        }
 
         plugin.getPlatformAdapter().runAsync(() -> {
             plugin.getStorageManager().setLastSeen(uuid, now);

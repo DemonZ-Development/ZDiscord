@@ -202,5 +202,6 @@ public class PerformanceModule {
     }
 
     public void shutdown() {
+        running = false;
     }
 }

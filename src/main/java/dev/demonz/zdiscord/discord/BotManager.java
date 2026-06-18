@@ -15,7 +15,6 @@ import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 
-
 public class BotManager {
 
     private final ZDiscord plugin;
@@ -30,6 +29,20 @@ public class BotManager {
         String token = plugin.getConfigManager().getString("bot.token");
         if (token == null || token.isEmpty() || token.equals("YOUR_BOT_TOKEN_HERE")) {
             plugin.getLogger().warning("No bot token configured. Set bot.token in config.yml.");
+            return false;
+        }
+
+        String guildId = plugin.getConfigManager().getString("bot.guild-id");
+        if (guildId == null || guildId.isEmpty() || guildId.equals("YOUR_GUILD_ID_HERE")) {
+            plugin.getLogger().warning("No guild-id configured. Set bot.guild-id in config.yml "
+                    + "(right-click your server in Discord > Copy ID, Developer Mode must be on).");
+            return false;
+        }
+        try {
+            Long.parseLong(guildId.trim());
+        } catch (NumberFormatException e) {
+            plugin.getLogger().severe("bot.guild-id is not a valid Discord snowflake: "
+                    + "'" + guildId + "'. Expected a numeric ID like 123456789012345678.");
             return false;
         }
 
@@ -59,19 +72,18 @@ public class BotManager {
                             })
                     .build();
 
-
-
-
-            jda.awaitReady();
+            jda.awaitStatus(JDA.Status.CONNECTED);
 
             plugin.getLogger().info("Connecting to Discord...");
             return true;
         } catch (InterruptedException e) {
             plugin.getLogger().severe("Interrupted while waiting for Discord connection.");
+            shutdown();
             Thread.currentThread().interrupt();
             return false;
         } catch (Exception e) {
             plugin.getLogger().severe("Failed to connect to Discord: " + e.getMessage());
+            shutdown();
             return false;
         }
     }
@@ -150,9 +162,14 @@ public class BotManager {
             return null;
         }
         String guildId = plugin.getConfigManager().getString("bot.guild-id");
-        if (guildId == null || guildId.isEmpty()) {
+        if (guildId == null || guildId.isEmpty() || guildId.equals("YOUR_GUILD_ID_HERE")) {
             return null;
         }
-        return jda.getGuildById(guildId);
+        try {
+            return jda.getGuildById(guildId.trim());
+        } catch (NumberFormatException e) {
+            plugin.getLogger().warning("bot.guild-id is not a valid snowflake: " + guildId);
+            return null;
+        }
     }
 }

@@ -58,6 +58,13 @@ public class ReactionRoleModule {
                 String roleId = data.getString("messages." + messageId + "." + emoji + ".role-id");
                 String permission = data.getString(
                         "messages." + messageId + "." + emoji + ".permission", "");
+                if (permission != null && !permission.isEmpty()
+                        && !PERMISSION_PATTERN.matcher(permission).matches()) {
+                    plugin.getLogger().warning("Skipping reaction-role mapping with invalid "
+                            + "permission '" + permission + "' for emoji " + emoji
+                            + " on message " + messageId);
+                    continue;
+                }
                 emojiMap.put(emoji, new RoleMapping(roleId, permission));
             }
             mappings.put(messageId, emojiMap);

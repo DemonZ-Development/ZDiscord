@@ -89,11 +89,11 @@ public class ConsoleModule {
     }
 
     public void shutdown() {
-        running = false;
         if (handler != null && registeredLogger != null) {
             registeredLogger.removeHandler(handler);
         }
         flushBuffer();
+        running = false;
     }
 
     private final class ConsoleHandler extends Handler {

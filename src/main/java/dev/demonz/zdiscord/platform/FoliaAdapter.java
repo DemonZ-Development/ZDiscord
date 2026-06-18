@@ -100,5 +100,11 @@ public class FoliaAdapter implements PlatformAdapter {
         } catch (Exception e) {
             Bukkit.getScheduler().cancelTasks(plugin);
         }
+        try {
+            Object asyncScheduler = Bukkit.class.getMethod("getAsyncScheduler").invoke(null);
+            asyncScheduler.getClass().getMethod("cancelTasks", org.bukkit.plugin.Plugin.class)
+                    .invoke(asyncScheduler, plugin);
+        } catch (Exception ignored) {
+        }
     }
 }

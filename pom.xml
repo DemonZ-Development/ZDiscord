@@ -84,6 +84,19 @@
             <artifactId>json-simple</artifactId>
             <version>1.1.1</version>
             <scope>compile</scope>
+            <exclusions>
+                <!-- json-simple declares junit + hamcrest as compile deps,
+                     which leaks ~300 test-framework class files into the
+                     shaded production JAR. -->
+                <exclusion>
+                    <groupId>junit</groupId>
+                    <artifactId>junit</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.hamcrest</groupId>
+                    <artifactId>hamcrest-core</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -167,6 +180,33 @@
                         <relocation>
                             <pattern>org.json.simple</pattern>
                             <shadedPattern>dev.demonz.zdiscord.libs.json</shadedPattern>
+                        </relocation>
+                        <!-- JDA transitive deps — relocating these prevents
+                             classpath conflicts with co-resident plugins
+                             (Essentials, DiscordSRV, etc. all ship okhttp/jackson). -->
+                        <relocation>
+                            <pattern>okhttp3</pattern>
+                            <shadedPattern>dev.demonz.zdiscord.libs.okhttp3</shadedPattern>
+                        </relocation>
+                        <relocation>
+                            <pattern>okio</pattern>
+                            <shadedPattern>dev.demonz.zdiscord.libs.okio</shadedPattern>
+                        </relocation>
+                        <relocation>
+                            <pattern>com.fasterxml.jackson</pattern>
+                            <shadedPattern>dev.demonz.zdiscord.libs.jackson</shadedPattern>
+                        </relocation>
+                        <relocation>
+                            <pattern>com.neovisionaries.ws</pattern>
+                            <shadedPattern>dev.demonz.zdiscord.libs.nvws</shadedPattern>
+                        </relocation>
+                        <relocation>
+                            <pattern>gnu.trove</pattern>
+                            <shadedPattern>dev.demonz.zdiscord.libs.trove</shadedPattern>
+                        </relocation>
+                        <relocation>
+                            <pattern>org.slf4j</pattern>
+                            <shadedPattern>dev.demonz.zdiscord.libs.slf4j</shadedPattern>
                         </relocation>
                     </relocations>
                     <filters>

@@ -500,7 +500,7 @@ public class LeaderboardModule {
 
 
     private File panelDataFile() {
-        return new File(plugin.getDataFolder(), "leaderboard_data.yml");
+        return new File(plugin.getDataFolder(), "leaderboard_panel.yml");
     }
 
     private void persistPanelMessageId(String messageId) {

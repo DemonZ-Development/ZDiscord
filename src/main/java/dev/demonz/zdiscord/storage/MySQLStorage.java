@@ -363,7 +363,8 @@ public class MySQLStorage implements StorageManager {
         runTrackedAsync(() -> {
             try (Connection conn = dataSource.getConnection();
                     PreparedStatement ps = conn.prepareStatement(
-                            "INSERT IGNORE INTO zdiscord_player_activity (player_uuid, first_join) VALUES (?, ?)")) {
+                            "INSERT INTO zdiscord_player_activity (player_uuid, first_join) VALUES (?, ?) " +
+                                    "ON DUPLICATE KEY UPDATE first_join = IF(first_join = 0, VALUES(first_join), first_join)")) {
                 ps.setString(1, playerUUID.toString());
                 ps.setLong(2, millis);
                 ps.executeUpdate();

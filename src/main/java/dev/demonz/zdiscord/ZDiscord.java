@@ -154,17 +154,28 @@ public class ZDiscord extends JavaPlugin {
     }
 
     private void detectPlatform() {
+        boolean isFolia = false;
         try {
             Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
             platformAdapter = new FoliaAdapter(this);
+            isFolia = true;
         } catch (ClassNotFoundException e) {
             try {
                 Class.forName("io.papermc.paper.event.player.AsyncChatEvent");
                 platformAdapter = new PaperAdapter(this);
-                paperModern = true;
             } catch (ClassNotFoundException e2) {
                 platformAdapter = new SpigotAdapter(this);
             }
+        }
+        try {
+            Class.forName("io.papermc.paper.event.player.AsyncChatEvent");
+            paperModern = true;
+        } catch (ClassNotFoundException ignored) {
+            paperModern = false;
+        }
+        if (isFolia && paperModern) {
+            ZLogger.info(ZLogger.Category.SYSTEM,
+                    "Folia detected — modern Paper chat events will be used.");
         }
     }
 

@@ -423,9 +423,7 @@ public class SetupCommand extends ListenerAdapter {
                     .setEphemeral(true)
                     .queue();
         } else if (event instanceof ModalInteractionEvent) {
-
-            ((ModalInteractionEvent) event).getHook()
-                    .editOriginalEmbeds(embed.build())
+            ((ModalInteractionEvent) event).editMessageEmbeds(embed.build())
                     .setComponents(rows)
                     .queue();
         }
@@ -492,7 +490,7 @@ public class SetupCommand extends ListenerAdapter {
     public void onButtonInteraction(ButtonInteractionEvent event) {
         String id = event.getComponentId();
 
-        if (id.startsWith("zdiscord_create_ticket")) {
+        if (!id.startsWith("zdiscord_setup_")) {
             return;
         }
         if (!isAdmin(event.getMember())) {

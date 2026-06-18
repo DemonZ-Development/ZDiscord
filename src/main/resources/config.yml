@@ -191,6 +191,10 @@ misc:
   # Prefix for console commands sent from the console channel.
   console-prefix: "!"
   console-role: ""
+  # Commands that may be run from the Discord console channel. Empty list = safe
+  # defaults (read-only + moderate gameplay commands). Anything not on this list
+  # is rejected. Note: op/deop/stop/restart/reload/perms are never allowed here.
+  console-allowed-commands: []
   debug: false
   update-checker: true
   update-silent: false

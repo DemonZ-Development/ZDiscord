@@ -54,7 +54,7 @@ public class StaffChatModule extends ListenerAdapter {
         plugin.getPlatformAdapter().runSync(() -> {
             for (Player player : Bukkit.getOnlinePlayers()) {
                 if (player.hasPermission("zdiscord.staffchat")) {
-                    player.sendMessage("Â§3[SC] Â§9" + name + "Â§8: Â§f" + msg);
+                    player.sendMessage("\u00A73[SC] \u00A79" + name + "\u00A78: \u00A7f" + msg);
                 }
             }
         });
@@ -63,7 +63,7 @@ public class StaffChatModule extends ListenerAdapter {
     public void broadcastToStaff(Player sender, String message) {
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (player.hasPermission("zdiscord.staffchat")) {
-                player.sendMessage("Â§3[SC] Â§b" + sender.getName() + "Â§8: Â§f" + message);
+                player.sendMessage("\u00A73[SC] \u00A7b" + sender.getName() + "\u00A78: \u00A7f" + message);
             }
         }
     }

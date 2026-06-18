@@ -10,7 +10,11 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 
@@ -101,28 +105,13 @@ public class DiscordChatListener extends ListenerAdapter {
             return;
         }
 
-
-
-        String lc = command.toLowerCase(Locale.ROOT);
-        if (lc.startsWith("op ")
-                || lc.startsWith("deop ")
-                || lc.startsWith("stop")
-                || lc.startsWith("restart")
-                || lc.equals("reload")
-                || lc.startsWith("reload ")
-                || lc.startsWith("bukkit:op")
-                || lc.startsWith("minecraft:op")
-                || lc.startsWith("bukkit:deop")
-                || lc.startsWith("minecraft:deop")
-                || lc.startsWith("bukkit:stop")
-                || lc.startsWith("minecraft:stop")
-                || lc.startsWith("bukkit:restart")
-                || lc.startsWith("minecraft:restart")
-                || lc.startsWith("bukkit:reload")
-                || lc.startsWith("minecraft:reload")
-                || lc.startsWith("whitelist remove ")) {
-            event.getMessage().reply("That command is not allowed via Discord console.")
-                    .queue();
+        String base = command.split("\\s+", 2)[0].toLowerCase(Locale.ROOT);
+        int colon = base.indexOf(':');
+        if (colon >= 0) {
+            base = base.substring(colon + 1);
+        }
+        if (!isAllowed(base)) {
+            event.getMessage().reply("That command is not on the Discord console allowlist.").queue();
             return;
         }
 
@@ -135,5 +124,29 @@ public class DiscordChatListener extends ListenerAdapter {
                 event.getMessage().reply("Error: " + e.getMessage()).queue();
             }
         });
+    }
+
+    private boolean isAllowed(String base) {
+        List<String> configured = plugin.getConfigManager().getStringList("misc.console-allowed-commands");
+        Set<String> allowed;
+        if (configured == null || configured.isEmpty()) {
+            allowed = new HashSet<>(Arrays.asList(
+                    "say", "msg", "tell", "w", "whisper", "r", "reply",
+                    "list", "tps", "seed", "help", "?",
+                    "weather", "time", "difficulty", "gamerule",
+                    "give", "clear", "effect", "enchant",
+                    "teleport", "tp", "summon",
+                    "gamemode", "xp", "experience",
+                    "whitelist", "ban", "banlist", "pardon",
+                    "kick", "kill", "spawnpoint", "setblock", "fill",
+                    "title", "advancement", "attribute", "bossbar",
+                    "particle", "playsound", "stopsound"));
+        } else {
+            allowed = new HashSet<>();
+            for (String s : configured) {
+                allowed.add(s.toLowerCase(Locale.ROOT));
+            }
+        }
+        return allowed.contains(base);
     }
 }

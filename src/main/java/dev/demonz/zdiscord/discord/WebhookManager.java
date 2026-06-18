@@ -38,6 +38,8 @@ public class WebhookManager {
         if (existing != null) {
             return existing;
         }
+
+        WebhookClient client = null;
         try {
             var webhooks = channel.retrieveWebhooks().complete();
             var found = webhooks.stream()
@@ -51,14 +53,20 @@ public class WebhookManager {
                 var webhook = channel.createWebhook("ZChat").complete();
                 webhookUrl = webhook.getUrl();
             }
-            WebhookClient client = WebhookClient.withUrl(webhookUrl);
-            webhookClients.put(channel.getId(), client);
-            return client;
+            client = WebhookClient.withUrl(webhookUrl);
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to create webhook for #"
                     + channel.getName() + ": " + e.getMessage());
-            return null;
         }
+
+        if (client != null) {
+            WebhookClient prior = webhookClients.putIfAbsent(channel.getId(), client);
+            if (prior != null) {
+                client.close();
+                client = prior;
+            }
+        }
+        return client;
     }
 
 
@@ -81,11 +89,6 @@ public class WebhookManager {
 
 
     public void sendWebhookMessage(TextChannel channel, String username, String avatarUrl, String message) {
-        WebhookClient client = getOrCreateWebhook(channel);
-        if (client == null) {
-            return;
-        }
-
         String safeName = sanitizeUsername(username);
         long delayMs = acquireSlot();
         WebhookMessageBuilder builder = new WebhookMessageBuilder()
@@ -93,11 +96,17 @@ public class WebhookManager {
                 .setAvatarUrl(avatarUrl)
                 .setContent(message);
 
+        Runnable task = () -> {
+            WebhookClient client = getOrCreateWebhook(channel);
+            if (client != null) {
+                doSend(client, channel, builder);
+            }
+        };
         if (delayMs == 0) {
-            plugin.getPlatformAdapter().runAsync(() -> doSend(client, channel, builder));
+            plugin.getPlatformAdapter().runAsync(task);
         } else {
             scheduler.schedule(
-                    () -> plugin.getPlatformAdapter().runAsync(() -> doSend(client, channel, builder)),
+                    () -> plugin.getPlatformAdapter().runAsync(task),
                     delayMs, TimeUnit.MILLISECONDS);
         }
     }
@@ -110,7 +119,7 @@ public class WebhookManager {
             if (errorMsg.contains("404") || errorMsg.contains("Unknown Webhook")) {
                 webhookClients.remove(channel.getId());
                 plugin.debug("Webhook invalidated for #" + channel.getName()
-                        + " â€” will be re-created on next message.");
+                        + " — will be re-created on next message.");
             } else {
                 plugin.debug("Webhook send failed: " + errorMsg);
             }

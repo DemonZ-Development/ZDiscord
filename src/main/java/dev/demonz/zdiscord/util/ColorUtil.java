@@ -41,7 +41,7 @@ public final class ColorUtil {
         if (stripped == null) {
             return "";
         }
-        return stripped.replaceAll("&[0-9a-fk-or]", "");
+        return stripped.replaceAll("&[0-9a-fk-orA-FK-OR]", "");
     }
 
 
@@ -64,28 +64,24 @@ public final class ColorUtil {
                 i++;
                 switch (code) {
                     case 'l':
-                        out.append(bold ? "**" : "**");
+                        out.append("**");
                         bold = !bold;
                         break;
                     case 'o':
-                        out.append(italic ? "*" : "*");
+                        out.append("*");
                         italic = !italic;
                         break;
                     case 'n':
-                        out.append(underline ? "__" : "__");
+                        out.append("__");
                         underline = !underline;
                         break;
                     case 'm':
-                        out.append(strike ? "~~" : "~~");
+                        out.append("~~");
                         strike = !strike;
                         break;
                     case 'k':
-
                         break;
                     case 'r':
-
-
-
                         if (strike) out.append("~~");
                         if (underline) out.append("__");
                         if (italic) out.append('*');
@@ -93,7 +89,6 @@ public final class ColorUtil {
                         bold = italic = underline = strike = false;
                         break;
                     default:
-
                         break;
                 }
                 continue;

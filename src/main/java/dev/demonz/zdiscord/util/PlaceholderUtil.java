@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord.util;
+package dev.demonz.zdiscord.util;
 
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;

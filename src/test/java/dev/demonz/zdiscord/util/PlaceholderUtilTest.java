@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord.util;
+package dev.demonz.zdiscord.util;
 
 import dev.demonz.zdiscord.testsupport.BukkitStub;
 import org.junit.jupiter.api.AfterEach;

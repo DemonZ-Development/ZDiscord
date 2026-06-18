@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord.util;
+package dev.demonz.zdiscord.util;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.modules.LinkModule;

@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord.platform;
+package dev.demonz.zdiscord.platform;
 
 import dev.demonz.zdiscord.ZDiscord;
 import org.bukkit.Bukkit;

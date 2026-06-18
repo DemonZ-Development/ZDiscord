@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord.api.model;
+package dev.demonz.zdiscord.api.model;
 
 import java.util.ArrayList;
 import java.util.Collections;

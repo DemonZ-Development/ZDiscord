@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord.api;
+package dev.demonz.zdiscord.api;
 
 import dev.demonz.zdiscord.api.model.LeaderboardEntry;
 import dev.demonz.zdiscord.api.model.PlayerProfile;

@@ -6,12 +6,6 @@
 
 Discord integration for Minecraft servers.
 
-[![Version](https://img.shields.io/badge/version-1.2.0-blue)](https://github.com/DemonZ-Development/ZDiscord/releases)
-[![Minecraft](https://img.shields.io/badge/Minecraft-1.20.4%2B-green)](https://papermc.io)
-[![Platform](https://img.shields.io/badge/Paper%20%7C%20Folia%20%7C%20Spigot-orange)](https://papermc.io)
-[![Java](https://img.shields.io/badge/Java-17%2B-red)](https://adoptium.net)
-[![License](https://img.shields.io/badge/License-Apache%202.0-lightgrey)](LICENSE)
-
 [Releases](https://github.com/DemonZ-Development/ZDiscord/releases) · [Wiki](https://github.com/DemonZ-Development/ZDiscord/wiki) · [Issues](https://github.com/DemonZ-Development/ZDiscord/issues)
 
 </div>

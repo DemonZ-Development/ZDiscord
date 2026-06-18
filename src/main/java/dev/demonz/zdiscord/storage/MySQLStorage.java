@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord.storage;
+package dev.demonz.zdiscord.storage;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;

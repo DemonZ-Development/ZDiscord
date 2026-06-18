@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord.util;
+package dev.demonz.zdiscord.util;
 
 import org.bukkit.configuration.file.FileConfiguration;
 

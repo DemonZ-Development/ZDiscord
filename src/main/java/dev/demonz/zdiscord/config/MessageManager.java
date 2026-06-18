@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord.config;
+package dev.demonz.zdiscord.config;
 
 import dev.demonz.zdiscord.ZDiscord;
 import org.bukkit.ChatColor;

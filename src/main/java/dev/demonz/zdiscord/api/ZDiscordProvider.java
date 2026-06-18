@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord.api;
+package dev.demonz.zdiscord.api;
 
 public final class ZDiscordProvider {
 

@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord.storage;
+package dev.demonz.zdiscord.storage;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.platform.PlatformAdapter;

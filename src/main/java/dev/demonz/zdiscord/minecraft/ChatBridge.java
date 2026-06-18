@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord.minecraft;
+package dev.demonz.zdiscord.minecraft;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.util.ColorUtil;

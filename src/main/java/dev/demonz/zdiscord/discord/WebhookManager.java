@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord.discord;
+package dev.demonz.zdiscord.discord;
 
 import club.minnced.discord.webhook.WebhookClient;
 import club.minnced.discord.webhook.send.WebhookMessageBuilder;

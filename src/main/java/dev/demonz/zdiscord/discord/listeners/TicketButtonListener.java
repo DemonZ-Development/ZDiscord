@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord.discord.listeners;
+package dev.demonz.zdiscord.discord.listeners;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.modules.TicketModule;

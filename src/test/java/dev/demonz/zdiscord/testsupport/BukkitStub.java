@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord.testsupport;
+package dev.demonz.zdiscord.testsupport;
 
 import dev.demonz.zdiscord.util.ServerBridge;
 

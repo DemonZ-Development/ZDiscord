@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord.minecraft.listeners;
+package dev.demonz.zdiscord.minecraft.listeners;
 
 import dev.demonz.zdiscord.ZDiscord;
 import org.bukkit.event.EventHandler;

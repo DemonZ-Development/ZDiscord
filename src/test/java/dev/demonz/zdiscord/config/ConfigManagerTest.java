@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord.config;
+package dev.demonz.zdiscord.config;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

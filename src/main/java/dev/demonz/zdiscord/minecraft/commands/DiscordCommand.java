@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord.minecraft.commands;
+package dev.demonz.zdiscord.minecraft.commands;
 
 import dev.demonz.zdiscord.ZDiscord;
 import org.bukkit.command.Command;

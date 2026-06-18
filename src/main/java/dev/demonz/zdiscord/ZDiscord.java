@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord;
+package dev.demonz.zdiscord;
 
 import dev.demonz.zdiscord.config.ConfigManager;
 import dev.demonz.zdiscord.config.MessageManager;

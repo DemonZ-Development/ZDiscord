@@ -1,0 +1,8 @@
+jdk:
+  - openjdk17
+
+env:
+  MAVEN_OPTS: "-Xmx1024m -Xms512m"
+
+install:
+  - mvn clean install -DskipTests -B --no-transfer-progress

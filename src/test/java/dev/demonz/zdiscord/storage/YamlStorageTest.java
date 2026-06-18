@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord.storage;
+package dev.demonz.zdiscord.storage;
 
 import dev.demonz.zdiscord.testsupport.SyncPlatformAdapter;
 import org.junit.jupiter.api.Test;

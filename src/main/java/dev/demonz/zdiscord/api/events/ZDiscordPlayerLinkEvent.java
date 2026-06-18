@@ -1,4 +1,4 @@
-﻿package dev.demonz.zdiscord.api.events;
+package dev.demonz.zdiscord.api.events;
 
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;

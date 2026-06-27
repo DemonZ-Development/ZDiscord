@@ -18,7 +18,7 @@ import java.util.logging.Logger;
 public class ConfigManager {
 
 
-    public static final int CURRENT_VERSION = 4;
+    public static final int CURRENT_VERSION = 5;
 
     private final File dataFolder;
     private final Logger logger;

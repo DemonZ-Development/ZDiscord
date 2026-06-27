@@ -8,6 +8,13 @@ public final class StartupBanner {
 
     private static final int BOX_WIDTH = 46;
 
+    /**
+     * Total number of toggleable modules. Must match the number of module
+     * getters checked in {@link #countActiveModules(ZDiscord)} and the module
+     * fields declared on {@link ZDiscord}. Keep these three in sync.
+     */
+    private static final int TOTAL_MODULES = 13;
+
     private StartupBanner() {
     }
 
@@ -37,7 +44,7 @@ public final class StartupBanner {
         log.info(pad("  ZDiscord v" + version));
         log.info(pad("  Platform: " + platform));
         log.info(pad("  Bot: " + botName + " \u2022 Guild: " + truncate(guildName, 20)));
-        log.info(pad("  Modules: " + activeModules + "/15 \u2022 Storage: " + storage));
+        log.info(pad("  Modules: " + activeModules + "/" + TOTAL_MODULES + " \u2022 Storage: " + storage));
         log.info(pad("  Startup: " + startupMs + "ms"));
         log.info("\u255A" + "\u2550".repeat(BOX_WIDTH) + "\u255D");
         log.info("");

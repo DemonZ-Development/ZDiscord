@@ -79,6 +79,8 @@ public class SetupCommand extends ListenerAdapter {
                 "TPS and memory alerts when thresholds are exceeded."));
         MODULES.put("achievements", new ModuleInfo("Achievements", "channels.achievements",
                 "Player advancement announcements."));
+        MODULES.put("confessions", new ModuleInfo("Confessions", "channels.confessions",
+                "Anonymous confessions via /confess."));
     }
 
     private static final List<String> MODULE_NAMES = new ArrayList<>(MODULES.keySet());

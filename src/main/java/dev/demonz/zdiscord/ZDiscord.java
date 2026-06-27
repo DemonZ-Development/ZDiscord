@@ -110,12 +110,14 @@ public class ZDiscord extends JavaPlugin {
         registerCommands();
 
 
-        ZDiscordProvider.register(new ZDiscordAPIImpl(this));
-        getServer().getServicesManager().register(
-                dev.demonz.zdiscord.api.ZDiscordAPI.class,
-                ZDiscordProvider.get(),
-                this,
-                org.bukkit.plugin.ServicePriority.Normal);
+        if (configManager.getBoolean("api.enabled", true)) {
+            ZDiscordProvider.register(new ZDiscordAPIImpl(this));
+            getServer().getServicesManager().register(
+                    dev.demonz.zdiscord.api.ZDiscordAPI.class,
+                    ZDiscordProvider.get(),
+                    this,
+                    org.bukkit.plugin.ServicePriority.Normal);
+        }
 
         if (configManager.getBoolean("misc.update-checker", true)) {
             new UpdateChecker(this);

@@ -1,4 +1,4 @@
-config-version: 4
+config-version: 5
 
 storage:
   # yaml = flatfile. mysql = requires a MySQL server running.
@@ -94,11 +94,7 @@ status:
 # can be viewed with /leaderboard on Discord.
 leaderboard:
   enabled: true
-  tracked-stats:
-    - KILLS
-    - DEATHS
-    - PLAYTIME
-  top-count: 10
+  # Number of entries shown per leaderboard page.
   per-page: 10
   panel-channel: ""
   panel-update-interval: 120
@@ -183,7 +179,8 @@ performance:
 
 reaction-roles:
   enabled: true
-  # Add mappings via /zdiscord reactionrole. See wiki for setup.
+  # Add mappings to the `mappings` list below.
+  # Each mapping: message-id, emoji, role-id, and (optional) minecraft permission.
   mappings: []
 
 misc:

@@ -363,7 +363,7 @@ public class SlashCommandManager extends ListenerAdapter {
                     : 0L;
 
             EmbedBuilder embed = new EmbedBuilder()
-                    .setAuthor(name + "  Â·  Last seen",
+                    .setAuthor(name + "  \u00B7  Last seen",
                             "https://namemc.com/profile/" + uuid,
                             HeadUtil.avatar(uuid, HeadUtil.SIZE_SMALL))
                     .setColor(ColorUtil.parseHex("#3498DB"))
@@ -530,7 +530,7 @@ public class SlashCommandManager extends ListenerAdapter {
                 .setAuthor(":love_letter: A new confession", null, null)
                 .setDescription(ColorUtil.toDiscordMarkdown(message))
                 .setColor(ColorUtil.parseHex(colorHex))
-                .setFooter(handle + "  Â·  posted at", null)
+                .setFooter(handle + "  \u00B7  posted at", null)
                 .setTimestamp(Instant.now());
 
         channel.sendMessageEmbeds(embed.build()).queue(

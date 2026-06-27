@@ -56,6 +56,14 @@ public class SetupCommand extends ListenerAdapter {
     private static final String BTN_DONE = "zdiscord_setup_ticket_done";
     private static final String BTN_CONFIRM_REMOVE = "zdiscord_setup_ticket_confirm_remove:";
 
+    private static final String LABEL_ADD = "\u2795 Add";
+    private static final String LABEL_EDIT = "\u270f\ufe0f Edit";
+    private static final String LABEL_REMOVE = "\ud83d\uddd1\ufe0f Remove";
+    private static final String LABEL_MOVE_UP = "\u2b06\ufe0f Move up";
+    private static final String LABEL_MOVE_DOWN = "\u2b07\ufe0f Move down";
+    private static final String LABEL_DONE = "\u2705 Done & post panel";
+    private static final String LABEL_CANCEL = "\u274c Cancel";
+
     private static final Map<String, ModuleInfo> MODULES = new LinkedHashMap<>();
 
     static {
@@ -375,11 +383,11 @@ public class SetupCommand extends ListenerAdapter {
 
         List<net.dv8tion.jda.api.interactions.components.LayoutComponent> rows = new ArrayList<>();
         rows.add(ActionRow.of(
-                Button.success(BTN_ADD, ":heavy_plus_sign: Add"),
-                Button.primary(BTN_EDIT, ":pencil2: Edit"),
-                Button.danger(BTN_REMOVE, ":wastebasket: Remove"),
-                Button.secondary(BTN_UP, ":arrow_up_small: Move up"),
-                Button.secondary(BTN_DOWN, ":arrow_down_small: Move down")));
+                Button.success(BTN_ADD, LABEL_ADD),
+                Button.primary(BTN_EDIT, LABEL_EDIT),
+                Button.danger(BTN_REMOVE, LABEL_REMOVE),
+                Button.secondary(BTN_UP, LABEL_MOVE_UP),
+                Button.secondary(BTN_DOWN, LABEL_MOVE_DOWN)));
 
         if (!cats.isEmpty()) {
 
@@ -404,7 +412,7 @@ public class SetupCommand extends ListenerAdapter {
             rows.add(ActionRow.of(select.build()));
         }
 
-        rows.add(ActionRow.of(Button.success(BTN_DONE, ":white_check_mark: Done & post panel")));
+        rows.add(ActionRow.of(Button.success(BTN_DONE, LABEL_DONE)));
 
         if (event instanceof SlashCommandInteractionEvent) {
             ((SlashCommandInteractionEvent) event).replyEmbeds(embed.build())
@@ -459,11 +467,11 @@ public class SetupCommand extends ListenerAdapter {
 
         List<net.dv8tion.jda.api.interactions.components.LayoutComponent> rows = new ArrayList<>();
         rows.add(ActionRow.of(
-                Button.success(BTN_ADD, ":heavy_plus_sign: Add"),
-                Button.primary(BTN_EDIT, ":pencil2: Edit"),
-                Button.danger(BTN_REMOVE, ":wastebasket: Remove"),
-                Button.secondary(BTN_UP, ":arrow_up_small: Move up"),
-                Button.secondary(BTN_DOWN, ":arrow_down_small: Move down")));
+                Button.success(BTN_ADD, LABEL_ADD),
+                Button.primary(BTN_EDIT, LABEL_EDIT),
+                Button.danger(BTN_REMOVE, LABEL_REMOVE),
+                Button.secondary(BTN_UP, LABEL_MOVE_UP),
+                Button.secondary(BTN_DOWN, LABEL_MOVE_DOWN)));
 
         StringSelectMenu.Builder select = StringSelectMenu.create(TICKET_CATEGORY_MENU_ID)
                 .setPlaceholder("Pick a category for the action")
@@ -484,7 +492,7 @@ public class SetupCommand extends ListenerAdapter {
             select.addOption(label, entry.getKey(), desc);
         }
         rows.add(ActionRow.of(select.build()));
-        rows.add(ActionRow.of(Button.success(BTN_DONE, ":white_check_mark: Done & post panel")));
+        rows.add(ActionRow.of(Button.success(BTN_DONE, LABEL_DONE)));
 
         event.editMessageEmbeds(embed.build()).setComponents(rows).queue();
     }
@@ -696,8 +704,8 @@ public class SetupCommand extends ListenerAdapter {
                         + "users just won't be able to open new ones in it.")
                 .build())
                 .addActionRow(
-                        Button.danger(BTN_CONFIRM_REMOVE + categoryId, ":wastebasket: Yes, remove"),
-                        Button.secondary(BTN_DONE, ":x: Cancel"))
+                        Button.danger(BTN_CONFIRM_REMOVE + categoryId, "\ud83d\uddd1\ufe0f Yes, remove"),
+                        Button.secondary(BTN_DONE, LABEL_CANCEL))
                 .setEphemeral(true)
                 .queue();
     }

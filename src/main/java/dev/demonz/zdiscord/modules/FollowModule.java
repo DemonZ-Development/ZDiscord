@@ -204,10 +204,10 @@ public class FollowModule {
     }
 
     public Button buildFollowButton(UUID target) {
-        return Button.success(FOLLOW_BUTTON_ID + ":" + target, ":bell: Follow");
+        return Button.success(FOLLOW_BUTTON_ID + ":" + target, "\ud83d\udd14 Follow");
     }
 
     public Button buildUnfollowButton(UUID target) {
-        return Button.secondary(UNFOLLOW_BUTTON_ID + ":" + target, ":no_bell: Unfollow");
+        return Button.secondary(UNFOLLOW_BUTTON_ID + ":" + target, "\ud83d\udd15 Unfollow");
     }
 }

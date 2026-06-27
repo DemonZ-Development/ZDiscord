@@ -8,6 +8,7 @@ import dev.demonz.zdiscord.discord.SlashCommandManager;
 import dev.demonz.zdiscord.discord.WebhookManager;
 import dev.demonz.zdiscord.api.ZDiscordAPIImpl;
 import dev.demonz.zdiscord.api.ZDiscordProvider;
+import dev.demonz.zdiscord.minecraft.commands.ConfessCommand;
 import dev.demonz.zdiscord.minecraft.commands.DiscordCommand;
 import dev.demonz.zdiscord.minecraft.commands.StaffChatCommand;
 import dev.demonz.zdiscord.minecraft.commands.ZDiscordCommand;
@@ -20,6 +21,7 @@ import dev.demonz.zdiscord.minecraft.listeners.PaperChatListener;
 import dev.demonz.zdiscord.minecraft.listeners.PaperStaffChatListener;
 import dev.demonz.zdiscord.modules.AntiRaidModule;
 import dev.demonz.zdiscord.modules.CommandLoggerModule;
+import dev.demonz.zdiscord.modules.ConfessionModule;
 import dev.demonz.zdiscord.modules.ConsoleModule;
 import dev.demonz.zdiscord.modules.EmbedBuilderModule;
 import dev.demonz.zdiscord.modules.FollowModule;
@@ -70,6 +72,7 @@ public class ZDiscord extends JavaPlugin {
     private VoiceStatusModule voiceStatusModule;
     private ConsoleModule consoleModule;
     private FollowModule followModule;
+    private ConfessionModule confessionModule;
 
     @Override
     public void onEnable() {
@@ -93,6 +96,7 @@ public class ZDiscord extends JavaPlugin {
         new org.bstats.bukkit.Metrics(this, 29652);
 
         botManager = new BotManager(this);
+        confessionModule = new ConfessionModule(this);
         slashCommandManager = new SlashCommandManager(this);
         setupCommand = new SetupCommand(this);
         if (!botManager.connect()) {
@@ -299,6 +303,10 @@ public class ZDiscord extends JavaPlugin {
             StaffChatCommand executor = new StaffChatCommand(this);
             sc.setExecutor(executor);
         }
+        org.bukkit.command.PluginCommand confess = getCommand("confess");
+        if (confess != null) {
+            confess.setExecutor(new ConfessCommand(this));
+        }
     }
 
     public void reload() {
@@ -408,6 +416,10 @@ public class ZDiscord extends JavaPlugin {
 
     public FollowModule getFollowModule() {
         return followModule;
+    }
+
+    public ConfessionModule getConfessionModule() {
+        return confessionModule;
     }
 
     public void debug(String message) {

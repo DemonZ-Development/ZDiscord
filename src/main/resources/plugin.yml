@@ -29,6 +29,10 @@ commands:
     usage: /<command> [message]
     permission: zdiscord.staffchat
     aliases: [staffchat]
+  confess:
+    description: Post an anonymous confession to the configured Discord channel
+    usage: /<command> <message>
+    permission: zdiscord.confess
 
 permissions:
   zdiscord.admin:
@@ -61,3 +65,6 @@ permissions:
   zdiscord.staffchat:
     description: Access to staff chat
     default: op
+  zdiscord.confess:
+    description: Allows posting anonymous confessions
+    default: true

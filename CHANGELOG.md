@@ -18,6 +18,7 @@ All notable changes to ZDiscord are documented here.
 - `ColorUtil.toDiscordMarkdown()` for `&l`, `&o`, `&n`, `&m` conversion.
 - `FollowModule` — in-memory cache with non-blocking DM dispatch.
 - `PlayerProfileBuilder` for profile card embeds with Discord username resolution.
+- In-game `/confess <message>` command for anonymous confessions.
 
 ### Changed
 - `config-version` bumped to 4. Default avatar changed to mc-heads.net.
@@ -36,6 +37,9 @@ All notable changes to ZDiscord are documented here.
 - `MySQLStorage.isFollowing` uses `SELECT COUNT(*)` instead of fetching all followers.
 - Profile card shows actual Discord username instead of raw ID.
 - Confession handles use monotonic counter instead of `hash % 10000`.
+- Confession embeds use a real love-letter emoji instead of a Discord shortcode.
+- Stat update events match the calling thread, fixing Paper quit-event crashes.
+- JDA SLF4J provider packaging fixed so startup does not use the fallback logger.
 - `/panel` no longer crashes in thread or forum channels.
 - `UpdateChecker` Discord announcement retries on failure.
 

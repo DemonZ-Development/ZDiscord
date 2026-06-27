@@ -18,7 +18,13 @@ public class ZDiscordStatUpdateEvent extends Event implements Cancellable {
 
     public ZDiscordStatUpdateEvent(UUID playerUUID, String stat,
                                    long oldValue, long newValue) {
-        super(true);
+        this(playerUUID, stat, oldValue, newValue, false);
+    }
+
+    public ZDiscordStatUpdateEvent(UUID playerUUID, String stat,
+                                   long oldValue, long newValue,
+                                   boolean async) {
+        super(async);
         this.playerUUID = playerUUID;
         this.stat = stat;
         this.oldValue = oldValue;

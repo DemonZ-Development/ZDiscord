@@ -109,6 +109,7 @@ User-facing strings live in `messages.yml`. They accept `&` colour codes and the
 | `/zdiscord dump` | `zdiscord.admin` | Write a diagnostics file |
 | `/discord` | `zdiscord.discord` | Show the Discord invite link |
 | `/sc [message]` | `zdiscord.staffchat` | Send to staff chat (toggle with no message) |
+| `/confess <message>` | `zdiscord.confess` | Post an anonymous confession |
 
 ### Discord slash commands
 

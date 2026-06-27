@@ -21,20 +21,12 @@ import org.bukkit.entity.Player;
 
 import java.time.Instant;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 
 public class SlashCommandManager extends ListenerAdapter {
 
     private final ZDiscord plugin;
-
-
-    private final ConcurrentHashMap<String, Long> confessionCooldowns = new ConcurrentHashMap<>();
-
-
-    private final AtomicInteger confessionCounter = new AtomicInteger(0);
 
     public SlashCommandManager(ZDiscord plugin) {
         this.plugin = plugin;
@@ -480,66 +472,7 @@ public class SlashCommandManager extends ListenerAdapter {
     }
 
     private void handleConfess(SlashCommandInteractionEvent event) {
-        String channelId = plugin.getConfigManager()
-                .getString("channels.confessions", "").trim();
-        if (channelId.isEmpty() || channelId.startsWith("YOUR_")) {
-            event.reply(":lock: Confessions are disabled on this server "
-                    + "(no `channels.confessions` is configured).")
-                    .setEphemeral(true).queue();
-            return;
-        }
-        var channel = plugin.getBotManager().getJda()
-                .getTextChannelById(channelId);
-        if (channel == null) {
-            event.reply(":lock: Confessions are disabled on this server "
-                    + "(the configured channel could not be found).")
-                    .setEphemeral(true).queue();
-            return;
-        }
-
-
-        long cooldownMs = plugin.getConfigManager()
-                .getInt("confessions.cooldown", 300) * 1000L;
-        String userId = event.getUser().getId();
-        long now = System.currentTimeMillis();
-        Long lastConfession = confessionCooldowns.get(userId);
-        if (lastConfession != null && (now - lastConfession) < cooldownMs) {
-            long remaining = (cooldownMs - (now - lastConfession)) / 1000;
-            event.reply(":clock1: You can confess again in " + remaining + " seconds.")
-                    .setEphemeral(true).queue();
-            return;
-        }
-
         String message = event.getOption("message").getAsString();
-        if (message.length() > 1500) {
-            event.reply(":lock: Your confession is too long (max 1500 characters).")
-                    .setEphemeral(true).queue();
-            return;
-        }
-
-
-
-
-        int handleNum = confessionCounter.incrementAndGet();
-        String handle = "Confessor #" + handleNum;
-
-        String colorHex = plugin.getConfigManager()
-                .getString("confessions.color", "#9B59B6");
-
-        EmbedBuilder embed = new EmbedBuilder()
-                .setAuthor(":love_letter: A new confession", null, null)
-                .setDescription(ColorUtil.toDiscordMarkdown(message))
-                .setColor(ColorUtil.parseHex(colorHex))
-                .setFooter(handle + "  \u00B7  posted at", null)
-                .setTimestamp(Instant.now());
-
-        channel.sendMessageEmbeds(embed.build()).queue(
-                success -> {
-                    confessionCooldowns.put(userId, now);
-                    event.reply(":white_check_mark: Your confession was posted anonymously.")
-                            .setEphemeral(true).queue();
-                },
-                error -> event.reply(":x: Failed to post your confession: "
-                        + error.getMessage()).setEphemeral(true).queue());
+        plugin.getConfessionModule().postFromDiscord(event, message);
     }
 }

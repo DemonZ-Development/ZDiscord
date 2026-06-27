@@ -156,7 +156,7 @@ public class LeaderboardModule {
                     return oldRef[0] + amount;
                 });
         ZDiscordStatUpdateEvent event = new ZDiscordStatUpdateEvent(
-                uuid, stat, oldRef[0], newValue);
+                uuid, stat, oldRef[0], newValue, !Bukkit.isPrimaryThread());
         Bukkit.getPluginManager().callEvent(event);
         if (event.isCancelled()) {
             statsCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>())
@@ -174,7 +174,7 @@ public class LeaderboardModule {
                     return value;
                 });
         ZDiscordStatUpdateEvent event = new ZDiscordStatUpdateEvent(
-                uuid, stat, oldRef[0], value);
+                uuid, stat, oldRef[0], value, !Bukkit.isPrimaryThread());
         Bukkit.getPluginManager().callEvent(event);
         if (event.isCancelled()) {
             statsCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>())

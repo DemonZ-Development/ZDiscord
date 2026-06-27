@@ -136,7 +136,7 @@ public class UpdateChecker implements Listener {
         EmbedBuilder embed = new EmbedBuilder()
                 .setTitle(":arrows_counterclockwise: ZDiscord update available")
                 .setDescription("A new version of **ZDiscord** is available. "
-                        + "No action is required â€” this is a quiet notice.\n\n"
+                        + "No action is required — this is a quiet notice.\n\n"
                         + "Installed: `v" + currentVersion + "`\n"
                         + "Latest: `v" + latestVersion + "`")
                 .setColor(0xF1C40F)

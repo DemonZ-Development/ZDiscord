@@ -151,13 +151,13 @@ public class SetupCommand extends ListenerAdapter {
                 statusLines.append(":white_check_mark: **").append(entry.getKey())
                         .append("** -> <#").append(val).append(">\n");
             } else {
-                statusLines.append(":black_square_for_button: ").append(entry.getKey()).append("\n");
+                statusLines.append(":black_square_button: ").append(entry.getKey()).append("\n");
             }
         }
 
         int catCount = getCategoriesFromConfig().size();
         String catLine = catCount == 0
-                ? ":black_square_for_button: ticket categories (none yet)"
+                ? ":black_square_button: ticket categories (none yet)"
                 : ":white_check_mark: " + catCount + " ticket categor"
                         + (catCount == 1 ? "y" : "ies") + " configured";
 
@@ -597,7 +597,7 @@ public class SetupCommand extends ListenerAdapter {
         modal.addActionRow(TextInput.create("emoji", "Emoji (optional)",
                 TextInputStyle.SHORT)
                 .setValue(existing == null || existing.emoji == null ? "" : existing.emoji)
-                .setPlaceholder("â“  âš¡  ðŸ›  (single emoji)")
+                .setPlaceholder("❓  ⚡  🐛  (single emoji)")
                 .setRequired(false)
                 .setMaxLength(8)
                 .build());

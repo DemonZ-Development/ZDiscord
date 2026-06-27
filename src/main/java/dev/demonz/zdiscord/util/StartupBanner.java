@@ -18,7 +18,7 @@ public final class StartupBanner {
         String platform = plugin.getPlatformAdapter().getPlatformName();
 
         String botName = "Not connected";
-        String guildName = "â€”";
+        String guildName = "—";
         if (plugin.getBotManager() != null && plugin.getBotManager().isConnected()) {
             botName = plugin.getBotManager().getJda().getSelfUser().getName();
             var guild = plugin.getBotManager().getGuild();
@@ -52,7 +52,7 @@ public final class StartupBanner {
 
     private static String truncate(String text, int maxLen) {
         if (text == null) {
-            return "â€”";
+            return "—";
         }
         if (text.length() <= maxLen) {
             return text;

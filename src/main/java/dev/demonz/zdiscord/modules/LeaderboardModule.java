@@ -342,7 +342,7 @@ public class LeaderboardModule {
             String value = formatStatValue(key, entry.getValue());
 
             sb.append(rank).append(" **").append(playerName).append("**")
-                    .append("  â€”  `").append(value).append("`\n")
+                    .append("  —  `").append(value).append("`\n")
                     .append("\u200B \u200B \u200B \u200B ").append(bar).append("\n");
         }
 
@@ -437,7 +437,7 @@ public class LeaderboardModule {
             String rank = i < 3 ? MEDALS[i] : "**" + (i + 1) + ".**";
             String bar = buildProgressBar(entry.getValue(), maxVal);
             sb.append(rank).append(" **").append(name).append("**")
-                    .append("  â€”  `").append(entry.getValue()).append(" followers`\n")
+                    .append("  —  `").append(entry.getValue()).append(" followers`\n")
                     .append("\u200B \u200B \u200B \u200B ").append(bar).append("\n");
         }
         embed.setDescription(sb.toString());

@@ -54,13 +54,13 @@ public final class PlayerProfileBuilder {
                 "profile.embed.color", "#9B59B6");
 
         EmbedBuilder embed = new EmbedBuilder()
-                .setAuthor(profile.name + "  Â·  Player profile",
+                .setAuthor(profile.name + "  ·  Player profile",
                         "https://namemc.com/profile/" + profile.uuid,
                         avatarSmall)
                 .setThumbnail(avatarLarge)
                 .setColor(ColorUtil.parseHex(color))
                 .setFooter("Requested by " + requestedBy
-                        + "  â€¢  ZDiscord v" + plugin.getDescription().getVersion(), null)
+                        + "  •  ZDiscord v" + plugin.getDescription().getVersion(), null)
                 .setTimestamp(Instant.now());
 
 

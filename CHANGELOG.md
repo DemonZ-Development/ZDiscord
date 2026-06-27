@@ -43,6 +43,7 @@ All notable changes to ZDiscord are documented here.
 - Ticket setup now uses the guided `/setup` wizard only and posts a ticket-specific setup flow.
 - Ticket creation ignores placeholder support-role IDs instead of aborting channel creation.
 - Setup and follow buttons use real emoji instead of Discord shortcode text.
+- Ticket panel dropdown values now submit category IDs instead of display labels.
 - `/panel` no longer crashes in thread or forum channels.
 - `UpdateChecker` Discord announcement retries on failure.
 

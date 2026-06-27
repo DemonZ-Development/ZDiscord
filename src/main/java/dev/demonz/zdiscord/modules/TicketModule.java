@@ -226,7 +226,17 @@ public class TicketModule {
         if (id == null) {
             return null;
         }
-        return getCategories().get(id);
+        Map<String, TicketCategory> cats = getCategories();
+        TicketCategory direct = cats.get(id);
+        if (direct != null) {
+            return direct;
+        }
+        for (TicketCategory category : cats.values()) {
+            if (id.equals(category.label) || id.equals(displayLabel(category))) {
+                return category;
+            }
+        }
+        return null;
     }
 
     public String defaultCategoryId() {
@@ -421,12 +431,11 @@ public class TicketModule {
                 .setMinValues(1)
                 .setMaxValues(1);
         for (TicketCategory c : cats.values()) {
-            String label = c.emoji.isEmpty() ? c.label
-                    : (c.emoji + " " + c.label);
+            String label = displayLabel(c);
             String desc = c.description != null && c.description.length() > 100
                     ? c.description.substring(0, 97) + "..."
                     : (c.description == null ? "" : c.description);
-            menu.addOption(c.id, label, desc);
+            menu.addOption(label, c.id, desc);
         }
 
         List<net.dv8tion.jda.api.interactions.components.LayoutComponent> rows = new ArrayList<>();
@@ -494,5 +503,11 @@ public class TicketModule {
 
     public static boolean isUsableSnowflake(String value) {
         return value != null && value.matches(SNOWFLAKE_PATTERN);
+    }
+
+    private static String displayLabel(TicketCategory category) {
+        return category.emoji.isEmpty()
+                ? category.label
+                : category.emoji + " " + category.label;
     }
 }

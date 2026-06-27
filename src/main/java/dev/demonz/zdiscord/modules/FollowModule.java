@@ -4,7 +4,6 @@ import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.api.events.ZDiscordFollowEvent;
 import dev.demonz.zdiscord.storage.StorageManager;
 import net.dv8tion.jda.api.EmbedBuilder;
-import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import org.bukkit.Bukkit;

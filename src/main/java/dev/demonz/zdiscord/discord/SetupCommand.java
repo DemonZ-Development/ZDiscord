@@ -1,6 +1,7 @@
 package dev.demonz.zdiscord.discord;
 
 import dev.demonz.zdiscord.ZDiscord;
+import dev.demonz.zdiscord.modules.TicketModule;
 import dev.demonz.zdiscord.util.ColorUtil;
 import dev.demonz.zdiscord.util.EmbedUtil;
 import dev.demonz.zdiscord.util.StatusEmbedBuilder;
@@ -10,13 +11,11 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
-import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.EntitySelectInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.interactions.commands.Command;
 import net.dv8tion.jda.api.interactions.components.ActionRow;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import net.dv8tion.jda.api.interactions.components.selections.EntitySelectMenu;
@@ -34,7 +33,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 
 public class SetupCommand extends ListenerAdapter {
@@ -69,7 +67,7 @@ public class SetupCommand extends ListenerAdapter {
                 "Join, quit, death, and advancement events."));
         MODULES.put("console", new ModuleInfo("Console", "channels.console",
                 "Server console output streamed to Discord."));
-        MODULES.put("tickets", new ModuleInfo("Tickets", "channels.ticket-category",
+        MODULES.put("tickets", new ModuleInfo("Tickets", "tickets.panel-channel",
                 "Support ticket system with private channels."));
         MODULES.put("staffchat", new ModuleInfo("Staff Chat", "staff-chat.channel",
                 "Private staff communication bridge."));
@@ -82,8 +80,6 @@ public class SetupCommand extends ListenerAdapter {
         MODULES.put("confessions", new ModuleInfo("Confessions", "channels.confessions",
                 "Anonymous confessions via /confess."));
     }
-
-    private static final List<String> MODULE_NAMES = new ArrayList<>(MODULES.keySet());
 
     public SetupCommand(ZDiscord plugin) {
         this.plugin = plugin;
@@ -100,32 +96,7 @@ public class SetupCommand extends ListenerAdapter {
             return;
         }
 
-        var moduleOption = event.getOption("module");
-        var channelOption = event.getOption("channel");
-        if (moduleOption != null && channelOption != null) {
-            String module = moduleOption.getAsString();
-            TextChannel target = channelOption.getAsChannel().asTextChannel();
-            quickSetup(event, module, target);
-            return;
-        }
         showWizardPanel(event);
-    }
-
-    @Override
-    public void onCommandAutoCompleteInteraction(CommandAutoCompleteInteractionEvent event) {
-        if (!"setup".equals(event.getName())) {
-            return;
-        }
-        if (!"module".equals(event.getFocusedOption().getName())) {
-            return;
-        }
-        String typed = event.getFocusedOption().getValue().toLowerCase();
-        List<Command.Choice> choices = MODULE_NAMES.stream()
-                .filter(name -> name.startsWith(typed))
-                .map(name -> new Command.Choice(name, name))
-                .limit(25)
-                .collect(Collectors.toList());
-        event.replyChoices(choices).queue();
     }
 
     private void showWizardPanel(SlashCommandInteractionEvent event) {
@@ -225,6 +196,11 @@ public class SetupCommand extends ListenerAdapter {
             return;
         }
 
+        if ("tickets".equals(module)) {
+            showTicketChannelPrompt(event);
+            return;
+        }
+
         EmbedBuilder prompt = new EmbedBuilder()
                 .setTitle(":gear: Configure " + capitalize(module))
                 .setDescription(info.description
@@ -270,16 +246,16 @@ public class SetupCommand extends ListenerAdapter {
         }
         TextChannel channel = (TextChannel) selectedChannel;
 
-        saveToConfig(info.configPath, channel.getId());
-
         switch (module) {
             case "status":
+                saveToConfig(info.configPath, channel.getId());
                 handleStatusSetup(event, channel);
                 return;
             case "tickets":
                 handleTicketSetup(event, channel);
                 return;
             default:
+                saveToConfig(info.configPath, channel.getId());
                 postActivationNotice(channel, info, event.getUser().getName());
                 event.replyEmbeds(EmbedUtil.success(
                         capitalize(module) + " has been linked to " + channel.getAsMention() + ".")
@@ -287,6 +263,29 @@ public class SetupCommand extends ListenerAdapter {
                         .setEphemeral(true).queue();
                 break;
         }
+    }
+
+    private void showTicketChannelPrompt(StringSelectInteractionEvent event) {
+        EmbedBuilder prompt = new EmbedBuilder()
+                .setTitle(":ticket: Ticket Setup  \u2014  Step 1 of 3")
+                .setDescription("Select the text channel where ZDiscord should post the public ticket panel.\n\n"
+                        + "Private tickets will be created in that channel's category. "
+                        + "If the channel is not inside a category, tickets will be created at the server root.")
+                .setColor(ColorUtil.parseHex("#5865F2"))
+                .setFooter("Step 1/3  \u2022  Select ticket panel channel")
+                .setTimestamp(Instant.now());
+
+        EntitySelectMenu channelMenu = EntitySelectMenu.create(
+                CHANNEL_MENU_PREFIX + "tickets", EntitySelectMenu.SelectTarget.CHANNEL)
+                .setPlaceholder("Select the ticket panel channel")
+                .setMinValues(1)
+                .setMaxValues(1)
+                .build();
+
+        event.replyEmbeds(prompt.build())
+                .addActionRow(channelMenu)
+                .setEphemeral(true)
+                .queue();
     }
 
     private void handleStatusSetup(EntitySelectInteractionEvent event, TextChannel channel) {
@@ -321,6 +320,8 @@ public class SetupCommand extends ListenerAdapter {
         saveToConfig("tickets.panel-channel", channel.getId());
         if (channel.getParentCategory() != null) {
             saveToConfig("channels.ticket-category", channel.getParentCategory().getId());
+        } else {
+            saveToConfig("channels.ticket-category", "");
         }
 
         EmbedBuilder rolePrompt = new EmbedBuilder()
@@ -670,7 +671,7 @@ public class SetupCommand extends ListenerAdapter {
         if (!list.isEmpty()) {
             roleId = list.get(0);
         }
-        if (roleId == null) {
+        if (!TicketModule.isUsableSnowflake(roleId)) {
             return "(unset)";
         }
         Guild guild = event.getGuild();
@@ -770,29 +771,6 @@ public class SetupCommand extends ListenerAdapter {
             return;
         }
         plugin.getTicketModule().postPanel(channel);
-    }
-
-    private void quickSetup(SlashCommandInteractionEvent event, String module, TextChannel target) {
-        ModuleInfo info = MODULES.get(module);
-        if (info == null) {
-            event.reply("Unknown module: `" + module + "`. Available: "
-                    + String.join(", ", MODULE_NAMES)).setEphemeral(true).queue();
-            return;
-        }
-
-        saveToConfig(info.configPath, target.getId());
-
-        if ("tickets".equals(module) && target.getParentCategory() != null) {
-            saveToConfig("channels.ticket-category", target.getParentCategory().getId());
-            postTicketPanel(target);
-        }
-
-        postActivationNotice(target, info, event.getUser().getName());
-
-        event.replyEmbeds(EmbedUtil.success(
-                capitalize(module) + " linked to " + target.getAsMention() + ".")
-                .build())
-                .setEphemeral(true).queue();
     }
 
     private void postActivationNotice(TextChannel channel, ModuleInfo info, String username) {

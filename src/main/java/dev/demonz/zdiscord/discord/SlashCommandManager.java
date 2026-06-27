@@ -52,12 +52,7 @@ public class SlashCommandManager extends ListenerAdapter {
                 Commands.slash("leaderboard", "View player leaderboards")
                         .addOption(OptionType.STRING, "stat",
                                 "Stat to view (kills, deaths, playtime)", true),
-                Commands.slash("setup", "Open the ZDiscord setup wizard")
-                        .addOption(OptionType.STRING, "module",
-                                "Quick setup: module name (chat, status, events, etc.)",
-                                false, true)
-                        .addOption(OptionType.CHANNEL, "channel",
-                                "Quick setup: target channel", false),
+                Commands.slash("setup", "Open the ZDiscord setup wizard"),
                 Commands.slash("profile", "View a Minecraft player's profile card")
                         .addOption(OptionType.STRING, "player",
                                 "Player name (omit for yourself)", false),

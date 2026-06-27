@@ -1,4 +1,4 @@
-config-version: 5
+config-version: 6
 
 storage:
   # yaml = flatfile. mysql = requires a MySQL server running.
@@ -107,8 +107,7 @@ leaderboard:
 tickets:
   enabled: true
   # Staff roles that can see all tickets. Paste role IDs here.
-  support-roles:
-    - "YOUR_SUPPORT_ROLE_ID"
+  support-roles: []
   max-per-user: 3
   # Tickets auto-close after this many hours of inactivity. 0 = never.
   auto-close-hours: 48

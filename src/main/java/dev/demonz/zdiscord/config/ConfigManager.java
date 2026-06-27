@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
@@ -18,7 +19,7 @@ import java.util.logging.Logger;
 public class ConfigManager {
 
 
-    public static final int CURRENT_VERSION = 5;
+    public static final int CURRENT_VERSION = 6;
 
     private final File dataFolder;
     private final Logger logger;
@@ -45,6 +46,7 @@ public class ConfigManager {
         saveDefaultConfig();
         reload();
         migrateIfNeeded();
+        sanitizePlaceholders();
     }
 
     private void saveDefaultConfig() {
@@ -166,6 +168,28 @@ public class ConfigManager {
             config.save(configFile);
         } catch (IOException e) {
             logger.severe("Failed to save config: " + e.getMessage());
+        }
+    }
+
+    private void sanitizePlaceholders() {
+        List<String> roles = config.getStringList("tickets.support-roles");
+        if (roles.isEmpty()) {
+            return;
+        }
+
+        List<String> clean = new ArrayList<>();
+        boolean changed = false;
+        for (String role : roles) {
+            if (role == null || role.isBlank() || role.startsWith("YOUR_")) {
+                changed = true;
+            } else {
+                clean.add(role);
+            }
+        }
+
+        if (changed) {
+            config.set("tickets.support-roles", clean);
+            save();
         }
     }
 }

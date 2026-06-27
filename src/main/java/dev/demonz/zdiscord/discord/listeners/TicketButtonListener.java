@@ -5,7 +5,9 @@ import dev.demonz.zdiscord.modules.TicketModule;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.interactions.InteractionHook;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -68,9 +70,7 @@ public class TicketButtonListener extends ListenerAdapter {
             return;
         }
         String categoryId = event.getValues().get(0);
-        plugin.getTicketModule().createTicketForCategory(event.getUser(), categoryId);
-        event.reply("Your support ticket has been created. Check the new channel.")
-                .setEphemeral(true).queue();
+        createTicketFromInteraction(event, event.getUser(), categoryId);
     }
 
     private void handleQuickOpen(ButtonInteractionEvent event) {
@@ -84,9 +84,28 @@ public class TicketButtonListener extends ListenerAdapter {
                     .setEphemeral(true).queue();
             return;
         }
-        plugin.getTicketModule().createTicketForCategory(event.getUser(), defaultId);
-        event.reply("Your support ticket has been created. Check the new channel.")
-                .setEphemeral(true).queue();
+        createTicketFromInteraction(event, event.getUser(), defaultId);
+    }
+
+    private void createTicketFromInteraction(
+            net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent event,
+            User user,
+            String categoryId) {
+        if (event instanceof ButtonInteractionEvent) {
+            ((ButtonInteractionEvent) event).deferReply(true).queue(
+                    hook -> completeTicketCreate(hook, user, categoryId));
+        } else if (event instanceof StringSelectInteractionEvent) {
+            ((StringSelectInteractionEvent) event).deferReply(true).queue(
+                    hook -> completeTicketCreate(hook, user, categoryId));
+        }
+    }
+
+    private void completeTicketCreate(InteractionHook hook, User user, String categoryId) {
+        plugin.getPlatformAdapter().runAsync(() -> {
+            String message = plugin.getTicketModule()
+                    .createTicketForCategory(user, categoryId);
+            hook.sendMessage(message).queue();
+        });
     }
 
     private void handleClose(ButtonInteractionEvent event) {

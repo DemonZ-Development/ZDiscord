@@ -31,6 +31,7 @@ public class TicketModule {
 
     public static final String PANEL_BUTTON_ID = "zdiscord_create_ticket";
     public static final String PANEL_SELECT_ID = "zdiscord_ticket_category";
+    private static final String SNOWFLAKE_PATTERN = "\\d{17,20}";
 
     private final ZDiscord plugin;
     private final Map<String, Integer> openTicketsByUser = new ConcurrentHashMap<>();
@@ -108,55 +109,52 @@ public class TicketModule {
 
     public void createTicket(User user, String subject, String categoryId,
                              SlashCommandInteractionEvent event) {
+        String message = createTicketMessage(user, subject, categoryId);
+        if (event != null) {
+            event.reply(message).setEphemeral(true).queue();
+        }
+    }
+
+    private String createTicketMessage(User user, String subject, String categoryId) {
         if (!canCreate(user.getId(), user.getId())) {
             int max = plugin.getConfigManager().getInt("tickets.max-per-user", 3);
-            if (event != null) {
-                event.reply("You have reached the maximum number of open tickets ("
-                        + max + ").").setEphemeral(true).queue();
-            }
-            return;
+            return "You have reached the maximum number of open tickets (" + max + ").";
         }
 
         TicketCategory cat = getCategory(categoryId);
         String finalCategory = cat != null ? cat.id : defaultCategoryId();
+        if (finalCategory == null) {
+            return "No default ticket category is configured.";
+        }
+        TicketCategory finalCat = getCategory(finalCategory);
         String effectiveSubject = subject != null && !subject.isBlank()
                 ? subject
-                : (cat != null ? cat.label : "Support");
-
+                : (finalCat != null ? finalCat.label : "Support");
         TextChannel channel = createTicketChannel(
                 user.getName(), effectiveSubject, finalCategory, user.getId());
-        if (channel != null) {
-            markOpened(user.getId());
-            if (event != null) {
-                event.reply("Ticket created. See " + channel.getAsMention())
-                        .setEphemeral(true).queue();
-            }
-        } else if (event != null) {
-            event.reply("Failed to create ticket. Please contact an admin.")
-                    .setEphemeral(true).queue();
+        if (channel == null) {
+            return "Failed to create ticket. Please contact an admin.";
         }
+        markOpened(user.getId());
+        return "Ticket created. See " + channel.getAsMention();
     }
 
-    public void createTicketForCategory(User user, String categoryId) {
+    public String createTicketForCategory(User user, String categoryId) {
         if (!canCreate(user.getId(), user.getId())) {
             int max = plugin.getConfigManager().getInt("tickets.max-per-user", 3);
-            user.openPrivateChannel().queue(pc ->
-                    pc.sendMessage("You have reached the maximum number of open tickets ("
-                            + max + ").").queue());
-            return;
+            return "You have reached the maximum number of open tickets (" + max + ").";
         }
         TicketCategory cat = getCategory(categoryId);
         if (cat == null) {
-            user.openPrivateChannel().queue(pc ->
-                    pc.sendMessage("That ticket category is no longer available.").queue());
-            return;
+            return "That ticket category is no longer available.";
         }
         TextChannel channel = createTicketChannel(
                 user.getName(), cat.label, cat.id, user.getId());
         if (channel == null) {
-            user.openPrivateChannel().queue(pc ->
-                    pc.sendMessage("Failed to create ticket. Please contact an admin.").queue());
+            return "Failed to create ticket. Please contact an admin.";
         }
+        markOpened(user.getId());
+        return "Ticket created. See " + channel.getAsMention();
     }
 
 
@@ -274,7 +272,7 @@ public class TicketModule {
 
         String categoryChannelId = plugin.getConfigManager().getString("channels.ticket-category");
         Category category = null;
-        if (categoryChannelId != null && !categoryChannelId.isEmpty()) {
+        if (isUsableSnowflake(categoryChannelId)) {
             category = guild.getCategoryById(categoryChannelId);
         }
 
@@ -297,6 +295,9 @@ public class TicketModule {
                     EnumSet.of(Permission.VIEW_CHANNEL));
 
             for (String roleId : plugin.getConfigManager().getStringList("tickets.support-roles")) {
+                if (!isUsableSnowflake(roleId)) {
+                    continue;
+                }
                 var role = guild.getRoleById(roleId);
                 if (role != null) {
                     builder = builder.addPermissionOverride(role,
@@ -489,5 +490,9 @@ public class TicketModule {
             }
         }
         return result;
+    }
+
+    public static boolean isUsableSnowflake(String value) {
+        return value != null && value.matches(SNOWFLAKE_PATTERN);
     }
 }

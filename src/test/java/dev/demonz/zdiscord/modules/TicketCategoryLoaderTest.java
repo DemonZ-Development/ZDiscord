@@ -118,4 +118,16 @@ class TicketCategoryLoaderTest {
         Map<String, TicketCategory> cats = TicketModule.loadCategories(cfg);
         assertNull(cats.get("nonexistent"));
     }
+
+    @Test
+    void placeholderRoleIdIsNotUsableSnowflake() {
+        assertFalse(TicketModule.isUsableSnowflake("YOUR_SUPPORT_ROLE_ID"));
+        assertFalse(TicketModule.isUsableSnowflake(""));
+        assertFalse(TicketModule.isUsableSnowflake(null));
+    }
+
+    @Test
+    void numericRoleIdIsUsableSnowflake() {
+        assertTrue(TicketModule.isUsableSnowflake("123456789012345678"));
+    }
 }

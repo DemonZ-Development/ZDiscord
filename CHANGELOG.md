@@ -40,6 +40,8 @@ All notable changes to ZDiscord are documented here.
 - Confession embeds use a real love-letter emoji instead of a Discord shortcode.
 - Stat update events match the calling thread, fixing Paper quit-event crashes.
 - JDA SLF4J provider packaging fixed so startup does not use the fallback logger.
+- Ticket setup now uses the guided `/setup` wizard only and posts a ticket-specific setup flow.
+- Ticket creation ignores placeholder support-role IDs instead of aborting channel creation.
 - `/panel` no longer crashes in thread or forum channels.
 - `UpdateChecker` Discord announcement retries on failure.
 

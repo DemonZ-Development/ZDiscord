@@ -61,8 +61,8 @@ class ConfigManagerTest {
         ConfigManager mgr = newManager(tmp.toFile());
         var roles = mgr.getStringList("tickets.support-roles");
         assertNotNull(roles);
-        assertFalse(roles.isEmpty(),
-                "Default tickets.support-roles should have at least one placeholder");
+        assertTrue(roles.isEmpty(),
+                "Default tickets.support-roles should not contain placeholder role IDs");
     }
 
     @Test
@@ -96,5 +96,23 @@ class ConfigManagerTest {
                 "Existing values must be preserved across migration");
 
         assertEquals(ConfigManager.CURRENT_VERSION, mgr.getInt("config-version", 0));
+    }
+
+    @Test
+    void removesPlaceholderSupportRoles(@TempDir Path tmp) throws IOException {
+        Path cfg = Paths.get(tmp.toString(), "config.yml");
+        Files.writeString(cfg, """
+                config-version: 6
+                tickets:
+                  support-roles:
+                    - YOUR_SUPPORT_ROLE_ID
+                    - 123456789012345678
+                """);
+
+        ConfigManager mgr = newManager(tmp.toFile());
+        var roles = mgr.getStringList("tickets.support-roles");
+
+        assertEquals(1, roles.size());
+        assertEquals("123456789012345678", roles.get(0));
     }
 }

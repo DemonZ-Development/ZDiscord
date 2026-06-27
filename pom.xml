@@ -106,11 +106,21 @@
             <scope>compile</scope>
         </dependency>
 
+        <!-- SLF4J backend for JDA. JDA 5.x pulls slf4j-api 2.0.x, so the
+             binding must also be 2.0.x (1.7.x uses a static binder that
+             slf4j-api 2.0 cannot discover, which produces
+             "No SLF4J providers were found" and falls back to a NOP
+             logger). We use slf4j-jdk14 (not slf4j-simple) so JDA logs
+             route through java.util.logging, which Paper/Bukkit capture
+             and format as normal plugin log lines — avoiding the
+             System.err "Nag author" warning slf4j-simple would trigger.
+             Must be compile scope so it is shaded into the jar. -->
         <dependency>
             <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <version>1.7.36</version>
-            <scope>provided</scope> </dependency>
+            <artifactId>slf4j-jdk14</artifactId>
+            <version>2.0.13</version>
+            <scope>compile</scope>
+        </dependency>
 
         <!-- Test dependencies -->
         <dependency>
@@ -222,6 +232,14 @@
                         </filter>
                     </filters>
                     <minimizeJar>false</minimizeJar>
+                    <!-- Relocate the FQCNs inside META-INF/services files
+                         so SLF4J 2.0's ServiceLoader finds the relocated
+                         provider (e.g. JULServiceProvider). Without this,
+                         the relocated slf4j-jdk14 binding is never wired
+                         up and SLF4J silently falls back to NOP. -->
+                    <transformers>
+                        <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                    </transformers>
                 </configuration>
                 <executions>
                     <execution>

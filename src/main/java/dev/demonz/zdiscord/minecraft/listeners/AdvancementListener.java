@@ -101,7 +101,6 @@ public class AdvancementListener implements Listener {
                 error -> plugin.debug("Failed to send advancement embed: " + error.getMessage()));
     }
 
-    // "nether_get_wither_skull" -> "Nether Get Wither Skull"
     private String formatAdvancementName(String key) {
         if (key.contains("/")) {
             key = key.substring(key.lastIndexOf('/') + 1);

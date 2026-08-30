@@ -44,7 +44,6 @@ public class LeaderboardModule {
     private final ZDiscord plugin;
     private final Map<UUID, Map<String, Long>> statsCache = new ConcurrentHashMap<>();
     private final Map<String, CachedLeaderboard> sortedCache = new ConcurrentHashMap<>();
-    // /leaderboard replies that keep editing themselves; keyed by message id
     private final Map<String, LiveBoard> liveBoards = new ConcurrentHashMap<>();
     private static final long LIVE_BOARD_MAX_SECONDS = 30L * 60L;
     private String panelMessageId;
@@ -168,8 +167,6 @@ public class LeaderboardModule {
         }
         var playerStats = statsCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>());
 
-        // compare-and-set loop so a cancelled event can't roll back somebody
-        // else's increment that landed while we were firing it
         while (true) {
             long current = playerStats.getOrDefault(stat, 0L);
             long updated = current + amount;
@@ -258,8 +255,6 @@ public class LeaderboardModule {
         armLiveBoardTick(board);
     }
 
-    // self-rescheduling loop - each tick edits the message with fresh data,
-    // until it hits the lifetime cap, the message dies, or the plugin stops
     private void armLiveBoardTick(LiveBoard board) {
         plugin.getPlatformAdapter().runLater(
                 () -> refreshLiveBoard(board), liveBoardPeriodTicks());
@@ -346,7 +341,6 @@ public class LeaderboardModule {
         return true;
     }
 
-    // auto-refresh follows whatever the user last browsed to on this message
     private void trackLiveBoardState(String messageId, String stat, int page) {
         LiveBoard board = liveBoards.get(messageId);
         if (board != null) {
@@ -441,9 +435,6 @@ public class LeaderboardModule {
                 .setColor(ColorUtil.parseHex("#9B59B6"))
                 .setTimestamp(Instant.now());
 
-        // read straight from storage - the in-memory follower view only
-        // covers players who joined recently, which used to make this panel
-        // miss most of the data
         List<Map.Entry<UUID, Integer>> ranked =
                 plugin.getStorageManager().getTopFollowedPlayers(Integer.MAX_VALUE);
 

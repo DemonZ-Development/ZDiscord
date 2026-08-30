@@ -31,8 +31,6 @@ public class MySQLStorage implements StorageManager {
 
     private void runTrackedAsync(Runnable task) {
         pendingOps.incrementAndGet();
-        // once the pool is closing, queued tasks would just get cancelled by
-        // the scheduler teardown - run them on the caller thread instead
         if (shuttingDown) {
             try {
                 task.run();
@@ -60,8 +58,6 @@ public class MySQLStorage implements StorageManager {
         boolean useSsl = plugin.getConfigManager().getBoolean("storage.mysql.use-ssl", true);
         boolean verifyCert = plugin.getConfigManager().getBoolean("storage.mysql.ssl-verify-certificate", false);
 
-        // encrypted by default, but cert verification is opt-in since most self-hosted
-        // MySQL servers don't have a CA-signed certificate
         String jdbcUrl = "jdbc:mysql://" + host + ":" + port + "/" + database
                 + "?autoReconnect=true"
                 + (useSsl
@@ -141,7 +137,6 @@ public class MySQLStorage implements StorageManager {
     @Override
     public void shutdown() {
         shuttingDown = true;
-        // Give in-flight async writes a moment to finish before closing the pool
         if (pendingOps.get() > 0) {
             plugin.getLogger().info("Waiting for " + pendingOps.get() + " pending MySQL operations...");
             long deadline = System.currentTimeMillis() + 5000;

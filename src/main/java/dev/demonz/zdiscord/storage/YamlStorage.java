@@ -485,7 +485,6 @@ public class YamlStorage implements StorageManager {
             }
         }
 
-        // when the timer is gone (disabled or no scheduler), writes must hit disk right away
         private boolean flushIsScheduled() {
             return running && platform != null && enabledSupplier.getAsBoolean();
         }

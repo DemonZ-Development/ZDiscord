@@ -21,21 +21,18 @@ public interface StorageManager {
         return -1;
     }
 
-    // Links
     Map<UUID, String> loadLinks();
 
     void saveLink(UUID playerUUID, String discordId);
 
     void removeLink(UUID playerUUID);
 
-    // Stats
     Map<UUID, Map<String, Long>> loadStats();
 
     void saveStat(UUID playerUUID, String stat, long value);
 
     List<Map.Entry<UUID, Long>> getTopStats(String stat, int limit);
 
-    // Misc key/value data
     String getData(String key);
 
     String getData(String key, String defaultValue);
@@ -46,7 +43,6 @@ public interface StorageManager {
 
     void setData(String key, int value);
 
-    // Player activity
     void setLastSeen(UUID playerUUID, long millis);
 
     long getLastSeen(UUID playerUUID);
@@ -59,7 +55,6 @@ public interface StorageManager {
 
     long getSessions(UUID playerUUID);
 
-    // Advancements
     void recordAdvancementUnlock(UUID playerUUID, String advancementKey);
 
     boolean recordAdvancementUnlockIfNew(UUID playerUUID, String advancementKey);
@@ -70,7 +65,6 @@ public interface StorageManager {
 
     int getAdvancementActivePlayerCount();
 
-    // Follows
     void addFollower(UUID playerUUID, String discordId);
 
     void removeFollower(UUID playerUUID, String discordId);

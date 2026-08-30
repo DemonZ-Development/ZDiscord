@@ -83,7 +83,6 @@ public class SlashCommandManager extends ListenerAdapter {
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        // /setup has its own wizard handler
         if ("setup".equals(event.getName())) return;
 
         switch (event.getName()) {
@@ -120,8 +119,6 @@ public class SlashCommandManager extends ListenerAdapter {
     }
 
     private void handlePlayers(SlashCommandInteractionEvent event) {
-        // snapshot the player list on the main thread - iterating the live
-        // collection from here races with joins/quits
         List<String> names;
         try {
             names = plugin.getPlatformAdapter().supplySync(() -> {
@@ -211,8 +208,6 @@ public class SlashCommandManager extends ListenerAdapter {
             event.reply("The ticket system is disabled in config.yml.").setEphemeral(true).queue();
             return;
         }
-        // channel creation is a blocking REST round trip - keep it off the
-        // gateway thread or every other Discord event stalls behind it
         User user = event.getUser();
         String subject = event.getOption("subject").getAsString();
         plugin.getPlatformAdapter().runAsync(() ->

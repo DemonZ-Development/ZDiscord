@@ -57,8 +57,6 @@ public class FollowModule {
                 return cached.size();
             }
         }
-        // not in memory = they haven't joined this session; ask storage so
-        // /profile doesn't show 0 followers for everyone
         return plugin.getStorageManager().getFollowers(playerUUID).size();
     }
 
@@ -109,7 +107,6 @@ public class FollowModule {
                 "follow.join-notification-cooldown", 300) * 1000L;
         long now = System.currentTimeMillis();
 
-        // keep the map from growing forever on busy servers
         if (lastJoinNotification.size() > 1000) {
             lastJoinNotification.values().removeIf(t -> now - t >= cooldownMs);
         }

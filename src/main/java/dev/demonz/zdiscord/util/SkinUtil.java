@@ -20,7 +20,6 @@ public final class SkinUtil {
 
     private static final long CACHE_TTL_MS = 15L * 60L * 1000L;
     private static final int CACHE_MAX_ENTRIES = 2048;
-    // Floodgate hands out UUIDs in this fixed range for Bedrock players
     private static final String FLOODGATE_PREFIX = "00000000-0000-0000-0009-";
     private static final String HEAD_URL = "https://mc-heads.net/avatar/%s/%d";
 
@@ -75,7 +74,6 @@ public final class SkinUtil {
             getSkinTextureHash = textureHash;
             log.info("SkinsRestorer detected - using real skins for profile pictures.");
         } catch (ClassNotFoundException e) {
-            // not installed, default avatars are fine
         } catch (Exception e) {
             log.warning("SkinsRestorer API is incompatible (" + e.getMessage()
                     + "); falling back to default avatars.");
@@ -129,8 +127,6 @@ public final class SkinUtil {
     }
 
     private static String fallbackUrl(UUID uuid, String name, int size) {
-        // Bedrock players have no Mojang account behind their UUID, so ask
-        // by name instead and hope mc-heads knows them
         if (name != null && !name.isEmpty() && isBedrockUuid(uuid)) {
             return String.format(Locale.ROOT, HEAD_URL, name, size);
         }

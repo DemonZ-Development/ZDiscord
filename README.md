@@ -61,7 +61,7 @@ ZDiscord connects your Minecraft server to Discord. Chat flows both ways, player
 
 ## Installation
 
-1. Download `ZDiscord-1.3.0.jar` from the [Releases](https://github.com/DemonZ-Development/ZDiscord/releases) page.
+1. Download `ZDiscord-1.3.1.jar` from the [Releases](https://github.com/DemonZ-Development/ZDiscord/releases) page.
 2. Place the JAR in your server's `plugins/` directory.
 3. Start the server to generate the default `config.yml` and `messages.yml`.
 4. Open `plugins/ZDiscord/config.yml` and set:
@@ -143,7 +143,7 @@ cd ZDiscord
 mvn clean package
 ```
 
-The shaded JAR is written to `target/ZDiscord-1.3.0.jar`.
+The shaded JAR is written to `target/ZDiscord-1.3.1.jar`.
 
 ## Developer API
 

@@ -511,7 +511,6 @@ public class SetupCommand extends ListenerAdapter {
         }
     }
 
-    // the selected category id is stashed in the embed footer for the action buttons
     private String lastSelectedCategory(List<MessageEmbed> embeds) {
         if (embeds.isEmpty()) return null;
         var footer = embeds.get(0).getFooter();
@@ -734,7 +733,6 @@ public class SetupCommand extends ListenerAdapter {
         var config = plugin.getConfigManager().getConfig();
         Map<String, CategoryDraft> out = new LinkedHashMap<>();
 
-        // newer configs store categories as a map; older ones as a list — read both
         ConfigurationSection sec = config.getConfigurationSection("tickets.categories");
         if (sec != null) {
             for (String id : sec.getKeys(false)) {

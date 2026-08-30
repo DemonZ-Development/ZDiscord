@@ -47,7 +47,6 @@ public class StaffChatCommand implements CommandExecutor, Listener {
         return true;
     }
 
-    // Legacy (Spigot) chat hook for toggled staff chat; Paper uses PaperStaffChatListener.
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onChat(AsyncPlayerChatEvent event) {
         if (plugin.getStaffChatModule() == null) return;

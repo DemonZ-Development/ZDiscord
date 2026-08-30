@@ -92,7 +92,6 @@ public class JoinQuitListener implements Listener {
         long now = System.currentTimeMillis();
 
         if (plugin.getBotManager() != null) {
-            // give the player a tick to actually leave so the count is right
             plugin.getPlatformAdapter().runLater(
                     () -> plugin.getPlatformAdapter().runAsync(plugin.getBotManager()::updateActivity), 2L);
         }

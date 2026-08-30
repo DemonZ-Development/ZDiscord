@@ -74,7 +74,6 @@ public final class ChatBridge {
 
             plugin.getWebhookManager().sendWebhookMessage(chatChannel, webhookName, resolvedAvatar, message);
         } else {
-            // no webhooks configured, fall back to a plain bot message
             String name;
             if (preferLinkedName && linkedMember != null) {
                 name = linkedMember.getEffectiveName() + " (" + player.getName() + ")";

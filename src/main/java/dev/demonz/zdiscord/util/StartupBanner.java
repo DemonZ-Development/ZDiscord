@@ -2,14 +2,12 @@ package dev.demonz.zdiscord.util;
 
 import dev.demonz.zdiscord.ZDiscord;
 
+import java.util.Arrays;
 import java.util.logging.Logger;
 
 public final class StartupBanner {
 
     private static final int BOX_WIDTH = 46;
-
-    // Keep in sync with the module fields on ZDiscord + countActiveModules below.
-    private static final int TOTAL_MODULES = 13;
 
     private StartupBanner() {
     }
@@ -27,7 +25,24 @@ public final class StartupBanner {
             if (guild != null) guildName = guild.getName();
         }
 
-        int activeModules = countActiveModules(plugin);
+        ModuleCount moduleCount = countModules(
+                plugin.getStatusModule(),
+                plugin.getLiveStatsModule(),
+                plugin.getLeaderboardModule(),
+                plugin.getTicketModule(),
+                plugin.getLinkModule(),
+                plugin.getAntiRaidModule(),
+                plugin.getPerformanceModule(),
+                plugin.getReactionRoleModule(),
+                plugin.getEmbedBuilderModule(),
+                plugin.getCommandLoggerModule(),
+                plugin.getStaffChatModule(),
+                plugin.getVoiceStatusModule(),
+                plugin.getConsoleModule(),
+                plugin.getFollowModule(),
+                plugin.getConfessionModule(),
+                plugin.getIntegrationModule()
+        );
         String storage = plugin.getStorageManager() != null
                 ? plugin.getStorageManager().getTypeName() : "none";
 
@@ -37,7 +52,7 @@ public final class StartupBanner {
         log.info(pad("  ZDiscord v" + version));
         log.info(pad("  Platform: " + platform));
         log.info(pad("  Bot: " + botName + " | Guild: " + truncate(guildName, 20)));
-        log.info(pad("  Modules: " + activeModules + "/" + TOTAL_MODULES + " | Storage: " + storage));
+        log.info(pad("  Modules: " + moduleCount.active() + "/" + moduleCount.total() + " | Storage: " + storage));
         log.info(pad("  Startup: " + startupMs + "ms"));
         log.info(bar);
         log.info("");
@@ -56,21 +71,13 @@ public final class StartupBanner {
         return text.substring(0, maxLen - 1) + "..";
     }
 
-    private static int countActiveModules(ZDiscord plugin) {
-        int count = 0;
-        if (plugin.getStatusModule() != null) count++;
-        if (plugin.getLeaderboardModule() != null) count++;
-        if (plugin.getTicketModule() != null) count++;
-        if (plugin.getLinkModule() != null) count++;
-        if (plugin.getAntiRaidModule() != null) count++;
-        if (plugin.getPerformanceModule() != null) count++;
-        if (plugin.getReactionRoleModule() != null) count++;
-        if (plugin.getEmbedBuilderModule() != null) count++;
-        if (plugin.getCommandLoggerModule() != null) count++;
-        if (plugin.getStaffChatModule() != null) count++;
-        if (plugin.getVoiceStatusModule() != null) count++;
-        if (plugin.getConsoleModule() != null) count++;
-        if (plugin.getFollowModule() != null) count++;
-        return count;
+    static ModuleCount countModules(Object... modules) {
+        return new ModuleCount(
+                Arrays.stream(modules).filter(module -> module != null).count(),
+                modules.length
+        );
+    }
+
+    record ModuleCount(long active, int total) {
     }
 }

@@ -36,7 +36,6 @@ public final class ZLogger {
     public static void init(Logger bukkitLogger, FileConfiguration config) {
         bukkit = bukkitLogger;
 
-        // one switch for troubleshooting: everything loud, JDA included
         boolean debugMode = config != null && config.getBoolean("logging.debug", false);
 
         String g = config != null ? config.getString("logging.level", "INFO") : "INFO";
@@ -54,8 +53,6 @@ public final class ZLogger {
             }
         }
 
-        // JDA and Hikari are noisy as hell, default them to WARNING. Debug
-        // mode lets them talk at INFO - their DEBUG would be a firehose.
         if (config == null || (config.getBoolean("logging.suppress-jda", true) && !debugMode)) {
             setJavaLogLevel("net.dv8tion.jda", java.util.logging.Level.WARNING);
         } else if (debugMode) {

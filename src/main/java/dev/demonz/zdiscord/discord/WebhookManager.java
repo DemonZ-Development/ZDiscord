@@ -28,8 +28,6 @@ public class WebhookManager {
 
     private final ZDiscord plugin;
     private final Map<String, WebhookClient> webhookClients = new ConcurrentHashMap<>();
-    // guards webhook creation so two threads can't both create a "ZChat"
-    // webhook for the same channel - the loser would leak an orphan on Discord
     private final Object createLock = new Object();
     private final AtomicLong nextSlot = new AtomicLong(0);
     private final AtomicInteger pendingSends = new AtomicInteger();
@@ -72,7 +70,6 @@ public class WebhookManager {
     private String sanitizeUsername(String username) {
         if (username == null || username.isEmpty()) return "Player";
 
-        // Discord forbids these names, it'll 400 otherwise
         String sanitized = FORBIDDEN_NAME.matcher(username).replaceAll("Player");
         if (sanitized.length() > 80) {
             sanitized = sanitized.substring(0, 80);

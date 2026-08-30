@@ -19,8 +19,6 @@ public class ConfigManager {
 
     public static final int CURRENT_VERSION = 11;
 
-    // defaults that used to ship in config.yml; if a user never touched them
-    // we swap them for "auto" so SkinsRestorer/Geyser avatars kick in
     private static final List<String> LEGACY_AVATAR_DEFAULTS = List.of(
             "https://mc-heads.net/avatar/%uuid%/128",
             "https://crafatar.com/avatars/%uuid%?overlay=true");
@@ -62,7 +60,6 @@ public class ConfigManager {
         }
     }
 
-    // New schema versions just merge in missing keys, existing values are never overwritten
     private void migrateIfNeeded() {
         int current = config.getInt("config-version", 0);
         if (current >= CURRENT_VERSION) return;
@@ -106,7 +103,6 @@ public class ConfigManager {
     public void reload() {
         config = YamlConfiguration.loadConfiguration(configFile);
 
-        // copyDefaults so any key missing from the user's file gets the shipped default
         try (InputStream defStream = defaultResource == null ? null : defaultResource.get()) {
             if (defStream != null) {
                 YamlConfiguration defaults = YamlConfiguration.loadConfiguration(new InputStreamReader(defStream));
@@ -166,7 +162,6 @@ public class ConfigManager {
         }
     }
 
-    // Filter out unfilled placeholder roles ("YOUR_ROLE_ID" etc.) from the ticket config
     private void sanitizePlaceholders() {
         List<String> roles = config.getStringList("tickets.support-roles");
         if (roles.isEmpty()) return;

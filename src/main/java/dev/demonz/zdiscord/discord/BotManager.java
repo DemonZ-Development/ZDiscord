@@ -74,7 +74,6 @@ public class BotManager {
                     .build();
 
             plugin.getLogger().info("Connecting to Discord...");
-            // don't let a black-holed network stall the whole enable phase
             long deadline = System.currentTimeMillis() + 15_000L;
             while (jda.getStatus() != JDA.Status.CONNECTED
                     && System.currentTimeMillis() < deadline) {

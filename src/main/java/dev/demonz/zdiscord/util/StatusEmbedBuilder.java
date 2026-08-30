@@ -144,8 +144,6 @@ public final class StatusEmbedBuilder {
                 StringBuilder list = new StringBuilder();
                 int shown = 0;
                 boolean raced = false;
-                // the live collection can be mutated by joins/quits while we
-                // read it; if that happens just skip the list this refresh
                 try {
                     for (Player p : ServerBridge.onlinePlayers()) {
                         if (p == null) continue;

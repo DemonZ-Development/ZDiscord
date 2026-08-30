@@ -128,7 +128,6 @@ public class StatusModule {
             return;
         }
 
-        // flip the panel to an offline state so nobody thinks the server is still up
         StatusEmbedBuilder.StatusContext ctx = StatusEmbedBuilder.StatusContext.capture(
                 plugin.getBotManager()::getGuild,
                 plugin.getConfigManager().getString("status.embed.title", "Server Status"),

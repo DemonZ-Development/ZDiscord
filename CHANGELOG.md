@@ -2,6 +2,15 @@
 
 All notable changes to ZDiscord are documented here.
 
+## [1.3.1] - 2026-08-30
+
+### Fixed
+- The startup banner now derives its module total from all 16 current modules, including Live Stats, Confession, and the Onlysleep/RedstoneReboot integration bridge.
+
+### Changed
+- Completed a maintainability pass across configuration, storage, Discord bridge, module, and utility code while preserving public API documentation and runtime behavior.
+- Added regression coverage for startup module accounting.
+
 ## [1.3.0] - 2026-08-30
 
 ### Added

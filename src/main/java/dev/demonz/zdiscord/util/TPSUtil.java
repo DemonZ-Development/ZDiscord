@@ -33,7 +33,6 @@ public final class TPSUtil {
         return available;
     }
 
-    // Older Spigot versions throw NoSuchMethodError on Bukkit.getTPS()
     private static boolean probe() {
         try {
             ServerBridge.tps();

@@ -444,6 +444,10 @@ public class ZDiscord extends JavaPlugin {
         return confessionModule;
     }
 
+    public IntegrationModule getIntegrationModule() {
+        return integrationModule;
+    }
+
     public void debug(String message) {
         ZLogger.debug(ZLogger.Category.SYSTEM, message);
     }

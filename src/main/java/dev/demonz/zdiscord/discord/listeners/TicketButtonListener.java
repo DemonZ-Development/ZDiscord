@@ -109,8 +109,6 @@ public class TicketButtonListener extends ListenerAdapter {
             if (ownerKey != null) {
                 plugin.getTicketModule().onTicketClose(ownerKey);
             } else {
-                // older tickets have no topic ref, fall back to guessing
-                // from the member permission overrides
                 decrementForTicketCreator(channel);
             }
         }
@@ -223,7 +221,6 @@ public class TicketButtonListener extends ListenerAdapter {
         return topic.substring(TicketModule.OWNER_TOPIC_PREFIX.length());
     }
 
-    // track down the ticket owner so we can decrement their open-ticket limit
     private void decrementForTicketCreator(TextChannel channel) {
         for (var override : channel.getMemberPermissionOverrides()) {
             Member member = override.getMember();

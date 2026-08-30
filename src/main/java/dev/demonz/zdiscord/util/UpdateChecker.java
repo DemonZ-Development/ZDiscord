@@ -35,7 +35,7 @@ public class UpdateChecker implements Listener {
     private static final String API_URL = "https://api.modrinth.com/v2/project/" + PROJECT_SLUG + "/version";
     private static final String PAGE_URL = "https://modrinth.com/project/" + PROJECT_SLUG;
 
-    private static final long REPEAT_CHECK_TICKS = 20L * 60L * 60L * 5L; // every 5 hours
+    private static final long REPEAT_CHECK_TICKS = 20L * 60L * 60L * 5L;
     private static final Pattern VERSION_TOKEN = Pattern.compile("(\\d+)\\.(\\d+)(?:\\.(\\d+))?(?:-(.+))?");
 
     private final ZDiscord plugin;
@@ -147,7 +147,6 @@ public class UpdateChecker implements Listener {
             if (c[i] != m[i]) return c[i] > m[i];
         }
 
-        // Equal version numbers — a stable beats a pre-release of the same version
         return preRelease(candidate) == null && preRelease(current) != null;
     }
 

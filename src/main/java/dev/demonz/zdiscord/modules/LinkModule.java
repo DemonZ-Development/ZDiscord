@@ -149,9 +149,6 @@ public class LinkModule {
     public void unlink(UUID playerUUID) {
         String discordId = linkedAccounts.remove(playerUUID);
         if (discordId != null) {
-            // only clear the reverse mapping if it still points at us -
-            // several players can share one discord id in bad legacy data
-            // and the other player would silently lose lookups
             discordToMc.remove(discordId, playerUUID);
         }
         plugin.getStorageManager().removeLink(playerUUID);

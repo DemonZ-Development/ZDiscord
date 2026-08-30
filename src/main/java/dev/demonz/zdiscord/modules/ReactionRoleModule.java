@@ -13,18 +13,18 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
-
 
 public class ReactionRoleModule {
 
+    private static final Pattern PERMISSION_PATTERN = Pattern.compile("^[a-z0-9._-]+$");
+
     private final ZDiscord plugin;
     private final File dataFile;
-    private FileConfiguration data;
     private final Map<String, Map<String, RoleMapping>> mappings = new ConcurrentHashMap<>();
-    private static final Pattern PERMISSION_PATTERN = Pattern.compile("^[a-z0-9._-]+$");
+    private FileConfiguration data;
 
     public ReactionRoleModule(ZDiscord plugin) {
         this.plugin = plugin;
@@ -49,15 +49,16 @@ public class ReactionRoleModule {
         data = YamlConfiguration.loadConfiguration(dataFile);
         mappings.clear();
 
-        if (data.getConfigurationSection("messages") == null) {
+        var messages = data.getConfigurationSection("messages");
+        if (messages == null) {
             return;
         }
-        for (String messageId : data.getConfigurationSection("messages").getKeys(false)) {
+        for (String messageId : messages.getKeys(false)) {
             Map<String, RoleMapping> emojiMap = new ConcurrentHashMap<>();
-            for (String emoji : data.getConfigurationSection("messages." + messageId).getKeys(false)) {
-                String roleId = data.getString("messages." + messageId + "." + emoji + ".role-id");
-                String permission = data.getString(
-                        "messages." + messageId + "." + emoji + ".permission", "");
+            for (String emoji : messages.getConfigurationSection(messageId).getKeys(false)) {
+                String path = "messages." + messageId + "." + emoji;
+                String roleId = data.getString(path + ".role-id");
+                String permission = data.getString(path + ".permission", "");
                 if (permission != null && !permission.isEmpty()
                         && !PERMISSION_PATTERN.matcher(permission).matches()) {
                     plugin.getLogger().warning("Skipping reaction-role mapping with invalid "
@@ -72,7 +73,8 @@ public class ReactionRoleModule {
     }
 
     public void addMapping(String messageId, String emoji, String roleId, String permission) {
-        if (permission != null && !permission.isEmpty() && !PERMISSION_PATTERN.matcher(permission).matches()) {
+        if (permission != null && !permission.isEmpty()
+                && !PERMISSION_PATTERN.matcher(permission).matches()) {
             plugin.getLogger().warning("Invalid permission format rejected: " + permission);
             return;
         }
@@ -82,7 +84,8 @@ public class ReactionRoleModule {
     }
 
     public void onReactionAdd(MessageReactionAddEvent event) {
-        RoleMapping mapping = lookup(event.getMessageId(), event.getReaction().getEmoji().getAsReactionCode());
+        RoleMapping mapping = lookup(event.getMessageId(),
+                event.getReaction().getEmoji().getAsReactionCode());
         if (mapping == null) {
             return;
         }
@@ -96,7 +99,8 @@ public class ReactionRoleModule {
     }
 
     public void onReactionRemove(MessageReactionRemoveEvent event) {
-        RoleMapping mapping = lookup(event.getMessageId(), event.getReaction().getEmoji().getAsReactionCode());
+        RoleMapping mapping = lookup(event.getMessageId(),
+                event.getReaction().getEmoji().getAsReactionCode());
         if (mapping == null) {
             return;
         }
@@ -142,7 +146,8 @@ public class ReactionRoleModule {
         }
         String action = grant ? "set" : "unset";
         String value = grant ? " true" : "";
-        String command = "lp user " + playerUUID + " permission " + action + " " + permission + value;
+        String command = "lp user " + playerUUID + " permission " + action
+                + " " + permission + value;
         plugin.getPlatformAdapter().runSync(
                 () -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command));
     }

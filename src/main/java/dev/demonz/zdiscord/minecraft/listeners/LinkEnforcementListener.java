@@ -6,7 +6,6 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerLoginEvent;
 
-
 public class LinkEnforcementListener implements Listener {
 
     private final ZDiscord plugin;
@@ -17,12 +16,8 @@ public class LinkEnforcementListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onLogin(PlayerLoginEvent event) {
-        if (plugin.getLinkModule() == null) {
-            return;
-        }
-        if (!plugin.getConfigManager().getBoolean("linking.required", false)) {
-            return;
-        }
+        if (plugin.getLinkModule() == null) return;
+        if (!plugin.getConfigManager().getBoolean("linking.required", false)) return;
 
         if (event.getPlayer().isOp()
                 || event.getPlayer().hasPermission("zdiscord.bypass.link")) {

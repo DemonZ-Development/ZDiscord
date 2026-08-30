@@ -2,6 +2,52 @@
 
 All notable changes to ZDiscord are documented here.
 
+## [1.3.0] - 2026-08-30
+
+### Added
+- Real profile pictures. If SkinsRestorer is installed, `/profile` cards and leaderboard thumbnails use the player's actual skin instead of the default Steve/Alex head. Set `profile.skin-restorer` to `false` to disable.
+- Discord replies are now quoted in Minecraft chat. Replying to a bridged message shows a short "Replying to X: ..." line above it, so it's clear what the message is answering. See `chat.show-replies`, `chat.reply-format`, `chat.reply-preview-length`.
+- More console logging: account links/unlinks, ticket open/close, and a shutdown summary with storage flush confirmation.
+- `SkinsRestorer` listed as a soft dependency in `plugin.yml`.
+- `/zdiscord diagnostics` — a read-only health check in-game: storage backend and unflushed writes, Discord ping, active webhooks, SkinsRestorer/Geyser detection with Bedrock player count, and module states.
+- **Live stats panel** — one combined embed that refreshes itself in a channel: players online (with names), TPS, memory, top kills, most playtime, and most followed. Enable it with `live-stats.channel` in config.yml; refresh rate via `live-stats.update-interval`.
+- **Self-refreshing `/leaderboard` replies** — command responses now re-edit themselves with fresh data every `leaderboard.auto-refresh-seconds` (default 60s, 0 disables) and follow you when you page or switch stats. They stop after 30 minutes or if the message is deleted.
+- `logging.debug: false` in config.yml — one switch for troubleshooting. Turns every log category to DEBUG, unsuppresses JDA/Hikari connection logs, and applies live via `/zdiscord reload` (previously logging changes needed a restart). `/zdiscord diagnostics` shows whether it's on.
+- Geyser/Floodgate awareness for avatars. Bedrock players get name-based mc-heads heads when SkinsRestorer has no skin for them instead of a guaranteed-broken UUID URL. `chat.avatar-url` now also accepts `"auto"` (the new default) which picks the best source per player; custom `%uuid%`/`%name%` formats still work everywhere.
+- The "Most Followed Players" leaderboard panel now reads follower counts from storage, so players who haven't joined since the last restart no longer disappear from it.
+- Ticket channels store their owner in the channel topic, so closing a ticket always frees the right person's ticket slot.
+- Optional Onlysleep and RedstoneReboot bridges forward sleep/night and restart messages through ZDiscord's existing bot connection. Each can use a dedicated channel or fall back to `channels.events`.
+- The public API can queue plain messages and `EmbedData` objects to configured Discord channels.
+
+### Changed
+- `config-version` bumped to 11 so existing configs pick up all avatar, logging, live-stats, reply, and integration keys. Untouched `chat.avatar-url` defaults are migrated to `"auto"` automatically.
+- JDA updated from 5.2.1 to 6.5.0 for current Discord API behavior and 2026 permission changes; SLF4J updated/aligned to 2.0.18 and relocated inside the plugin JAR.
+- MySQL connections encrypt by default (`use-ssl: true`) but no longer demand a CA-signed certificate; set `storage.mysql.ssl-verify-certificate: true` if yours has one. The official Connector/J driver is now bundled and relocated, so MySQL 8+ storage works on a clean server without another plugin supplying a driver.
+- Stat-update events (`ZDiscordStatUpdateEvent`) fire before the value lands and cancelling one no longer rolls back increments that raced with it.
+- `/zdiscord embed` reports "bot not connected" instead of throwing when startup failed.
+
+### Fixed
+- Emoji shortcodes (`:green_circle:` etc.) showed as raw text in every embed - Discord only renders shortcodes in plain messages, not embed titles/fields/footers. All ~80 usages across panels, cards, tickets, and status embeds now use real Unicode emoji, which render everywhere. (config-version 10)
+- YAML storage could silently drop writes: a save landing between the flusher's file snapshot and its dirty-flag reset was lost until restart. Dirty flags now live under the same lock as the save itself.
+- Pending MySQL writes queued during shutdown ran anyway instead of being cancelled with the scheduler teardown.
+- `/ticket` from Discord no longer blocks JDA's gateway thread during channel creation (chat relay froze while tickets were being made).
+- `/players` and the status embed no longer risk a `ConcurrentModificationException` when someone joins or leaves mid-refresh; the status panel just skips the player list that tick.
+- Two simultaneous first messages in a channel can't create duplicate "ZChat" webhooks anymore (orphans count against Discord's 10-webhook channel cap).
+- Unlinking no longer clears the reverse lookup when legacy data maps several players to one Discord ID - the other linked player keeps working.
+- Startup gives up on a stuck Discord connection after 15 seconds instead of hanging the server enable phase forever.
+- Transcript button on a fresh empty ticket replies with a friendly message instead of an exception.
+- Numbers formatted into URLs and embeds (TPS, memory, K/D, avatar URLs) now use locale-independent formatting, so servers running under digit-substituting locales don't produce broken image links.
+- Skin cache is bounded (~2048 entries) so very large servers don't accumulate entries forever; confession/follow cooldown maps evict expired entries too.
+- SkinsRestorer's overloaded texture helper is resolved by its `SkinProperty` parameter, avoiding a runtime mismatch with the `String` overload.
+- Release automation publishes only the shaded runtime JAR and now runs from immutable `v*` tags instead of every push to `main`.
+- Discord console commands keep a hard denylist even when a custom allowlist is configured; shutdown, permission escalation, arbitrary command execution, and plugin reload commands cannot be enabled remotely.
+- Minecraft chat cannot trigger Discord `@everyone`, `@here`, or role/user mentions, and console/webhook buffers now have hard memory bounds under message floods.
+
+- Ticket numbering no longer resets to #1 after a restart (the counter was written as a string and read back as 0).
+- ZDiscord no longer crashes at startup if the server console can't display unicode; the startup banner and console messages are ASCII-safe.
+- `status.embed.color` is honored again; it was silently ignored during the rewrite.
+- TPS reading falls back to a flat 20.0 on old Spigot builds instead of breaking the embed.
+
 ## [1.2.0] - 2026-06-16
 
 ### Added

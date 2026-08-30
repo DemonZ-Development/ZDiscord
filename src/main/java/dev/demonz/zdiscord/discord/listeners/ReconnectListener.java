@@ -4,7 +4,6 @@ import dev.demonz.zdiscord.ZDiscord;
 import net.dv8tion.jda.api.events.session.SessionRecreateEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
-
 public class ReconnectListener extends ListenerAdapter {
 
     private final ZDiscord plugin;

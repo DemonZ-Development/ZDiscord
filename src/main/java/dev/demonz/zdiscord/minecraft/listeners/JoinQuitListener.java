@@ -3,6 +3,7 @@ package dev.demonz.zdiscord.minecraft.listeners;
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.util.ColorUtil;
 import dev.demonz.zdiscord.util.HeadUtil;
+import dev.demonz.zdiscord.util.SkinUtil;
 import dev.demonz.zdiscord.util.ZLogger;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
@@ -35,12 +36,11 @@ public class JoinQuitListener implements Listener {
         UUID uuid = player.getUniqueId();
         long now = System.currentTimeMillis();
 
-        final boolean firstJoin;
+        boolean firstJoin;
         if (knownPlayers.contains(uuid)) {
             firstJoin = false;
         } else {
-            long existingFirstJoin = plugin.getStorageManager().getFirstJoin(uuid);
-            firstJoin = (existingFirstJoin == 0);
+            firstJoin = plugin.getStorageManager().getFirstJoin(uuid) == 0;
             knownPlayers.add(uuid);
         }
 
@@ -52,9 +52,6 @@ public class JoinQuitListener implements Listener {
             }
         });
 
-
-
-
         joinTimestamps.put(uuid, now);
 
         if (plugin.getBotManager() != null
@@ -65,23 +62,19 @@ public class JoinQuitListener implements Listener {
 
         if (firstJoin
                 && plugin.getConfigManager().getBoolean("events.join.show-first-join-indicator", true)) {
-            String welcome = plugin.getConfigManager().getString(
-                    "events.join.first-join-message", "");
+            String welcome = plugin.getConfigManager().getString("events.join.first-join-message", "");
             if (!welcome.isEmpty()) {
-                String resolved = ColorUtil.stripColor(
-                        welcome
-                                .replace("%player%", player.getName())
-                                .replace("%displayname%", ColorUtil.stripColor(player.getDisplayName()))
-                                .replace("%uuid%", player.getUniqueId().toString()));
-                plugin.getPlatformAdapter().runLater(
-                        () -> player.sendMessage(resolved), 20L);
+                String resolved = ColorUtil.stripColor(welcome
+                        .replace("%player%", player.getName())
+                        .replace("%displayname%", ColorUtil.stripColor(player.getDisplayName()))
+                        .replace("%uuid%", player.getUniqueId().toString()));
+                plugin.getPlatformAdapter().runLater(() -> player.sendMessage(resolved), 20L);
             }
         }
 
         if (plugin.getAntiRaidModule() != null) {
             plugin.getAntiRaidModule().onPlayerJoin(player);
         }
-
 
         if (plugin.getFollowModule() != null) {
             plugin.getFollowModule().onPlayerJoin(player);
@@ -98,27 +91,21 @@ public class JoinQuitListener implements Listener {
         UUID uuid = player.getUniqueId();
         long now = System.currentTimeMillis();
 
-
-
         if (plugin.getBotManager() != null) {
+            // give the player a tick to actually leave so the count is right
             plugin.getPlatformAdapter().runLater(
-                    () -> plugin.getPlatformAdapter().runAsync(
-                            () -> plugin.getBotManager().updateActivity()),
-                    2L);
+                    () -> plugin.getPlatformAdapter().runAsync(plugin.getBotManager()::updateActivity), 2L);
         }
 
         Long joinTime = joinTimestamps.remove(uuid);
         if (joinTime != null && plugin.getLeaderboardModule() != null) {
             long sessionSeconds = (now - joinTime) / 1000L;
             if (sessionSeconds > 0) {
-                plugin.getLeaderboardModule().incrementStatBy(
-                        uuid, "playtime", sessionSeconds);
+                plugin.getLeaderboardModule().incrementStatBy(uuid, "playtime", sessionSeconds);
             }
         }
 
-
-        plugin.getPlatformAdapter().runAsync(
-                () -> plugin.getStorageManager().setLastSeen(uuid, now));
+        plugin.getPlatformAdapter().runAsync(() -> plugin.getStorageManager().setLastSeen(uuid, now));
 
         if (plugin.getBotManager() != null
                 && plugin.getBotManager().isConnected()
@@ -129,24 +116,18 @@ public class JoinQuitListener implements Listener {
 
     private void sendEmbed(Player player, boolean joined, Long knownJoinTime, boolean firstJoin) {
         TextChannel channel = resolveEventChannel();
-        if (channel == null) {
-            return;
-        }
+        if (channel == null) return;
 
         String typeKey = joined ? "join" : "quit";
         String colorHex = plugin.getConfigManager().getString(
-                "events." + typeKey + ".color",
-                joined ? "#2ECC71" : "#E74C3C");
+                "events." + typeKey + ".color", joined ? "#2ECC71" : "#E74C3C");
 
         String title = joined ? "Player Joined" : "Player Left";
         String verb = joined ? "joined" : "left";
+        String avatarUrl = SkinUtil.avatar(plugin, player.getUniqueId(), player.getName(),
+                HeadUtil.SIZE_MEDIUM);
 
-
-        String avatarUrl = HeadUtil.avatar(player.getUniqueId(), HeadUtil.SIZE_MEDIUM);
-
-
-        String footerIcon = plugin.getConfigManager().getString(
-                "events." + typeKey + ".footer-icon", "");
+        String footerIcon = plugin.getConfigManager().getString("events." + typeKey + ".footer-icon", "");
         if (footerIcon.isEmpty()) {
             footerIcon = plugin.getConfigManager().getString("events.footer-icon", "");
         }
@@ -157,34 +138,28 @@ public class JoinQuitListener implements Listener {
             }
         }
 
-
         int currentOnline = plugin.getServer().getOnlinePlayers().size();
         int maxOnline = plugin.getServer().getMaxPlayers();
         int prevOnline = currentOnline - (joined ? 1 : -1);
 
         EmbedBuilder embed = new EmbedBuilder()
-                .setAuthor(player.getName(),
-                        "https://namemc.com/profile/" + player.getUniqueId(),
-                        avatarUrl)
-                .setTitle((joined ? ":green_circle: " : ":red_circle: ") + title)
+                .setAuthor(player.getName(), "https://namemc.com/profile/" + player.getUniqueId(), avatarUrl)
+                .setTitle((joined ? "🟢 " : "🔴 ") + title)
                 .setDescription("**" + player.getName() + "** " + verb + " the server")
                 .setColor(ColorUtil.parseHex(colorHex))
                 .setThumbnail(avatarUrl)
                 .addField("Player", "`" + player.getName() + "`", true)
-                .addField("Online",
-                        currentOnline + "/" + maxOnline + " (was " + prevOnline + ")", true)
-                .addField("Status",
-                        joined ? ":white_check_mark: Online" : ":x: Offline", true)
+                .addField("Online", currentOnline + "/" + maxOnline + " (was " + prevOnline + ")", true)
+                .addField("Status", joined ? "✅ Online" : "❌ Offline", true)
                 .setFooter("**" + player.getName() + "** " + verb + " the server",
                         footerIcon.isEmpty() ? null : footerIcon)
                 .setTimestamp(Instant.now());
 
         if (joined && firstJoin
                 && plugin.getConfigManager().getBoolean("events.join.show-first-join-indicator", true)) {
-            embed.addField(":sparkles: New Player",
+            embed.addField("✨ New Player",
                     "Welcome! This is **" + player.getName() + "**'s first join.", false);
         }
-
 
         if (!joined) {
             long seconds = -1;
@@ -192,8 +167,7 @@ public class JoinQuitListener implements Listener {
                 seconds = (System.currentTimeMillis() - knownJoinTime) / 1000L;
             }
             if (seconds > 0) {
-                String duration = formatDuration(seconds);
-                embed.addField("Session", ":hourglass: " + duration, false);
+                embed.addField("Session", "⌛ " + formatDuration(seconds), false);
             }
         }
 
@@ -204,27 +178,18 @@ public class JoinQuitListener implements Listener {
     }
 
     private String formatDuration(long seconds) {
-        if (seconds < 60) {
-            return seconds + "s";
-        }
+        if (seconds < 60) return seconds + "s";
         long minutes = seconds / 60;
-        if (minutes < 60) {
-            return minutes + "m " + (seconds % 60) + "s";
-        }
+        if (minutes < 60) return minutes + "m " + (seconds % 60) + "s";
         long hours = minutes / 60;
         minutes = minutes % 60;
-        if (hours < 24) {
-            return hours + "h " + minutes + "m";
-        }
+        if (hours < 24) return hours + "h " + minutes + "m";
         long days = hours / 24;
-        hours = hours % 24;
-        return days + "d " + hours + "h";
+        return days + "d " + (hours % 24) + "h";
     }
 
     private TextChannel resolveEventChannel() {
-        if (plugin.getBotManager() == null) {
-            return null;
-        }
+        if (plugin.getBotManager() == null) return null;
         TextChannel channel = plugin.getBotManager().getTextChannel("channels.events");
         if (channel == null) {
             channel = plugin.getBotManager().getTextChannel("channels.chat");

@@ -13,7 +13,6 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 
 import java.time.Instant;
 
-
 public class DeathListener implements Listener {
 
     private final ZDiscord plugin;
@@ -29,17 +28,12 @@ public class DeathListener implements Listener {
         if (plugin.getLeaderboardModule() != null) {
             plugin.getLeaderboardModule().incrementStat(player.getUniqueId(), "deaths");
             if (player.getKiller() != null) {
-                plugin.getLeaderboardModule().incrementStat(
-                        player.getKiller().getUniqueId(), "kills");
+                plugin.getLeaderboardModule().incrementStat(player.getKiller().getUniqueId(), "kills");
             }
         }
 
-        if (!plugin.getBotManager().isConnected()) {
-            return;
-        }
-        if (!plugin.getConfigManager().getBoolean("events.death.enabled", true)) {
-            return;
-        }
+        if (!plugin.getBotManager().isConnected()) return;
+        if (!plugin.getConfigManager().getBoolean("events.death.enabled", true)) return;
 
         String deathMessage = event.getDeathMessage();
         if (deathMessage == null) {
@@ -47,14 +41,10 @@ public class DeathListener implements Listener {
         }
 
         TextChannel channel = resolveEventChannel();
-        if (channel == null) {
-            return;
-        }
+        if (channel == null) return;
 
-        String template = plugin.getConfigManager()
-                .getString("events.death.message", "%death_message%");
-        String message = PlaceholderUtil.resolve(template, player)
-                .replace("%death_message%", deathMessage);
+        String template = plugin.getConfigManager().getString("events.death.message", "%death_message%");
+        String message = PlaceholderUtil.resolve(template, player).replace("%death_message%", deathMessage);
         String colorHex = plugin.getConfigManager().getString("events.death.color", "#95A5A6");
 
         EmbedBuilder embed = new EmbedBuilder()

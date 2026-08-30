@@ -2,14 +2,12 @@ package dev.demonz.zdiscord.testsupport;
 
 import dev.demonz.zdiscord.util.ServerBridge;
 
-
 public final class BukkitStub {
-
-    private BukkitStub() {
-    }
 
     private static State state;
 
+    private BukkitStub() {
+    }
 
     public static synchronized State install() {
         if (state != null) {
@@ -20,7 +18,6 @@ public final class BukkitStub {
         return state;
     }
 
-
     public static synchronized void uninstall() {
         if (state == null) {
             return;
@@ -28,7 +25,6 @@ public final class BukkitStub {
         ServerBridge.resetBackend();
         state = null;
     }
-
 
     public static final class State extends ServerBridge.StubBackend {
 
@@ -41,7 +37,6 @@ public final class BukkitStub {
             this.maxPlayers = max;
             return this;
         }
-
 
         public State withOnlineCount(int count) {
             this.onlineCount = count;

@@ -2,11 +2,16 @@ package dev.demonz.zdiscord.api;
 
 import dev.demonz.zdiscord.api.model.LeaderboardEntry;
 import dev.demonz.zdiscord.api.model.PlayerProfile;
+import dev.demonz.zdiscord.api.model.EmbedData;
 
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * Public API for other plugins to hook into ZDiscord.
+ * Obtain an instance via {@link ZDiscordProvider#get()}.
+ */
 public interface ZDiscordAPI {
 
     PlayerProfile getPlayerProfile(UUID uuid);
@@ -28,6 +33,12 @@ public interface ZDiscordAPI {
     String getPluginVersion();
 
     boolean isBotConnected();
+
+    /** Queue a plain message to the channel ID stored at the given config path. */
+    boolean sendMessage(String channelConfigPath, String message);
+
+    /** Queue an embed to the channel ID stored at the given config path. */
+    boolean sendEmbed(String channelConfigPath, EmbedData embed);
 
     int getOnlinePlayerCount();
 

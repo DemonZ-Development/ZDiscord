@@ -1,6 +1,7 @@
 package dev.demonz.zdiscord.util;
 
 import dev.demonz.zdiscord.testsupport.BukkitStub;
+import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,7 +27,7 @@ class StatusEmbedBuilderTest {
 
     @Test
     void buildsEmbedWithExpectedFields() {
-        Supplier<net.dv8tion.jda.api.entities.Guild> emptyGuild = () -> null;
+        Supplier<Guild> emptyGuild = () -> null;
 
         StatusEmbedBuilder.StatusContext ctx = StatusEmbedBuilder.StatusContext.capture(
                 emptyGuild,

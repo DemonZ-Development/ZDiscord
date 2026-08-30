@@ -87,16 +87,11 @@ class ColorUtilTest {
 
     @Test
     void toDiscordMarkdownClosesNestedRuns() {
-
-
-
-
         assertEquals("**a *b***", ColorUtil.toDiscordMarkdown("&la &ob&r"));
     }
 
     @Test
     void toDiscordMarkdownTogglesBold() {
-
         assertEquals("**hi**", ColorUtil.toDiscordMarkdown("&lhi&l"));
     }
 

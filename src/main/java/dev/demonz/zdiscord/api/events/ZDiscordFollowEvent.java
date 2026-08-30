@@ -13,21 +13,15 @@ public class ZDiscordFollowEvent extends Event {
     private final String followerDiscordId;
     private final boolean followed;
 
-    public ZDiscordFollowEvent(UUID targetPlayerUUID, String followerDiscordId,
-                               boolean followed) {
+    public ZDiscordFollowEvent(UUID targetPlayerUUID, String followerDiscordId, boolean followed) {
         super(true);
         this.targetPlayerUUID = targetPlayerUUID;
         this.followerDiscordId = followerDiscordId;
         this.followed = followed;
     }
 
-
     public UUID getTargetPlayerUUID() { return targetPlayerUUID; }
-
-
     public String getFollowerDiscordId() { return followerDiscordId; }
-
-
     public boolean isFollowed() { return followed; }
 
     @Override

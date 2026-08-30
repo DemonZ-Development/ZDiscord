@@ -8,16 +8,11 @@ public final class StartupBanner {
 
     private static final int BOX_WIDTH = 46;
 
-    /**
-     * Total number of toggleable modules. Must match the number of module
-     * getters checked in {@link #countActiveModules(ZDiscord)} and the module
-     * fields declared on {@link ZDiscord}. Keep these three in sync.
-     */
+    // Keep in sync with the module fields on ZDiscord + countActiveModules below.
     private static final int TOTAL_MODULES = 13;
 
     private StartupBanner() {
     }
-
 
     public static void print(ZDiscord plugin, long startupMs) {
         Logger log = plugin.getLogger();
@@ -25,46 +20,40 @@ public final class StartupBanner {
         String platform = plugin.getPlatformAdapter().getPlatformName();
 
         String botName = "Not connected";
-        String guildName = "—";
+        String guildName = "-";
         if (plugin.getBotManager() != null && plugin.getBotManager().isConnected()) {
             botName = plugin.getBotManager().getJda().getSelfUser().getName();
             var guild = plugin.getBotManager().getGuild();
-            if (guild != null) {
-                guildName = guild.getName();
-            }
+            if (guild != null) guildName = guild.getName();
         }
 
         int activeModules = countActiveModules(plugin);
         String storage = plugin.getStorageManager() != null
-                ? plugin.getStorageManager().getTypeName()
-                : "none";
+                ? plugin.getStorageManager().getTypeName() : "none";
 
+        String bar = "=".repeat(BOX_WIDTH + 4);
         log.info("");
-        log.info("\u2554" + "\u2550".repeat(BOX_WIDTH) + "\u2557");
+        log.info(bar);
         log.info(pad("  ZDiscord v" + version));
         log.info(pad("  Platform: " + platform));
-        log.info(pad("  Bot: " + botName + " \u2022 Guild: " + truncate(guildName, 20)));
-        log.info(pad("  Modules: " + activeModules + "/" + TOTAL_MODULES + " \u2022 Storage: " + storage));
+        log.info(pad("  Bot: " + botName + " | Guild: " + truncate(guildName, 20)));
+        log.info(pad("  Modules: " + activeModules + "/" + TOTAL_MODULES + " | Storage: " + storage));
         log.info(pad("  Startup: " + startupMs + "ms"));
-        log.info("\u255A" + "\u2550".repeat(BOX_WIDTH) + "\u255D");
+        log.info(bar);
         log.info("");
     }
 
     private static String pad(String text) {
         if (text.length() >= BOX_WIDTH) {
-            return "\u2551" + text.substring(0, BOX_WIDTH) + "\u2551";
+            return "| " + text.substring(0, BOX_WIDTH) + " |";
         }
-        return "\u2551" + text + " ".repeat(BOX_WIDTH - text.length()) + "\u2551";
+        return "| " + text + " ".repeat(BOX_WIDTH - text.length()) + " |";
     }
 
     private static String truncate(String text, int maxLen) {
-        if (text == null) {
-            return "—";
-        }
-        if (text.length() <= maxLen) {
-            return text;
-        }
-        return text.substring(0, maxLen - 1) + "\u2026";
+        if (text == null) return "-";
+        if (text.length() <= maxLen) return text;
+        return text.substring(0, maxLen - 1) + "..";
     }
 
     private static int countActiveModules(ZDiscord plugin) {

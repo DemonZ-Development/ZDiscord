@@ -5,11 +5,12 @@ import dev.demonz.zdiscord.api.events.ZDiscordFollowEvent;
 import dev.demonz.zdiscord.storage.StorageManager;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
-import net.dv8tion.jda.api.interactions.components.buttons.Button;
+import net.dv8tion.jda.api.components.buttons.Button;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -18,15 +19,12 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
-
 public class FollowModule {
 
     public static final String FOLLOW_BUTTON_ID = "zdiscord:follow";
     public static final String UNFOLLOW_BUTTON_ID = "zdiscord:unfollow";
 
     private final ZDiscord plugin;
-
-
     private final Map<UUID, Set<String>> followers = new HashMap<>();
     private final Map<UUID, Long> lastJoinNotification = new ConcurrentHashMap<>();
 
@@ -35,7 +33,6 @@ public class FollowModule {
     }
 
     public void init() {
-
     }
 
     public void reload() {
@@ -45,11 +42,7 @@ public class FollowModule {
     }
 
     public void shutdown() {
-
-
     }
-
-
 
     public boolean isFollowing(UUID playerUUID, String discordId) {
         synchronized (followers) {
@@ -59,20 +52,19 @@ public class FollowModule {
 
     public int getFollowerCount(UUID playerUUID) {
         synchronized (followers) {
-            return followers.getOrDefault(playerUUID, Set.of()).size();
+            Set<String> cached = followers.get(playerUUID);
+            if (cached != null) {
+                return cached.size();
+            }
         }
+        // not in memory = they haven't joined this session; ask storage so
+        // /profile doesn't show 0 followers for everyone
+        return plugin.getStorageManager().getFollowers(playerUUID).size();
     }
 
     public Set<UUID> getFollowedPlayers(String discordId) {
-
-
-
-
-
         return plugin.getStorageManager().getFollowedPlayers(discordId);
     }
-
-
 
     public void follow(UUID playerUUID, String discordId) {
         synchronized (followers) {
@@ -98,9 +90,6 @@ public class FollowModule {
                 new ZDiscordFollowEvent(playerUUID, discordId, false));
     }
 
-
-
-
     public void onPlayerJoin(Player player) {
         if (!plugin.getConfigManager().getBoolean("follow.enabled", true)) {
             return;
@@ -118,8 +107,14 @@ public class FollowModule {
         String name = player.getName();
         long cooldownMs = plugin.getConfigManager().getInt(
                 "follow.join-notification-cooldown", 300) * 1000L;
-        Long lastNotify = lastJoinNotification.get(uuid);
         long now = System.currentTimeMillis();
+
+        // keep the map from growing forever on busy servers
+        if (lastJoinNotification.size() > 1000) {
+            lastJoinNotification.values().removeIf(t -> now - t >= cooldownMs);
+        }
+
+        Long lastNotify = lastJoinNotification.get(uuid);
         if (lastNotify != null && (now - lastNotify) < cooldownMs) {
             return;
         }
@@ -130,13 +125,13 @@ public class FollowModule {
                         user -> {
                             if (user == null) return;
                             EmbedBuilder embed = new EmbedBuilder()
-                                    .setTitle(":wave: " + name + " just logged in")
+                                    .setTitle("👋 " + name + " just logged in")
                                     .setDescription("**" + name
                                             + "** has just joined the Minecraft server.")
                                     .setColor(0x2ECC71)
                                     .addField("Joined at",
                                             "<t:" + (now / 1000L) + ":F>", false)
-                                    .setTimestamp(java.time.Instant.ofEpochMilli(now))
+                                    .setTimestamp(Instant.ofEpochMilli(now))
                                     .setFooter("You are following this player", null);
                             user.openPrivateChannel().queue(
                                     ch -> ch.sendMessageEmbeds(embed.build()).queue(
@@ -163,10 +158,7 @@ public class FollowModule {
         return sm.getFollowers(uuid);
     }
 
-
-
     public void handleFollowButton(ButtonInteractionEvent event) {
-
         String id = event.getComponentId();
         String prefix;
         boolean doFollow;
@@ -179,10 +171,10 @@ public class FollowModule {
         } else {
             return;
         }
-        String raw = id.substring(prefix.length());
+
         UUID target;
         try {
-            target = UUID.fromString(raw);
+            target = UUID.fromString(id.substring(prefix.length()));
         } catch (IllegalArgumentException e) {
             event.reply("That player is no longer tracked.").setEphemeral(true).queue();
             return;
@@ -194,11 +186,11 @@ public class FollowModule {
 
         if (doFollow) {
             follow(target, discordId);
-            event.reply(":bell: You will now be notified when **" + name
+            event.reply("🔔 You will now be notified when **" + name
                     + "** joins the server.").setEphemeral(true).queue();
         } else {
             unfollow(target, discordId);
-            event.reply(":no_bell: You will no longer be notified when **" + name
+            event.reply("🔕 You will no longer be notified when **" + name
                     + "** joins the server.").setEphemeral(true).queue();
         }
     }

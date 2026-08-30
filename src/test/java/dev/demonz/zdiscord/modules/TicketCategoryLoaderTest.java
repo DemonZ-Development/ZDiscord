@@ -58,7 +58,6 @@ class TicketCategoryLoaderTest {
         cfg.set("tickets.categories.bare.id", "bare");
         cfg.set("tickets.categories.bare.label", "Bare");
 
-
         Map<String, TicketCategory> cats = TicketModule.loadCategories(cfg);
         TicketCategory c = cats.get("bare");
         assertNotNull(c);

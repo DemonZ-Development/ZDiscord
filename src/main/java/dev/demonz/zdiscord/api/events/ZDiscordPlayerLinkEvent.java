@@ -20,13 +20,8 @@ public class ZDiscordPlayerLinkEvent extends Event {
         this.linked = linked;
     }
 
-
     public UUID getPlayerUUID() { return playerUUID; }
-
-
     public String getDiscordId() { return discordId; }
-
-
     public boolean isLinked() { return linked; }
 
     @Override

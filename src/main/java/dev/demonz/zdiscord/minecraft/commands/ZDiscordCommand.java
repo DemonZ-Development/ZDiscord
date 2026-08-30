@@ -1,16 +1,14 @@
 package dev.demonz.zdiscord.minecraft.commands;
 
 import dev.demonz.zdiscord.ZDiscord;
+import dev.demonz.zdiscord.util.SkinUtil;
 import dev.demonz.zdiscord.util.UpdateChecker;
+import dev.demonz.zdiscord.util.ZLogger;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
-
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -21,8 +19,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-import java.util.stream.Collectors;
-
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ZDiscordCommand implements CommandExecutor, TabCompleter {
 
@@ -39,37 +38,19 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
             sendHelp(sender);
             return true;
         }
+
         switch (args[0].toLowerCase()) {
-            case "reload":
-                handleReload(sender);
-                break;
-            case "status":
-                handleStatus(sender);
-                break;
-            case "link":
-                handleLink(sender);
-                break;
-            case "embed":
-                handleEmbed(sender, args);
-                break;
-            case "ticket":
-                handleTicket(sender, args);
-                break;
-            case "panel":
-                handlePanel(sender);
-                break;
-            case "lockdown":
-                handleLockdown(sender);
-                break;
-            case "update":
-                handleUpdate(sender, args);
-                break;
-            case "dump":
-                handleDump(sender);
-                break;
-            default:
-                sendHelp(sender);
-                break;
+            case "reload" -> handleReload(sender);
+            case "status" -> handleStatus(sender);
+            case "link" -> handleLink(sender);
+            case "embed" -> handleEmbed(sender, args);
+            case "ticket" -> handleTicket(sender, args);
+            case "panel" -> handlePanel(sender);
+            case "lockdown" -> handleLockdown(sender);
+            case "update" -> handleUpdate(sender, args);
+            case "dump" -> handleDump(sender);
+            case "diagnostics" -> handleDiagnostics(sender);
+            default -> sendHelp(sender);
         }
         return true;
     }
@@ -79,6 +60,7 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("ZDiscord commands:");
         sender.sendMessage("  /zdiscord reload");
         sender.sendMessage("  /zdiscord status");
+        sender.sendMessage("  /zdiscord diagnostics");
         sender.sendMessage("  /zdiscord link");
         sender.sendMessage("  /zdiscord embed <title> <description>");
         sender.sendMessage("  /zdiscord ticket <subject>");
@@ -106,11 +88,10 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
 
         var botManager = plugin.getBotManager();
         boolean connected = botManager != null && botManager.isConnected();
-        String statusText = connected ? "Online" : "Offline";
 
         sender.sendMessage("");
         sender.sendMessage("ZDiscord status");
-        sender.sendMessage("  Discord bot: " + statusText);
+        sender.sendMessage("  Discord bot: " + (connected ? "Online" : "Offline"));
         if (connected) {
             var jda = botManager.getJda();
             if (jda != null) {
@@ -127,7 +108,7 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleLink(CommandSender sender) {
-        if (!(sender instanceof Player)) {
+        if (!(sender instanceof Player player)) {
             sender.sendMessage(plugin.getMessageManager().get("player-only"));
             return;
         }
@@ -140,13 +121,9 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
-        Player player = (Player) sender;
         String code = plugin.getLinkModule().generateCode(player);
-        if (code == null) {
-            return;
-        }
-        sender.sendMessage(plugin.getMessageManager().get(
-                "link-code-generated", "%code%", code));
+        if (code == null) return;
+        sender.sendMessage(plugin.getMessageManager().get("link-code-generated", "%code%", code));
     }
 
     private void handleEmbed(CommandSender sender, String[] args) {
@@ -154,17 +131,20 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(plugin.getMessageManager().get("no-permission"));
             return;
         }
+        if (plugin.getEmbedBuilderModule() == null) {
+            sender.sendMessage("The Discord bot is not connected.");
+            return;
+        }
         if (args.length < 3) {
             sender.sendMessage("Usage: /zdiscord embed <title> <description>");
             return;
         }
-        String title = args[1];
-        String description = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
-        plugin.getEmbedBuilderModule().createAndSend(sender, title, description);
+        plugin.getEmbedBuilderModule().createAndSend(sender,
+                args[1], String.join(" ", Arrays.copyOfRange(args, 2, args.length)));
     }
 
     private void handleTicket(CommandSender sender, String[] args) {
-        if (!(sender instanceof Player)) {
+        if (!(sender instanceof Player player)) {
             sender.sendMessage(plugin.getMessageManager().get("player-only"));
             return;
         }
@@ -180,8 +160,8 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage("Usage: /zdiscord ticket <subject>");
             return;
         }
-        String subject = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
-        plugin.getTicketModule().createTicketFromMC((Player) sender, subject);
+        plugin.getTicketModule().createTicketFromMC(player,
+                String.join(" ", Arrays.copyOfRange(args, 1, args.length)));
     }
 
     private void handlePanel(CommandSender sender) {
@@ -197,31 +177,29 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage("The Discord bot is not connected.");
             return;
         }
+
         String panelChannelId = plugin.getConfigManager().getString("tickets.panel-channel", "");
         if (panelChannelId.isEmpty()) {
-            String categoryId = plugin.getConfigManager().getString("channels.ticket-category", "");
-            if (!categoryId.isEmpty()) {
-                panelChannelId = categoryId;
-            }
+            panelChannelId = plugin.getConfigManager().getString("channels.ticket-category", "");
         }
         if (panelChannelId.isEmpty()) {
             sender.sendMessage("Set tickets.panel-channel in config.yml first, "
                     + "or run /setup in Discord to configure tickets.");
             return;
         }
+
         final String targetChannelId = panelChannelId;
         plugin.getPlatformAdapter().runAsync(() -> {
             try {
-                var channel = plugin.getBotManager().getJda()
-                        .getTextChannelById(targetChannelId);
+                var channel = plugin.getBotManager().getJda().getTextChannelById(targetChannelId);
                 if (channel == null) {
-                    sender.sendMessage("Channel ID '" + targetChannelId + "' was not found.");
+                    reply(sender, "Channel ID '" + targetChannelId + "' was not found.");
                     return;
                 }
                 plugin.getTicketModule().postPanel(channel);
-                sender.sendMessage("Ticket panel posted in <#" + targetChannelId + ">.");
+                reply(sender, "Ticket panel posted in <#" + targetChannelId + ">.");
             } catch (Exception e) {
-                sender.sendMessage("Failed to post panel: " + e.getMessage());
+                reply(sender, "Failed to post panel: " + e.getMessage());
             }
         });
     }
@@ -243,22 +221,24 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(plugin.getMessageManager().get("no-permission"));
             return;
         }
+
         if (args.length >= 2) {
             switch (args[1].toLowerCase()) {
-                case "dismiss":
-                    if (sender instanceof Player) {
-                        dismissedUpdates.add(((Player) sender).getUniqueId());
+                case "dismiss" -> {
+                    if (sender instanceof Player player) {
+                        dismissedUpdates.add(player.getUniqueId());
                     }
                     sender.sendMessage(plugin.getMessageManager().getRaw("prefix")
                             + "\u00a77Update notification dismissed for this session.");
                     return;
-                case "check":
+                }
+                case "check" -> {
                     runManualUpdateCheck(sender);
                     return;
-                default:
-                    break;
+                }
             }
         }
+
         sender.sendMessage("Current: v" + plugin.getDescription().getVersion());
         if (plugin.getConfigManager().getBoolean("misc.update-checker", true)) {
             sender.sendMessage("Update checker: enabled. Use /zdiscord update check to query now.");
@@ -272,19 +252,16 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
             try {
                 String latest = UpdateChecker.fetchLatestSync();
                 if (latest == null) {
-                    sender.sendMessage("Could not reach the Modrinth API right now.");
-                } else if (UpdateChecker.isNewer(latest,
-                        plugin.getDescription().getVersion())) {
-                    sender.sendMessage("\u00a7aLatest version: v" + latest
-                            + " (you are running v"
-                            + plugin.getDescription().getVersion() + ")");
+                    reply(sender, "Could not reach the Modrinth API right now.");
+                } else if (UpdateChecker.isNewer(latest, plugin.getDescription().getVersion())) {
+                    reply(sender, "\u00a7aLatest version: v" + latest
+                            + " (you are running v" + plugin.getDescription().getVersion() + ")");
                 } else {
-                    sender.sendMessage(
-                            "\u00a7aYou are running the latest version (v"
-                                    + plugin.getDescription().getVersion() + ").");
+                    reply(sender, "\u00a7aYou are running the latest version (v"
+                            + plugin.getDescription().getVersion() + ").");
                 }
             } catch (Exception e) {
-                sender.sendMessage("Update check failed: " + e.getMessage());
+                reply(sender, "Update check failed: " + e.getMessage());
             }
         });
     }
@@ -297,14 +274,91 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
         dismissedUpdates.clear();
     }
 
+    private void reply(CommandSender sender, String message) {
+        if (sender instanceof Player player) {
+            plugin.getPlatformAdapter().runForEntity(player, () -> player.sendMessage(message));
+        } else {
+            plugin.getPlatformAdapter().runSync(() -> sender.sendMessage(message));
+        }
+    }
+
+    private void handleDiagnostics(CommandSender sender) {
+        if (!sender.hasPermission("zdiscord.admin")) {
+            sender.sendMessage(plugin.getMessageManager().get("no-permission"));
+            return;
+        }
+
+        sender.sendMessage("");
+        sender.sendMessage("\u00a7bZDiscord diagnostics\u00a77 (read-only)");
+
+        var storage = plugin.getStorageManager();
+        String storageLine = "  Storage: " + storage.getTypeName();
+        int pending = storage.pendingWriteCount();
+        if (pending > 0) {
+            storageLine += " \u00a7e(" + pending + " writes not yet persisted)";
+        } else if (pending == 0) {
+            storageLine += " \u00a7a(all writes flushed)";
+        }
+        sender.sendMessage(storageLine);
+
+        boolean connected = plugin.getBotManager() != null && plugin.getBotManager().isConnected();
+        if (connected) {
+            long ping = plugin.getBotManager().getJda().getGatewayPing();
+            sender.sendMessage("  Discord: connected, gateway ping " + ping + "ms");
+            if (plugin.getWebhookManager() != null) {
+                sender.sendMessage("  Webhooks active: "
+                        + plugin.getWebhookManager().getWebhookCount());
+            }
+        } else {
+            sender.sendMessage("  Discord: \u00a7cnot connected");
+        }
+
+        sender.sendMessage("  SkinsRestorer: "
+                + (SkinUtil.isAvailable() ? "\u00a7ahooked" : "\u00a77not installed"));
+        if (SkinUtil.isGeyserPresent()) {
+            int bedrock = countBedrockPlayers();
+            sender.sendMessage("  Geyser/Floodgate: \u00a7adetected\u00a77, "
+                    + bedrock + " Bedrock player(s) online right now");
+        } else {
+            sender.sendMessage("  Geyser/Floodgate: not installed");
+        }
+
+        sender.sendMessage("  Logging: " + (ZLogger.isDebugMode()
+                ? "\u00a7eDEBUG (logging.debug: true)" : "normal (logging.level)"));
+        sender.sendMessage("  Modules: status=" + onOff(plugin.getStatusModule() != null)
+                + " live-stats=" + onOff(plugin.getLiveStatsModule() != null)
+                + " leaderboard=" + onOff(plugin.getLeaderboardModule() != null)
+                + " tickets=" + onOff(plugin.getTicketModule() != null)
+                + " link=" + onOff(plugin.getLinkModule() != null)
+                + " anti-raid=" + onOff(plugin.getAntiRaidModule() != null));
+        sender.sendMessage("");
+    }
+
+    private int countBedrockPlayers() {
+        try {
+            return plugin.getPlatformAdapter().supplySync(() -> {
+                int n = 0;
+                for (var p : plugin.getServer().getOnlinePlayers()) {
+                    if (SkinUtil.isBedrockUuid(p.getUniqueId())) n++;
+                }
+                return n;
+            });
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    private String onOff(boolean b) {
+        return b ? "on" : "off";
+    }
+
     private void handleDump(CommandSender sender) {
         if (!sender.hasPermission("zdiscord.admin")) {
             sender.sendMessage(plugin.getMessageManager().get("no-permission"));
             return;
         }
 
-        File dumpFile = new File(plugin.getDataFolder(),
-                "dump-" + System.currentTimeMillis() + ".txt");
+        File dumpFile = new File(plugin.getDataFolder(), "dump-" + System.currentTimeMillis() + ".txt");
         try (PrintWriter out = new PrintWriter(new FileWriter(dumpFile))) {
             String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
             out.println("ZDiscord support dump");
@@ -362,17 +416,13 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> subs = new ArrayList<>(Arrays.asList(
-                    "reload", "status", "link", "embed", "ticket",
-                    "panel", "lockdown", "update", "dump"));
-            return subs.stream()
-                    .filter(s -> s.startsWith(args[0].toLowerCase()))
-                    .collect(Collectors.toList());
+            List<String> subs = Arrays.asList("reload", "status", "diagnostics", "link",
+                    "embed", "ticket", "panel", "lockdown", "update", "dump");
+            return subs.stream().filter(s -> s.startsWith(args[0].toLowerCase())).toList();
         }
         if (args.length == 2 && "update".equalsIgnoreCase(args[0])) {
             return Arrays.asList("check", "dismiss").stream()
-                    .filter(s -> s.startsWith(args[1].toLowerCase()))
-                    .collect(Collectors.toList());
+                    .filter(s -> s.startsWith(args[1].toLowerCase())).toList();
         }
         return Collections.emptyList();
     }

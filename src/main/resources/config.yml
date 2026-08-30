@@ -1,7 +1,7 @@
-config-version: 6
+config-version: 11
 
 storage:
-  # yaml = flatfile. mysql = requires a MySQL server running.
+  # yaml = flatfile. mysql = requires MySQL 8.0+ (the JDBC driver is bundled).
   type: "yaml"
   mysql:
     host: "localhost"
@@ -10,6 +10,10 @@ storage:
     username: "root"
     password: ""
     use-ssl: true
+    # Verify the server's TLS certificate. Most self-hosted MySQL servers
+    # don't have a CA-signed cert, so this is off by default (traffic is
+    # still encrypted).
+    ssl-verify-certificate: false
 
 bot:
   # Create an app at https://discord.com/developers/applications,
@@ -43,12 +47,20 @@ chat:
   prefer-linked-avatar: true
   prefer-linked-name: true
   webhook-name: "%displayname%"
-  # %uuid% = with dashes, %uuid_nodashes% = without, %name% = player name
-  avatar-url: "https://mc-heads.net/avatar/%uuid%/128"
+  # "auto" picks the best avatar per player (SkinsRestorer skin when that
+  # plugin is installed, mc-heads otherwise, name-based for Bedrock players).
+  # Or set a custom format: %uuid% = with dashes, %uuid_nodashes% = without,
+  # %name% = player name.
+  avatar-url: "auto"
   # Format for messages that appear in Minecraft. Use & color codes.
   minecraft-format: "&9[Discord] &b%name% &8> &f%message%"
   show-attachments: true
   attachment-text: "&e[Attachment] &7(Click to open)"
+  # When a Discord message is a reply, show a small quote line above it
+  # in Minecraft chat. %reply_name% / %reply_message% placeholders.
+  show-replies: true
+  reply-format: "&7┌ Replying to &b%reply_name%&7: &f%reply_message%"
+  reply-preview-length: 60
 
 events:
   # Channel set in channels.events above. Controls join/quit/death/advancement
@@ -90,6 +102,15 @@ status:
     show-memory: true
     server-ip: "play.yourserver.com"
 
+# One combined embed that refreshes itself in a channel: players online,
+# TPS, memory, top kills/playtime, most followed. Needs channels set to
+# a real channel ID to appear.
+live-stats:
+  enabled: true
+  channel: ""
+  # Seconds between refreshes.
+  update-interval: 60
+
 # Tracks kills/deaths/playtime. Stats are stored per-player and
 # can be viewed with /leaderboard on Discord.
 leaderboard:
@@ -98,6 +119,9 @@ leaderboard:
   per-page: 10
   panel-channel: ""
   panel-update-interval: 120
+  # /leaderboard command replies re-edit themselves with fresh data every
+  # N seconds (buttons still work while it does). 0 = post once, no refresh.
+  auto-refresh-seconds: 60
   panel-stats:
     - "kills"
     - "deaths"
@@ -228,6 +252,20 @@ voice-status:
 profile:
   embed:
     color: "#9B59B6"
+  # Use the player's real skin texture for profile pictures when
+  # SkinsRestorer is installed (soft dependency). Falls back to the
+  # default Steve/Alex head otherwise.
+  skin-restorer: true
+
+# Optional bridges to other DemonZ plugins. Leave channel empty to use
+# channels.events. These hooks load only when the corresponding plugin exists.
+integrations:
+  onlysleep:
+    enabled: true
+    channel: ""
+  redstone-reboot:
+    enabled: true
+    channel: ""
 
 # /profile has a Follow button. When the player joins the
 # server, followers get a DM notification.
@@ -245,6 +283,10 @@ api:
   enabled: true
 
 logging:
+  # Master troubleshooting switch: sets every category to DEBUG and unsuppresses
+  # JDA/Hikari logs. Apply with /zdiscord reload. Turn off when you're done -
+  # it is very chatty.
+  debug: false
   level: INFO
   compact: true
   categories:

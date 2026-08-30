@@ -7,17 +7,16 @@ import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
-import net.dv8tion.jda.api.interactions.InteractionHook;
+import net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.interactions.components.buttons.Button;
+import net.dv8tion.jda.api.interactions.InteractionHook;
 import net.dv8tion.jda.api.utils.FileUpload;
 
 import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-
 
 public class TicketButtonListener extends ListenerAdapter {
 
@@ -33,44 +32,29 @@ public class TicketButtonListener extends ListenerAdapter {
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
         String id = event.getComponentId();
-        if (!id.startsWith(TicketModule.PANEL_BUTTON_ID)) {
-            return;
-        }
+        if (!id.startsWith(TicketModule.PANEL_BUTTON_ID)) return;
         if (plugin.getTicketModule() == null) {
             event.reply("The ticket system is disabled.").setEphemeral(true).queue();
             return;
         }
 
-        String action = id.substring(TicketModule.PANEL_BUTTON_ID.length() + 1);
-        switch (action) {
-            case QUICK_ACTION:
-                handleQuickOpen(event);
-                break;
-            case "close":
-                handleClose(event);
-                break;
-            case "claim":
-                handleClaim(event);
-                break;
-            case "transcript":
-                handleTranscript(event);
-                break;
-            default:
-                break;
+        switch (id.substring(TicketModule.PANEL_BUTTON_ID.length() + 1)) {
+            case QUICK_ACTION -> handleQuickOpen(event);
+            case "close" -> handleClose(event);
+            case "claim" -> handleClaim(event);
+            case "transcript" -> handleTranscript(event);
         }
     }
 
     @Override
     public void onStringSelectInteraction(StringSelectInteractionEvent event) {
-        if (!TicketModule.PANEL_SELECT_ID.equals(event.getComponentId())) {
-            return;
-        }
+        if (!TicketModule.PANEL_SELECT_ID.equals(event.getComponentId())) return;
         if (plugin.getTicketModule() == null) {
             event.reply("The ticket system is disabled.").setEphemeral(true).queue();
             return;
         }
-        String categoryId = event.getValues().get(0);
-        createTicketFromInteraction(event, event.getUser(), categoryId);
+
+        createTicketFromInteraction(event, event.getUser(), event.getValues().get(0));
     }
 
     private void handleQuickOpen(ButtonInteractionEvent event) {
@@ -78,40 +62,33 @@ public class TicketButtonListener extends ListenerAdapter {
             event.reply("The ticket system is disabled.").setEphemeral(true).queue();
             return;
         }
+
         String defaultId = plugin.getTicketModule().defaultCategoryId();
         if (defaultId == null) {
-            event.reply("No default ticket category is configured.")
-                    .setEphemeral(true).queue();
+            event.reply("No default ticket category is configured.").setEphemeral(true).queue();
             return;
         }
         createTicketFromInteraction(event, event.getUser(), defaultId);
     }
 
-    private void createTicketFromInteraction(
-            net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent event,
-            User user,
-            String categoryId) {
-        if (event instanceof ButtonInteractionEvent) {
-            ((ButtonInteractionEvent) event).deferReply(true).queue(
-                    hook -> completeTicketCreate(hook, user, categoryId));
-        } else if (event instanceof StringSelectInteractionEvent) {
-            ((StringSelectInteractionEvent) event).deferReply(true).queue(
-                    hook -> completeTicketCreate(hook, user, categoryId));
+    private void createTicketFromInteraction(GenericInteractionCreateEvent event, User user, String categoryId) {
+        if (event instanceof ButtonInteractionEvent button) {
+            button.deferReply(true).queue(hook -> completeTicketCreate(hook, user, categoryId));
+        } else if (event instanceof StringSelectInteractionEvent select) {
+            select.deferReply(true).queue(hook -> completeTicketCreate(hook, user, categoryId));
         }
     }
 
     private void completeTicketCreate(InteractionHook hook, User user, String categoryId) {
         plugin.getPlatformAdapter().runAsync(() -> {
-            String message = plugin.getTicketModule()
-                    .createTicketForCategory(user, categoryId);
+            String message = plugin.getTicketModule().createTicketForCategory(user, categoryId);
             hook.sendMessage(message).queue();
         });
     }
 
     private void handleClose(ButtonInteractionEvent event) {
-        if (event.getMember() == null) {
-            return;
-        }
+        if (event.getMember() == null) return;
+
         TextChannel channel = event.getChannel().asTextChannel();
         if (!isTicketChannel(channel)) {
             event.reply(plugin.getMessageManager().getRaw("ticket-not-ticket-channel"))
@@ -125,11 +102,17 @@ public class TicketButtonListener extends ListenerAdapter {
         }
 
         event.reply(plugin.getMessageManager().get(
-                "ticket-closed-message",
-                "%staff%", event.getMember().getEffectiveName())).queue();
+                "ticket-closed-message", "%staff%", event.getMember().getEffectiveName())).queue();
 
         if (plugin.getTicketModule() != null) {
-            decrementForTicketCreator(channel);
+            String ownerKey = ticketOwnerFromTopic(channel);
+            if (ownerKey != null) {
+                plugin.getTicketModule().onTicketClose(ownerKey);
+            } else {
+                // older tickets have no topic ref, fall back to guessing
+                // from the member permission overrides
+                decrementForTicketCreator(channel);
+            }
         }
 
         plugin.getPlatformAdapter().runLater(
@@ -142,9 +125,8 @@ public class TicketButtonListener extends ListenerAdapter {
     }
 
     private void handleClaim(ButtonInteractionEvent event) {
-        if (event.getMember() == null) {
-            return;
-        }
+        if (event.getMember() == null) return;
+
         TextChannel channel = event.getChannel().asTextChannel();
         if (!isTicketChannel(channel)) {
             event.reply(plugin.getMessageManager().getRaw("ticket-not-ticket-channel"))
@@ -162,9 +144,8 @@ public class TicketButtonListener extends ListenerAdapter {
     }
 
     private void handleTranscript(ButtonInteractionEvent event) {
-        if (event.getMember() == null) {
-            return;
-        }
+        if (event.getMember() == null) return;
+
         TextChannel channel = event.getChannel().asTextChannel();
         if (!isTicketChannel(channel)) {
             event.reply(plugin.getMessageManager().getRaw("ticket-not-ticket-channel"))
@@ -178,29 +159,35 @@ public class TicketButtonListener extends ListenerAdapter {
         }
 
         event.deferReply().setEphemeral(true).queue();
+
+        if (channel.getLatestMessageId() == null) {
+            event.getHook().sendMessage("Nothing to transcribe - this channel "
+                    + "has no messages yet.").setEphemeral(true).queue();
+            return;
+        }
+
         channel.getHistoryBefore(channel.getLatestMessageId(), 100).queue(
                 history -> {
                     StringBuilder sb = new StringBuilder();
                     sb.append("# Ticket Transcript - ").append(channel.getName()).append("\n\n");
+
                     List<Message> messages = history.getRetrievedHistory();
                     for (int i = messages.size() - 1; i >= 0; i--) {
                         Message msg = messages.get(i);
                         String timestamp = msg.getTimeCreated()
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-                        String author = msg.getAuthor().getEffectiveName();
-                        String content = msg.getContentDisplay();
-                        sb.append("**").append(author).append("** (").append(timestamp).append("):\n")
-                                .append(content).append("\n\n");
+                        sb.append("**").append(msg.getAuthor().getEffectiveName())
+                                .append("** (").append(timestamp).append("):\n")
+                                .append(msg.getContentDisplay()).append("\n\n");
                     }
+
                     byte[] bytes = sb.toString().getBytes(StandardCharsets.UTF_8);
                     channel.sendFiles(FileUpload.fromData(bytes,
-                            "transcript-" + channel.getName() + ".md"))
-                            .queue(msg -> {
+                            "transcript-" + channel.getName() + ".md")).queue(
+                            msg -> {
                                 String url = msg.getAttachments().isEmpty()
-                                        ? "No attachment URL"
-                                        : msg.getAttachments().get(0).getUrl();
-                                event.getHook().sendMessage(
-                                        "Transcript generated: " + url)
+                                        ? "No attachment URL" : msg.getAttachments().get(0).getUrl();
+                                event.getHook().sendMessage("Transcript generated: " + url)
                                         .setEphemeral(true).queue();
                             },
                             err -> event.getHook().sendMessage(
@@ -217,11 +204,9 @@ public class TicketButtonListener extends ListenerAdapter {
     }
 
     private boolean isSupport(Member member) {
-        if (member.hasPermission(Permission.ADMINISTRATOR)) {
-            return true;
-        }
-        List<String> supportRoles = plugin.getConfigManager()
-                .getStringList("tickets.support-roles");
+        if (member.hasPermission(Permission.ADMINISTRATOR)) return true;
+
+        List<String> supportRoles = plugin.getConfigManager().getStringList("tickets.support-roles");
         for (String roleId : supportRoles) {
             if (member.getRoles().stream().anyMatch(r -> r.getId().equals(roleId))) {
                 return true;
@@ -230,7 +215,15 @@ public class TicketButtonListener extends ListenerAdapter {
         return false;
     }
 
+    private String ticketOwnerFromTopic(TextChannel channel) {
+        String topic = channel.getTopic();
+        if (topic == null || !topic.startsWith(TicketModule.OWNER_TOPIC_PREFIX)) {
+            return null;
+        }
+        return topic.substring(TicketModule.OWNER_TOPIC_PREFIX.length());
+    }
 
+    // track down the ticket owner so we can decrement their open-ticket limit
     private void decrementForTicketCreator(TextChannel channel) {
         for (var override : channel.getMemberPermissionOverrides()) {
             Member member = override.getMember();
@@ -240,9 +233,4 @@ public class TicketButtonListener extends ListenerAdapter {
             }
         }
     }
-
-
-    @SuppressWarnings("unused")
-    private static final Button LEGACY_CLOSE = Button.danger(
-            "zdiscord_ticket_close", "Close");
 }

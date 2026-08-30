@@ -11,7 +11,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-
 public class LinkModule {
 
     private static final long LINK_EXPIRY_MS = 5L * 60L * 1000L;
@@ -52,19 +51,16 @@ public class LinkModule {
                 + " linked accounts from " + plugin.getStorageManager().getTypeName());
     }
 
-
     public String generateCode(Player player) {
         if (linkedAccounts.containsKey(player.getUniqueId())) {
             player.sendMessage(plugin.getMessageManager().get("link-already-linked"));
             return null;
         }
 
-
         String code = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
         pendingLinks.put(code, new PendingLink(player.getUniqueId(), System.currentTimeMillis()));
         return code;
     }
-
 
     public boolean processLink(String discordId, String discordName, String code) {
         if (code == null) {
@@ -79,13 +75,20 @@ public class LinkModule {
         }
 
         UUID playerUUID = pending.playerUUID;
+        UUID previousPlayer = discordToMc.put(discordId, playerUUID);
+        if (previousPlayer != null && !previousPlayer.equals(playerUUID)) {
+            linkedAccounts.remove(previousPlayer);
+            plugin.getStorageManager().removeLink(previousPlayer);
+            plugin.getLogger().info("Discord account " + discordId
+                    + " was relinked from " + previousPlayer + " to " + playerUUID);
+        }
         linkedAccounts.put(playerUUID, discordId);
-        discordToMc.put(discordId, playerUUID);
         plugin.getStorageManager().saveLink(playerUUID, discordId);
+        plugin.getLogger().info("Linked account: " + playerUUID + " <-> Discord "
+                + discordId + " (" + discordName + ")");
 
         Bukkit.getPluginManager().callEvent(
                 new ZDiscordPlayerLinkEvent(playerUUID, discordId, true));
-
 
         String roleId = plugin.getConfigManager().getString("linking.linked-role");
         if (roleId != null && !roleId.isEmpty()) {
@@ -103,24 +106,29 @@ public class LinkModule {
             }
         }
 
-
         List<String> rewards = plugin.getConfigManager().getStringList("linking.rewards");
         plugin.getPlatformAdapter().runSync(() -> {
             Player player = Bukkit.getPlayer(playerUUID);
             if (player == null) {
                 return;
             }
-            player.sendMessage(plugin.getMessageManager().get(
-                    "link-success", "%discord_name%", discordName));
-            for (String cmd : rewards) {
-                String resolved = PlaceholderUtil.resolve(cmd, player);
-                try {
-                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), resolved);
-                } catch (Exception e) {
-                    plugin.getLogger().warning("Failed to run link reward command: "
-                            + e.getMessage());
-                }
-            }
+            plugin.getPlatformAdapter().runForEntity(player, () -> {
+                player.sendMessage(plugin.getMessageManager().get(
+                        "link-success", "%discord_name%", discordName));
+                List<String> resolvedRewards = rewards.stream()
+                        .map(cmd -> PlaceholderUtil.resolve(cmd, player))
+                        .toList();
+                plugin.getPlatformAdapter().runSync(() -> {
+                    for (String resolved : resolvedRewards) {
+                        try {
+                            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), resolved);
+                        } catch (Exception e) {
+                            plugin.getLogger().warning("Failed to run link reward command: "
+                                    + e.getMessage());
+                        }
+                    }
+                });
+            });
         });
 
         return true;
@@ -141,9 +149,14 @@ public class LinkModule {
     public void unlink(UUID playerUUID) {
         String discordId = linkedAccounts.remove(playerUUID);
         if (discordId != null) {
-            discordToMc.remove(discordId);
+            // only clear the reverse mapping if it still points at us -
+            // several players can share one discord id in bad legacy data
+            // and the other player would silently lose lookups
+            discordToMc.remove(discordId, playerUUID);
         }
         plugin.getStorageManager().removeLink(playerUUID);
+        plugin.getLogger().info("Unlinked account: " + playerUUID
+                + (discordId != null ? " (Discord " + discordId + ")" : ""));
         if (discordId != null) {
             Bukkit.getPluginManager().callEvent(
                     new ZDiscordPlayerLinkEvent(playerUUID, discordId, false));

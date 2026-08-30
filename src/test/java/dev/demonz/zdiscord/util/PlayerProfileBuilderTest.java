@@ -33,7 +33,6 @@ class PlayerProfileBuilderTest {
 
     @Test
     void formatDateNonZero() {
-
         String result = PlayerProfileBuilder.formatDate(1609459200000L);
         assertEquals("<t:1609459200:R>", result);
     }

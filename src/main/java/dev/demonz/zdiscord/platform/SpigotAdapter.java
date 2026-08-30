@@ -4,7 +4,6 @@ import dev.demonz.zdiscord.ZDiscord;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Entity;
 
-
 public class SpigotAdapter implements PlatformAdapter {
 
     private final ZDiscord plugin;
@@ -30,7 +29,6 @@ public class SpigotAdapter implements PlatformAdapter {
 
     @Override
     public void runForEntity(Entity entity, Runnable task) {
-
         runSync(task);
     }
 

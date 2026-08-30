@@ -19,19 +19,14 @@ public class PaperStaffChatListener implements Listener {
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onChat(AsyncChatEvent event) {
-        if (plugin.getStaffChatModule() == null) {
-            return;
-        }
-        if (!plugin.getStaffChatModule().isToggled(event.getPlayer().getUniqueId())) {
-            return;
-        }
+        if (plugin.getStaffChatModule() == null) return;
+        if (!plugin.getStaffChatModule().isToggled(event.getPlayer().getUniqueId())) return;
 
         event.setCancelled(true);
         String message = PLAIN.serialize(event.message());
-        String finalMessage = message;
         plugin.getPlatformAdapter().runSync(() -> {
-            plugin.getStaffChatModule().broadcastToStaff(event.getPlayer(), finalMessage);
-            plugin.getStaffChatModule().sendToDiscord(event.getPlayer(), finalMessage);
+            plugin.getStaffChatModule().broadcastToStaff(event.getPlayer(), message);
+            plugin.getStaffChatModule().sendToDiscord(event.getPlayer(), message);
         });
     }
 }

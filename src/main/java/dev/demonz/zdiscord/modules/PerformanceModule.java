@@ -12,13 +12,12 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.Locale;
 import java.util.logging.Level;
-
 
 public class PerformanceModule {
 
     private static final int HISTORY_SIZE = 30;
-
     private static final String SPARK_BLOCKS =
             "\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588";
 
@@ -35,7 +34,7 @@ public class PerformanceModule {
     public void init() {
         perfMessageId = loadMessageId();
         int interval = plugin.getConfigManager().getInt("performance.update-interval", 60);
-        plugin.getPlatformAdapter().runAsyncTimer(this::updatePerformance, 200L, interval * 20L);
+        plugin.getPlatformAdapter().runTimer(this::updatePerformance, 200L, interval * 20L);
     }
 
     private void updatePerformance() {
@@ -66,15 +65,15 @@ public class PerformanceModule {
         if (tps[0] >= tpsWarning && memPercent < memWarning) {
             color = 0x2ECC71;
             health = "Healthy";
-            healthEmoji = ":white_check_mark:";
+            healthEmoji = "✅";
         } else if (tps[0] >= tpsCritical && memPercent < 90) {
             color = 0xF1C40F;
             health = "Warning";
-            healthEmoji = ":warning:";
+            healthEmoji = "⚠️";
         } else {
             color = 0xE74C3C;
             health = "Critical";
-            healthEmoji = ":no_entry:";
+            healthEmoji = "⛔️";
         }
 
         String tpsSpark = buildSparkline(toDoubleArray(tpsHistory), 20.0);
@@ -87,10 +86,10 @@ public class PerformanceModule {
                 .setTitle(healthEmoji + " " + health)
                 .setColor(color)
                 .addField("TPS (1m / 5m / 15m)",
-                        String.format("`%.2f` / `%.2f` / `%.2f`",
+                        String.format(Locale.ROOT, "`%.2f` / `%.2f` / `%.2f`",
                                 tps[0], tps[1], tps[2]), true)
                 .addField("Memory",
-                        String.format("`%dMB` / `%dMB` (%d%%)",
+                        String.format(Locale.ROOT, "`%dMB` / `%dMB` (%d%%)",
                                 usedMb, maxMb, memPercent), true)
                 .addField("Players / Threads",
                         Bukkit.getOnlinePlayers().size() + " / " + Thread.activeCount(),
@@ -104,10 +103,10 @@ public class PerformanceModule {
                 .setTimestamp(Instant.now());
 
         if (tps[0] < tpsCritical) {
-            embed.addField(":rotating_light: Alert", "TPS is critically low.", false);
+            embed.addField("🚨 Alert", "TPS is critically low.", false);
         }
         if (memPercent >= 90) {
-            embed.addField(":rotating_light: Alert", "Memory usage is critically high.", false);
+            embed.addField("🚨 Alert", "Memory usage is critically high.", false);
         }
 
         if (perfMessageId != null) {
@@ -116,18 +115,14 @@ public class PerformanceModule {
                     error -> {
                         perfMessageId = null;
                         channel.sendMessageEmbeds(embed.build()).queue(msg -> {
-                            if (msg != null) {
-                                perfMessageId = msg.getId();
-                                persistMessageId(perfMessageId);
-                            }
+                            perfMessageId = msg.getId();
+                            persistMessageId(perfMessageId);
                         });
                     });
         } else {
             channel.sendMessageEmbeds(embed.build()).queue(msg -> {
-                if (msg != null) {
-                    perfMessageId = msg.getId();
-                    persistMessageId(perfMessageId);
-                }
+                perfMessageId = msg.getId();
+                persistMessageId(perfMessageId);
             });
         }
     }
@@ -182,7 +177,6 @@ public class PerformanceModule {
         }
         return out;
     }
-
 
     private String buildSparkline(double[] values, double max) {
         if (values.length == 0) {

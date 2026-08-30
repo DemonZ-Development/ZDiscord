@@ -55,8 +55,7 @@ public class ConfessionModule {
             return;
         }
 
-        TextChannel channel = plugin.getBotManager().getJda()
-                .getTextChannelById(channelId);
+        TextChannel channel = plugin.getBotManager().getJda().getTextChannelById(channelId);
         if (channel == null) {
             replyTarget.reply("Confessions are disabled on this server "
                     + "(the configured channel could not be found).");
@@ -77,6 +76,9 @@ public class ConfessionModule {
         long cooldownMs = plugin.getConfigManager()
                 .getInt("confessions.cooldown", 300) * 1000L;
         long now = System.currentTimeMillis();
+        if (cooldowns.size() > 1000) {
+            cooldowns.values().removeIf(t -> now - t >= cooldownMs);
+        }
         Long lastConfession = cooldowns.get(cooldownKey);
         if (lastConfession != null && (now - lastConfession) < cooldownMs) {
             long remaining = Math.max(1L, (cooldownMs - (now - lastConfession) + 999L) / 1000L);

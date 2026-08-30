@@ -7,10 +7,10 @@ import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+import java.awt.Color;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 
 public class AntiRaidModule {
 
@@ -49,14 +49,11 @@ public class AntiRaidModule {
         }
 
         long now = System.currentTimeMillis();
-        synchronized (recentJoins) {
-            recentJoins.addLast(now);
-        }
-
         int maxJoins = plugin.getConfigManager().getInt("anti-raid.max-joins", 10);
         int timeWindow = plugin.getConfigManager().getInt("anti-raid.time-window", 30);
 
         synchronized (recentJoins) {
+            recentJoins.addLast(now);
             long cutoff = now - (timeWindow * 1000L);
             long recent = recentJoins.stream().filter(t -> t >= cutoff).count();
             if (recent >= maxJoins) {
@@ -82,7 +79,7 @@ public class AntiRaidModule {
                         "Raid detected - server lockdown",
                         "A possible raid has been detected. The server is now in lockdown. "
                                 + "New joins will be kicked until the lockdown is lifted.",
-                        new java.awt.Color(0xE74C3C))
+                        new Color(0xE74C3C))
                         .addField("Recent joins", String.valueOf(recent), true)
                         .build())
                         .queue();
@@ -109,7 +106,7 @@ public class AntiRaidModule {
             channel.sendMessageEmbeds(EmbedUtil.simple(
                     "Lockdown lifted",
                     "The server lockdown has been lifted. Normal operations resumed.",
-                    new java.awt.Color(0x2ECC71)).build()).queue();
+                    new Color(0x2ECC71)).build()).queue();
         }
 
         synchronized (recentJoins) {

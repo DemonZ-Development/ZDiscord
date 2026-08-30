@@ -3,11 +3,16 @@ package dev.demonz.zdiscord.api;
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.api.model.LeaderboardEntry;
 import dev.demonz.zdiscord.api.model.PlayerProfile;
+import dev.demonz.zdiscord.api.model.EmbedData;
 import dev.demonz.zdiscord.modules.FollowModule;
 import dev.demonz.zdiscord.modules.LeaderboardModule;
 import dev.demonz.zdiscord.modules.LinkModule;
+import dev.demonz.zdiscord.util.PlayerProfileBuilder;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
+import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -15,6 +20,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.time.Instant;
+import dev.demonz.zdiscord.util.ColorUtil;
+import dev.demonz.zdiscord.util.ZLogger;
 
 public final class ZDiscordAPIImpl implements ZDiscordAPI {
 
@@ -27,8 +35,7 @@ public final class ZDiscordAPIImpl implements ZDiscordAPI {
     @Override
     public PlayerProfile getPlayerProfile(UUID uuid) {
         if (uuid == null) return null;
-        OfflinePlayer op = Bukkit.getOfflinePlayer(uuid);
-        var internal = dev.demonz.zdiscord.util.PlayerProfileBuilder.build(plugin, op);
+        var internal = PlayerProfileBuilder.build(plugin, Bukkit.getOfflinePlayer(uuid));
         return new PlayerProfile(
                 internal.uuid, internal.name, internal.online,
                 internal.firstJoinMs, internal.lastSeenMs, internal.sessions,
@@ -41,14 +48,13 @@ public final class ZDiscordAPIImpl implements ZDiscordAPI {
     public List<LeaderboardEntry> getLeaderboard(String stat, int limit) {
         LeaderboardModule lm = plugin.getLeaderboardModule();
         if (lm == null) return Collections.emptyList();
-        List<Map.Entry<UUID, Long>> raw = lm.getLeaderboard(stat, limit);
-        List<LeaderboardEntry> result = new ArrayList<>(raw.size());
+
+        List<LeaderboardEntry> result = new ArrayList<>();
         int rank = 1;
-        for (Map.Entry<UUID, Long> entry : raw) {
+        for (Map.Entry<UUID, Long> entry : lm.getLeaderboard(stat, limit)) {
             String name = Bukkit.getOfflinePlayer(entry.getKey()).getName();
             result.add(new LeaderboardEntry(
-                    entry.getKey(),
-                    name != null ? name : "Unknown",
+                    entry.getKey(), name != null ? name : "Unknown",
                     stat, entry.getValue(), rank++));
         }
         return result;
@@ -103,6 +109,54 @@ public final class ZDiscordAPIImpl implements ZDiscordAPI {
     }
 
     @Override
+    public boolean sendMessage(String channelConfigPath, String message) {
+        TextChannel channel = resolveChannel(channelConfigPath);
+        if (channel == null || message == null || message.isBlank()) return false;
+        String content = message.length() <= 2000 ? message : message.substring(0, 1999) + "\u2026";
+        channel.sendMessage(content)
+                .setAllowedMentions(Collections.<Message.MentionType>emptyList())
+                .queue(null, error -> ZLogger.warn(ZLogger.Category.API,
+                        "API message failed: " + error.getMessage()));
+        return true;
+    }
+
+    @Override
+    public boolean sendEmbed(String channelConfigPath, EmbedData data) {
+        TextChannel channel = resolveChannel(channelConfigPath);
+        if (channel == null || data == null) return false;
+        try {
+            EmbedBuilder embed = new EmbedBuilder()
+                    .setTitle(data.getTitle())
+                    .setDescription(data.getDescription())
+                    .setColor(ColorUtil.parseHex(data.getColor()))
+                    .setThumbnail(data.getThumbnailUrl())
+                    .setFooter(data.getFooterText())
+                    .setTimestamp(Instant.now());
+            if (data.getAuthorName() != null) {
+                embed.setAuthor(data.getAuthorName(), data.getAuthorUrl(), data.getAuthorIconUrl());
+            }
+            for (EmbedData.Field field : data.getFields()) {
+                embed.addField(field.getName(), field.getValue(), field.isInline());
+            }
+            channel.sendMessageEmbeds(embed.build()).queue(null,
+                    error -> ZLogger.warn(ZLogger.Category.API,
+                            "API embed failed: " + error.getMessage()));
+            return true;
+        } catch (RuntimeException e) {
+            ZLogger.warn(ZLogger.Category.API, "Rejected invalid API embed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private TextChannel resolveChannel(String configPath) {
+        if (configPath == null || configPath.isBlank()
+                || plugin.getBotManager() == null || !plugin.getBotManager().isConnected()) {
+            return null;
+        }
+        return plugin.getBotManager().getTextChannel(configPath);
+    }
+
+    @Override
     public int getOnlinePlayerCount() {
         return Bukkit.getOnlinePlayers().size();
     }
@@ -110,16 +164,12 @@ public final class ZDiscordAPIImpl implements ZDiscordAPI {
     @Override
     public void incrementStat(UUID playerUUID, String stat, long amount) {
         LeaderboardModule lm = plugin.getLeaderboardModule();
-        if (lm != null) {
-            lm.incrementStatBy(playerUUID, stat, amount);
-        }
+        if (lm != null) lm.incrementStatBy(playerUUID, stat, amount);
     }
 
     @Override
     public void setStat(UUID playerUUID, String stat, long value) {
         LeaderboardModule lm = plugin.getLeaderboardModule();
-        if (lm != null) {
-            lm.setStat(playerUUID, stat, value);
-        }
+        if (lm != null) lm.setStat(playerUUID, stat, value);
     }
 }

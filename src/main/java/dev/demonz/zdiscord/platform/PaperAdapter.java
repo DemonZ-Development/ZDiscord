@@ -4,7 +4,6 @@ import dev.demonz.zdiscord.ZDiscord;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Entity;
 
-
 public class PaperAdapter implements PlatformAdapter {
 
     private final ZDiscord plugin;

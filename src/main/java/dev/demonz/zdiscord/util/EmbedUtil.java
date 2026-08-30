@@ -17,40 +17,24 @@ public final class EmbedUtil {
     }
 
     public static EmbedBuilder simple(String title, String description, Color color) {
-        return branded()
-                .setTitle(title)
-                .setDescription(description)
-                .setColor(color);
+        return branded().setTitle(title).setDescription(description).setColor(color);
     }
 
     public static EmbedBuilder error(String message) {
-        return branded()
-                .setTitle(":x: Error")
-                .setDescription(message)
-                .setColor(ERROR);
+        return branded().setTitle("❌ Error").setDescription(message).setColor(ERROR);
     }
 
     public static EmbedBuilder success(String message) {
-        return branded()
-                .setTitle(":white_check_mark: Success")
-                .setDescription(message)
-                .setColor(SUCCESS);
+        return branded().setTitle("✅ Success").setDescription(message).setColor(SUCCESS);
     }
 
     public static EmbedBuilder info(String title, String message) {
-        return branded()
-                .setTitle(title)
-                .setDescription(message)
-                .setColor(INFO);
+        return branded().setTitle(title).setDescription(message).setColor(INFO);
     }
 
     public static EmbedBuilder warn(String title, String message) {
-        return branded()
-                .setTitle(":warning: " + title)
-                .setDescription(message)
-                .setColor(WARN);
+        return branded().setTitle("⚠️ " + title).setDescription(message).setColor(WARN);
     }
-
 
     public static EmbedBuilder branded() {
         return new EmbedBuilder()

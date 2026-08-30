@@ -26,3 +26,9 @@ messages.local.yml
 
 # Local AI / agent working notes
 AGENTS.md
+.tools/
+
+# Local server smoke-test state
+server.pid
+stdout.log
+stderr.log

@@ -10,8 +10,7 @@ public final class LeaderboardEntry {
     private final long value;
     private final int rank;
 
-    public LeaderboardEntry(UUID uuid, String playerName, String stat,
-                            long value, int rank) {
+    public LeaderboardEntry(UUID uuid, String playerName, String stat, long value, int rank) {
         this.uuid = uuid;
         this.playerName = playerName;
         this.stat = stat;

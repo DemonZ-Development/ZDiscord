@@ -180,4 +180,23 @@ class YamlStorageTest {
         assertEquals(1, storage.getFollowers(uuid).size());
         assertTrue(storage.getFollowedPlayers("222").contains(uuid));
     }
+
+    @Test
+    void topFollowedPlayersAreRankedFromDisk(@TempDir Path tmp) {
+        YamlStorage storage = newStorage(tmp.toFile());
+        UUID popular = UUID.randomUUID();
+        UUID known = UUID.randomUUID();
+        storage.addFollower(popular, "1");
+        storage.addFollower(popular, "2");
+        storage.addFollower(popular, "3");
+        storage.addFollower(known, "4");
+
+        var top = storage.getTopFollowedPlayers(10);
+        assertEquals(2, top.size());
+        assertEquals(popular, top.get(0).getKey());
+        assertEquals(3, top.get(0).getValue());
+
+        var onlyOne = storage.getTopFollowedPlayers(1);
+        assertEquals(1, onlyOne.size());
+    }
 }

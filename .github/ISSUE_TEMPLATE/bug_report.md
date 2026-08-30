@@ -26,7 +26,7 @@ What actually happens. Include the exact error message or screenshot if relevant
 
 ## Environment
 
-- ZDiscord version: (e.g. 1.2.0)
+- ZDiscord version: (e.g. 1.3.0)
 - Server software and version: (e.g. Paper 1.20.4, Folia, Spigot 1.20.4)
 - Java version: (`java -version`)
 - Storage backend: (YAML or MySQL)

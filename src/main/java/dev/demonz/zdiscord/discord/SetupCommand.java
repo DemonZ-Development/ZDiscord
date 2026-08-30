@@ -8,22 +8,26 @@ import dev.demonz.zdiscord.util.StatusEmbedBuilder;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.EntitySelectInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.interactions.components.ActionRow;
-import net.dv8tion.jda.api.interactions.components.buttons.Button;
-import net.dv8tion.jda.api.interactions.components.selections.EntitySelectMenu;
-import net.dv8tion.jda.api.interactions.components.selections.StringSelectMenu;
-import net.dv8tion.jda.api.interactions.modals.Modal;
+import net.dv8tion.jda.api.components.actionrow.ActionRow;
+import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.components.label.Label;
+import net.dv8tion.jda.api.components.selections.EntitySelectMenu;
+import net.dv8tion.jda.api.components.selections.StringSelectMenu;
+import net.dv8tion.jda.api.components.textinput.TextInput;
+import net.dv8tion.jda.api.components.textinput.TextInputStyle;
+import net.dv8tion.jda.api.modals.Modal;
 import net.dv8tion.jda.api.interactions.modals.ModalMapping;
-import net.dv8tion.jda.api.interactions.components.text.TextInput;
-import net.dv8tion.jda.api.interactions.components.text.TextInputStyle;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
 
@@ -34,7 +38,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-
+/**
+ * /setup wizard — channel linking for every module plus a full ticket
+ * category manager (add / edit / remove / reorder) driven by buttons,
+ * dropdowns and modals.
+ */
 public class SetupCommand extends ListenerAdapter {
 
     private final ZDiscord plugin;
@@ -42,7 +50,6 @@ public class SetupCommand extends ListenerAdapter {
     private static final String MODULE_MENU_ID = "zdiscord_setup_module";
     private static final String SUPPORT_ROLE_MENU_ID = "zdiscord_setup_support_role";
     private static final String CHANNEL_MENU_PREFIX = "zdiscord_setup_channel:";
-
 
     private static final String TICKET_CATEGORY_MENU_ID = "zdiscord_setup_ticket_cat_menu";
     private static final String TICKET_CATEGORY_PREFIX = "zdiscord_setup_ticket_cat:";
@@ -95,15 +102,12 @@ public class SetupCommand extends ListenerAdapter {
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        if (!"setup".equals(event.getName())) {
-            return;
-        }
+        if (!"setup".equals(event.getName())) return;
         if (!isAdmin(event.getMember())) {
             event.reply("You need **Administrator** permission to use this command.")
                     .setEphemeral(true).queue();
             return;
         }
-
         showWizardPanel(event);
     }
 
@@ -126,35 +130,34 @@ public class SetupCommand extends ListenerAdapter {
 
         StringBuilder statusLines = new StringBuilder();
         for (Map.Entry<String, ModuleInfo> entry : MODULES.entrySet()) {
-            ModuleInfo info = entry.getValue();
-            String val = plugin.getConfigManager().getString(info.configPath, "");
+            String val = plugin.getConfigManager().getString(entry.getValue().configPath, "");
             if (isSet(val)) {
-                statusLines.append(":white_check_mark: **").append(entry.getKey())
+                statusLines.append("✅ **").append(entry.getKey())
                         .append("** -> <#").append(val).append(">\n");
             } else {
-                statusLines.append(":black_square_button: ").append(entry.getKey()).append("\n");
+                statusLines.append("🔲 ").append(entry.getKey()).append("\n");
             }
         }
 
         int catCount = getCategoriesFromConfig().size();
         String catLine = catCount == 0
-                ? ":black_square_button: ticket categories (none yet)"
-                : ":white_check_mark: " + catCount + " ticket categor"
+                ? "🔲 ticket categories (none yet)"
+                : "✅ " + catCount + " ticket categor"
                         + (catCount == 1 ? "y" : "ies") + " configured";
 
         EmbedBuilder panel = new EmbedBuilder()
                 .setAuthor("ZDiscord Setup Wizard", null, guildIcon)
-                .setTitle(":gear: Configure your server integration")
+                .setTitle("⚙️ Configure your server integration")
                 .setDescription("Pick a module from the dropdown below to configure it.\n"
                         + "Each module has a guided flow with sensible defaults.")
                 .setColor(ColorUtil.parseHex("#5865F2"))
                 .setThumbnail(guildIcon)
-                .addField(":satellite: Connection",
-                        (botReady ? ":white_check_mark: Bot online" : ":x: Bot not connected")
+                .addField("📡 Connection",
+                        (botReady ? "✅ Bot online" : "❌ Bot not connected")
                                 + "\n" + online + "/" + max + " players", true)
-                .addField(":bar_chart: Progress",
+                .addField("📊 Progress",
                         configured + "/" + MODULES.size() + " modules\n" + catLine, true)
-                .addField(":clipboard: Module status", statusLines.toString(), false)
+                .addField("📋 Module status", statusLines.toString(), false)
                 .setFooter("ZDiscord v" + plugin.getDescription().getVersion()
                         + "  \u2022  /setup for this wizard")
                 .setTimestamp(Instant.now());
@@ -166,8 +169,7 @@ public class SetupCommand extends ListenerAdapter {
         for (Map.Entry<String, ModuleInfo> entry : MODULES.entrySet()) {
             ModuleInfo info = entry.getValue();
             String val = plugin.getConfigManager().getString(info.configPath, "");
-            String status = isSet(val) ? "Configured" : "Not set";
-            String desc = status + "  \u2022  " + info.description;
+            String desc = (isSet(val) ? "Configured" : "Not set") + "  \u2022  " + info.description;
             if (desc.length() > 100) {
                 desc = desc.substring(0, 97) + "...";
             }
@@ -175,17 +177,16 @@ public class SetupCommand extends ListenerAdapter {
         }
 
         event.replyEmbeds(panel.build())
-                .addActionRow(menuBuilder.build())
+                .addComponents(ActionRow.of(menuBuilder.build()))
                 .setEphemeral(false)
                 .queue();
     }
 
     @Override
     public void onStringSelectInteraction(StringSelectInteractionEvent event) {
-        String componentId = event.getComponentId();
-        if (MODULE_MENU_ID.equals(componentId)) {
+        if (MODULE_MENU_ID.equals(event.getComponentId())) {
             handleModuleSelect(event);
-        } else if (componentId.equals(TICKET_CATEGORY_MENU_ID)) {
+        } else if (TICKET_CATEGORY_MENU_ID.equals(event.getComponentId())) {
             handleTicketCategorySelect(event);
         }
     }
@@ -210,12 +211,11 @@ public class SetupCommand extends ListenerAdapter {
         }
 
         EmbedBuilder prompt = new EmbedBuilder()
-                .setTitle(":gear: Configure " + capitalize(module))
+                .setTitle("⚙️ Configure " + capitalize(module))
                 .setDescription(info.description
                         + "\n\nSelect a channel to link this module to. The dropdown only shows channels the bot can see.")
                 .setColor(ColorUtil.parseHex("#5865F2"))
-                .setFooter("Step 1/" + ("tickets".equals(module) ? "3" : "1")
-                        + "  \u2022  Select a channel")
+                .setFooter("Step 1/1  \u2022  Select a channel")
                 .setTimestamp(Instant.now());
 
         EntitySelectMenu channelMenu = EntitySelectMenu.create(
@@ -226,7 +226,7 @@ public class SetupCommand extends ListenerAdapter {
                 .build();
 
         event.replyEmbeds(prompt.build())
-                .addActionRow(channelMenu)
+                .addComponents(ActionRow.of(channelMenu))
                 .setEphemeral(true)
                 .queue();
     }
@@ -244,38 +244,34 @@ public class SetupCommand extends ListenerAdapter {
     private void handleChannelSelect(EntitySelectInteractionEvent event) {
         String module = event.getComponentId().replace(CHANNEL_MENU_PREFIX, "");
         ModuleInfo info = MODULES.get(module);
-        if (info == null) {
-            return;
-        }
+        if (info == null) return;
+
         var selectedChannel = event.getMentions().getChannels().get(0);
-        if (!(selectedChannel instanceof TextChannel)) {
+        if (!(selectedChannel instanceof TextChannel channel)) {
             event.reply("Please select a **text channel**.").setEphemeral(true).queue();
             return;
         }
-        TextChannel channel = (TextChannel) selectedChannel;
 
         switch (module) {
-            case "status":
+            case "status" -> {
                 saveToConfig(info.configPath, channel.getId());
                 handleStatusSetup(event, channel);
-                return;
-            case "tickets":
-                handleTicketSetup(event, channel);
-                return;
-            default:
+            }
+            case "tickets" -> handleTicketSetup(event, channel);
+            default -> {
                 saveToConfig(info.configPath, channel.getId());
                 postActivationNotice(channel, info, event.getUser().getName());
                 event.replyEmbeds(EmbedUtil.success(
                         capitalize(module) + " has been linked to " + channel.getAsMention() + ".")
                         .build())
                         .setEphemeral(true).queue();
-                break;
+            }
         }
     }
 
     private void showTicketChannelPrompt(StringSelectInteractionEvent event) {
         EmbedBuilder prompt = new EmbedBuilder()
-                .setTitle(":ticket: Ticket Setup  \u2014  Step 1 of 3")
+                .setTitle("🎫 Ticket Setup  \u2014  Step 1 of 3")
                 .setDescription("Select the text channel where ZDiscord should post the public ticket panel.\n\n"
                         + "Private tickets will be created in that channel's category. "
                         + "If the channel is not inside a category, tickets will be created at the server root.")
@@ -291,7 +287,7 @@ public class SetupCommand extends ListenerAdapter {
                 .build();
 
         event.replyEmbeds(prompt.build())
-                .addActionRow(channelMenu)
+                .addComponents(ActionRow.of(channelMenu))
                 .setEphemeral(true)
                 .queue();
     }
@@ -326,14 +322,11 @@ public class SetupCommand extends ListenerAdapter {
 
     private void handleTicketSetup(EntitySelectInteractionEvent event, TextChannel channel) {
         saveToConfig("tickets.panel-channel", channel.getId());
-        if (channel.getParentCategory() != null) {
-            saveToConfig("channels.ticket-category", channel.getParentCategory().getId());
-        } else {
-            saveToConfig("channels.ticket-category", "");
-        }
+        saveToConfig("channels.ticket-category",
+                channel.getParentCategory() != null ? channel.getParentCategory().getId() : "");
 
         EmbedBuilder rolePrompt = new EmbedBuilder()
-                .setTitle(":ticket: Ticket Setup  \u2014  Step 2 of 3")
+                .setTitle("🎫 Ticket Setup  \u2014  Step 2 of 3")
                 .setDescription("Tickets will be created in **"
                         + (channel.getParentCategory() != null
                                 ? channel.getParentCategory().getAsMention()
@@ -353,7 +346,7 @@ public class SetupCommand extends ListenerAdapter {
                 .build();
 
         event.replyEmbeds(rolePrompt.build())
-                .addActionRow(roleMenu)
+                .addComponents(ActionRow.of(roleMenu))
                 .setEphemeral(true)
                 .queue();
     }
@@ -361,18 +354,13 @@ public class SetupCommand extends ListenerAdapter {
     private void handleSupportRoleSelect(EntitySelectInteractionEvent event) {
         var role = event.getMentions().getRoles().get(0);
         saveToConfig("tickets.support-roles", Collections.singletonList(role.getId()));
-
-
         showTicketCategoryManager(event, role.getAsMention());
     }
 
-
-
-
-    private void showTicketCategoryManager(net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent event, String supportRoleMention) {
+    private void showTicketCategoryManager(GenericInteractionCreateEvent event, String supportRoleMention) {
         Map<String, CategoryDraft> cats = getCategoriesFromConfig();
         EmbedBuilder embed = new EmbedBuilder()
-                .setTitle(":ticket: Ticket Categories  \u2014  Step 3 of 3")
+                .setTitle("🎫 Ticket Categories  \u2014  Step 3 of 3")
                 .setDescription(buildCategoryListText(cats)
                         + "\n\nUse the buttons below to manage your categories. "
                         + "At least one category is required to post a panel.")
@@ -381,7 +369,7 @@ public class SetupCommand extends ListenerAdapter {
                         + supportRoleMention)
                 .setTimestamp(Instant.now());
 
-        List<net.dv8tion.jda.api.interactions.components.LayoutComponent> rows = new ArrayList<>();
+        List<ActionRow> rows = new ArrayList<>();
         rows.add(ActionRow.of(
                 Button.success(BTN_ADD, LABEL_ADD),
                 Button.primary(BTN_EDIT, LABEL_EDIT),
@@ -390,7 +378,6 @@ public class SetupCommand extends ListenerAdapter {
                 Button.secondary(BTN_DOWN, LABEL_MOVE_DOWN)));
 
         if (!cats.isEmpty()) {
-
             StringSelectMenu.Builder select = StringSelectMenu.create(TICKET_CATEGORY_MENU_ID)
                     .setPlaceholder("Pick a category for the action")
                     .setMinValues(1)
@@ -398,8 +385,7 @@ public class SetupCommand extends ListenerAdapter {
             for (Map.Entry<String, CategoryDraft> entry : cats.entrySet()) {
                 CategoryDraft c = entry.getValue();
                 String desc = c.description == null || c.description.isEmpty()
-                        ? "(no description)"
-                        : c.description;
+                        ? "(no description)" : c.description;
                 if (desc.length() > 100) {
                     desc = desc.substring(0, 97) + "...";
                 }
@@ -411,53 +397,34 @@ public class SetupCommand extends ListenerAdapter {
             }
             rows.add(ActionRow.of(select.build()));
         }
-
         rows.add(ActionRow.of(Button.success(BTN_DONE, LABEL_DONE)));
 
-        if (event instanceof SlashCommandInteractionEvent) {
-            ((SlashCommandInteractionEvent) event).replyEmbeds(embed.build())
-                    .addComponents(rows)
-                    .setEphemeral(true)
-                    .queue();
-        } else if (event instanceof ButtonInteractionEvent) {
-            ((ButtonInteractionEvent) event).replyEmbeds(embed.build())
-                    .addComponents(rows)
-                    .setEphemeral(true)
-                    .queue();
-        } else if (event instanceof StringSelectInteractionEvent) {
-            ((StringSelectInteractionEvent) event).editMessageEmbeds(embed.build())
-                    .setComponents(rows)
-                    .queue();
-        } else if (event instanceof EntitySelectInteractionEvent) {
-            ((EntitySelectInteractionEvent) event).replyEmbeds(embed.build())
-                    .addComponents(rows)
-                    .setEphemeral(true)
-                    .queue();
-        } else if (event instanceof ModalInteractionEvent) {
-            ((ModalInteractionEvent) event).editMessageEmbeds(embed.build())
-                    .setComponents(rows)
-                    .queue();
+        if (event instanceof SlashCommandInteractionEvent slash) {
+            slash.replyEmbeds(embed.build()).addComponents(rows).setEphemeral(true).queue();
+        } else if (event instanceof ButtonInteractionEvent button) {
+            button.replyEmbeds(embed.build()).addComponents(rows).setEphemeral(true).queue();
+        } else if (event instanceof StringSelectInteractionEvent select) {
+            select.editMessageEmbeds(embed.build()).setComponents(rows).queue();
+        } else if (event instanceof EntitySelectInteractionEvent entity) {
+            entity.replyEmbeds(embed.build()).addComponents(rows).setEphemeral(true).queue();
+        } else if (event instanceof ModalInteractionEvent modal) {
+            modal.editMessageEmbeds(embed.build()).setComponents(rows).queue();
         }
     }
 
     private void handleTicketCategorySelect(StringSelectInteractionEvent event) {
-
-
-
-
-
         String picked = event.getValues().get(0);
-
         Map<String, CategoryDraft> cats = getCategoriesFromConfig();
         CategoryDraft pickedCat = cats.get(picked);
         if (pickedCat == null) {
             event.reply("That category no longer exists.").setEphemeral(true).queue();
             return;
         }
+
         EmbedBuilder embed = new EmbedBuilder()
-                .setTitle(":ticket: Ticket Categories  \u2014  Step 3 of 3")
+                .setTitle("🎫 Ticket Categories  \u2014  Step 3 of 3")
                 .setDescription(buildCategoryListText(cats)
-                        + "\n\n:point_right: **Selected: **" + pickedCat.emoji + " " + pickedCat.label
+                        + "\n\n👉 **Selected: **" + pickedCat.emoji + " " + pickedCat.label
                         + " (`" + picked + "`)\n"
                         + "Now press an action button: **Edit**, **Remove**, "
                         + "**Move up**, or **Move down**.")
@@ -465,7 +432,7 @@ public class SetupCommand extends ListenerAdapter {
                 .setFooter("Selection pending  \u2022  category id: " + picked)
                 .setTimestamp(Instant.now());
 
-        List<net.dv8tion.jda.api.interactions.components.LayoutComponent> rows = new ArrayList<>();
+        List<ActionRow> rows = new ArrayList<>();
         rows.add(ActionRow.of(
                 Button.success(BTN_ADD, LABEL_ADD),
                 Button.primary(BTN_EDIT, LABEL_EDIT),
@@ -480,8 +447,7 @@ public class SetupCommand extends ListenerAdapter {
         for (Map.Entry<String, CategoryDraft> entry : cats.entrySet()) {
             CategoryDraft c = entry.getValue();
             String desc = c.description == null || c.description.isEmpty()
-                    ? "(no description)"
-                    : c.description;
+                    ? "(no description)" : c.description;
             if (desc.length() > 100) {
                 desc = desc.substring(0, 97) + "...";
             }
@@ -500,10 +466,7 @@ public class SetupCommand extends ListenerAdapter {
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
         String id = event.getComponentId();
-
-        if (!id.startsWith("zdiscord_setup_")) {
-            return;
-        }
+        if (!id.startsWith("zdiscord_setup_")) return;
         if (!isAdmin(event.getMember())) {
             event.reply("Only administrators can manage categories.")
                     .setEphemeral(true).queue();
@@ -511,10 +474,8 @@ public class SetupCommand extends ListenerAdapter {
         }
 
         switch (id) {
-            case BTN_ADD:
-                showCategoryModal(event, null);
-                return;
-            case BTN_EDIT: {
+            case BTN_ADD -> showCategoryModal(event, null);
+            case BTN_EDIT -> {
                 String picked = lastSelectedCategory(event.getMessage().getEmbeds());
                 if (picked == null) {
                     event.reply("Pick a category from the dropdown first, then press **Edit**.")
@@ -522,9 +483,8 @@ public class SetupCommand extends ListenerAdapter {
                     return;
                 }
                 showCategoryModal(event, picked);
-                return;
             }
-            case BTN_REMOVE: {
+            case BTN_REMOVE -> {
                 String picked = lastSelectedCategory(event.getMessage().getEmbeds());
                 if (picked == null) {
                     event.reply("Pick a category from the dropdown first, then press **Remove**.")
@@ -532,10 +492,8 @@ public class SetupCommand extends ListenerAdapter {
                     return;
                 }
                 askRemoveConfirm(event, picked);
-                return;
             }
-            case BTN_UP:
-            case BTN_DOWN: {
+            case BTN_UP, BTN_DOWN -> {
                 String picked = lastSelectedCategory(event.getMessage().getEmbeds());
                 if (picked == null) {
                     event.reply("Pick a category from the dropdown first, then press the move button.")
@@ -543,35 +501,26 @@ public class SetupCommand extends ListenerAdapter {
                     return;
                 }
                 reorderCategory(event, picked, id.equals(BTN_UP) ? -1 : +1);
-                return;
             }
-            case BTN_DONE:
-                finishTicketSetup(event);
-                return;
-            default:
+            case BTN_DONE -> finishTicketSetup(event);
+            default -> {
                 if (id.startsWith(BTN_CONFIRM_REMOVE)) {
-                    String picked = id.substring(BTN_CONFIRM_REMOVE.length());
-                    removeCategory(event, picked);
+                    removeCategory(event, id.substring(BTN_CONFIRM_REMOVE.length()));
                 }
+            }
         }
     }
 
-
-    private String lastSelectedCategory(List<net.dv8tion.jda.api.entities.MessageEmbed> embeds) {
-        if (embeds.isEmpty()) {
-            return null;
-        }
+    // the selected category id is stashed in the embed footer for the action buttons
+    private String lastSelectedCategory(List<MessageEmbed> embeds) {
+        if (embeds.isEmpty()) return null;
         var footer = embeds.get(0).getFooter();
-        if (footer == null || footer.getText() == null) {
-            return null;
-        }
+        if (footer == null || footer.getText() == null) return null;
+
         String prefix = "category id: ";
-        String text = footer.getText();
-        int idx = text.indexOf(prefix);
-        if (idx < 0) {
-            return null;
-        }
-        return text.substring(idx + prefix.length()).trim();
+        int idx = footer.getText().indexOf(prefix);
+        if (idx < 0) return null;
+        return footer.getText().substring(idx + prefix.length()).trim();
     }
 
     private void showCategoryModal(ButtonInteractionEvent event, String existingId) {
@@ -579,46 +528,40 @@ public class SetupCommand extends ListenerAdapter {
         CategoryDraft existing = existingId != null ? cats.get(existingId) : null;
 
         String title = existing == null
-                ? "Add a ticket category"
-                : "Edit category  \u2014  " + existing.label;
+                ? "Add a ticket category" : "Edit category  \u2014  " + existing.label;
         String modalId = TICKET_CATEGORY_MODAL_PREFIX + (existingId == null ? "_new" : existingId);
 
         Modal.Builder modal = Modal.create(modalId, title);
-        modal.addActionRow(TextInput.create("id", "ID (lowercase, no spaces)",
-                TextInputStyle.SHORT)
+        modal.addComponents(Label.of("ID (lowercase, no spaces)", TextInput.create("id", TextInputStyle.SHORT)
                 .setValue(existingId != null ? existingId : "")
                 .setPlaceholder("e.g. general, bug, billing")
                 .setRequired(true)
                 .setMaxLength(32)
-                .build());
-        modal.addActionRow(TextInput.create("label", "Label",
-                TextInputStyle.SHORT)
+                .build()));
+        modal.addComponents(Label.of("Label", TextInput.create("label", TextInputStyle.SHORT)
                 .setValue(existing == null ? "" : existing.label)
                 .setPlaceholder("e.g. General Support")
                 .setRequired(true)
                 .setMaxLength(80)
-                .build());
-        modal.addActionRow(TextInput.create("description", "Description",
-                TextInputStyle.PARAGRAPH)
+                .build()));
+        modal.addComponents(Label.of("Description", TextInput.create("description", TextInputStyle.PARAGRAPH)
                 .setValue(existing == null || existing.description == null ? "" : existing.description)
                 .setPlaceholder("One sentence describing when to use this category.")
                 .setRequired(false)
                 .setMaxLength(400)
-                .build());
-        modal.addActionRow(TextInput.create("emoji", "Emoji (optional)",
-                TextInputStyle.SHORT)
+                .build()));
+        modal.addComponents(Label.of("Emoji (optional)", TextInput.create("emoji", TextInputStyle.SHORT)
                 .setValue(existing == null || existing.emoji == null ? "" : existing.emoji)
                 .setPlaceholder("❓  ⚡  🐛  (single emoji)")
                 .setRequired(false)
                 .setMaxLength(8)
-                .build());
-        modal.addActionRow(TextInput.create("color", "Color (hex, optional)",
-                TextInputStyle.SHORT)
+                .build()));
+        modal.addComponents(Label.of("Color (hex, optional)", TextInput.create("color", TextInputStyle.SHORT)
                 .setValue(existing == null || existing.color == null ? "" : existing.color)
                 .setPlaceholder("#5865F2")
                 .setRequired(false)
                 .setMaxLength(9)
-                .build());
+                .build()));
 
         event.replyModal(modal.build()).queue();
     }
@@ -626,9 +569,8 @@ public class SetupCommand extends ListenerAdapter {
     @Override
     public void onModalInteraction(ModalInteractionEvent event) {
         String id = event.getModalId();
-        if (!id.startsWith(TICKET_CATEGORY_MODAL_PREFIX)) {
-            return;
-        }
+        if (!id.startsWith(TICKET_CATEGORY_MODAL_PREFIX)) return;
+
         String existingId = id.substring(TICKET_CATEGORY_MODAL_PREFIX.length());
         if ("_new".equals(existingId)) {
             existingId = null;
@@ -647,16 +589,10 @@ public class SetupCommand extends ListenerAdapter {
             color = "#" + color;
         }
         if (newId.isEmpty() || label.isEmpty()) {
-            event.reply("Category ID and Label are required.")
-                    .setEphemeral(true).queue();
+            event.reply("Category ID and Label are required.").setEphemeral(true).queue();
             return;
         }
-        if (existingId == null && cats.containsKey(newId)) {
-            event.reply("A category with that ID already exists. Pick a different ID.")
-                    .setEphemeral(true).queue();
-            return;
-        }
-        if (existingId != null && !existingId.equals(newId) && cats.containsKey(newId)) {
+        if (cats.containsKey(newId) && !newId.equals(existingId)) {
             event.reply("A category with that ID already exists. Pick a different ID.")
                     .setEphemeral(true).queue();
             return;
@@ -668,44 +604,37 @@ public class SetupCommand extends ListenerAdapter {
         cats.put(newId, new CategoryDraft(newId, label, description, emoji, color));
         saveCategoriesToConfig(cats);
 
-
         showTicketCategoryManager(event, supportRoleMention(event));
     }
 
-
-    private String supportRoleMention(net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent event) {
-        String roleId = null;
+    private String supportRoleMention(GenericInteractionCreateEvent event) {
         var list = plugin.getConfigManager().getStringList("tickets.support-roles");
-        if (!list.isEmpty()) {
-            roleId = list.get(0);
-        }
-        if (!TicketModule.isUsableSnowflake(roleId)) {
-            return "(unset)";
-        }
+        String roleId = list.isEmpty() ? null : list.get(0);
+        if (!TicketModule.isUsableSnowflake(roleId)) return "(unset)";
+
         Guild guild = event.getGuild();
-        if (guild == null) {
-            return "<@&" + roleId + ">";
-        }
+        if (guild == null) return "<@&" + roleId + ">";
+
         Role role = guild.getRoleById(roleId);
         return role != null ? role.getAsMention() : "<@&" + roleId + ">";
     }
 
     private void askRemoveConfirm(ButtonInteractionEvent event, String categoryId) {
-        Map<String, CategoryDraft> cats = getCategoriesFromConfig();
-        CategoryDraft c = cats.get(categoryId);
+        CategoryDraft c = getCategoriesFromConfig().get(categoryId);
         if (c == null) {
             event.reply("That category no longer exists.").setEphemeral(true).queue();
             return;
         }
+
         event.replyEmbeds(EmbedUtil.error(
                 "Are you sure you want to remove **" + c.label
                         + "** (`" + categoryId + "`)?\n"
                         + "Existing open tickets in this category will not be deleted; "
                         + "users just won't be able to open new ones in it.")
                 .build())
-                .addActionRow(
+                .addComponents(ActionRow.of(
                         Button.danger(BTN_CONFIRM_REMOVE + categoryId, "\ud83d\uddd1\ufe0f Yes, remove"),
-                        Button.secondary(BTN_DONE, LABEL_CANCEL))
+                        Button.secondary(BTN_DONE, LABEL_CANCEL)))
                 .setEphemeral(true)
                 .queue();
     }
@@ -714,7 +643,6 @@ public class SetupCommand extends ListenerAdapter {
         Map<String, CategoryDraft> cats = getCategoriesFromConfig();
         cats.remove(categoryId);
         saveCategoriesToConfig(cats);
-
         showTicketCategoryManager(event, supportRoleMention(event));
     }
 
@@ -728,13 +656,13 @@ public class SetupCommand extends ListenerAdapter {
                     .setEphemeral(true).queue();
             return;
         }
-        java.util.Collections.swap(ids, idx, newIdx);
+
+        Collections.swap(ids, idx, newIdx);
         Map<String, CategoryDraft> reordered = new LinkedHashMap<>();
         for (String id : ids) {
             reordered.put(id, cats.get(id));
         }
         saveCategoriesToConfig(reordered);
-
         showTicketCategoryManager(event, supportRoleMention(event));
     }
 
@@ -745,6 +673,7 @@ public class SetupCommand extends ListenerAdapter {
                     .setEphemeral(true).queue();
             return;
         }
+
         TextChannel panelChannel = null;
         String ticketCategoryId = plugin.getConfigManager().getString("channels.ticket-category", "");
         Guild guild = event.getGuild();
@@ -765,8 +694,8 @@ public class SetupCommand extends ListenerAdapter {
 
         postTicketPanel(panelChannel);
         event.replyEmbeds(EmbedUtil.success(
-                ":ticket: Ticket panel posted in " + panelChannel.getAsMention() + ".\n"
-                        + ":white_check_mark: Categories: " + cats.size() + "\n"
+                "🎫 Ticket panel posted in " + panelChannel.getAsMention() + ".\n"
+                        + "✅ Categories: " + cats.size() + "\n"
                         + "Users can now click the dropdown to open a support ticket.")
                 .build())
                 .setEphemeral(true)
@@ -791,8 +720,6 @@ public class SetupCommand extends ListenerAdapter {
                 .queue(s -> { }, err -> plugin.debug("Activation notice failed: " + err.getMessage()));
     }
 
-
-
     private void saveToConfig(String path, String value) {
         plugin.getConfigManager().getConfig().set(path, value);
         plugin.getConfigManager().save();
@@ -805,8 +732,10 @@ public class SetupCommand extends ListenerAdapter {
 
     private Map<String, CategoryDraft> getCategoriesFromConfig() {
         var config = plugin.getConfigManager().getConfig();
-        ConfigurationSection sec = config.getConfigurationSection("tickets.categories");
         Map<String, CategoryDraft> out = new LinkedHashMap<>();
+
+        // newer configs store categories as a map; older ones as a list — read both
+        ConfigurationSection sec = config.getConfigurationSection("tickets.categories");
         if (sec != null) {
             for (String id : sec.getKeys(false)) {
                 ConfigurationSection c = sec.getConfigurationSection(id);
@@ -825,6 +754,7 @@ public class SetupCommand extends ListenerAdapter {
         for (Map<?, ?> entry : rawList) {
             Object idObj = entry.get("id");
             if (idObj == null) continue;
+
             String id = idObj.toString();
             Object label = entry.get("label");
             Object description = entry.get("description");
@@ -856,8 +786,9 @@ public class SetupCommand extends ListenerAdapter {
 
     private String buildCategoryListText(Map<String, CategoryDraft> cats) {
         if (cats.isEmpty()) {
-            return ":warning: No categories yet. Press **Add** to create one.";
+            return "⚠️ No categories yet. Press **Add** to create one.";
         }
+
         StringBuilder sb = new StringBuilder();
         int i = 1;
         for (Map.Entry<String, CategoryDraft> entry : cats.entrySet()) {
@@ -884,14 +815,12 @@ public class SetupCommand extends ListenerAdapter {
         return value != null && !value.isEmpty() && !value.startsWith("YOUR_");
     }
 
-    private boolean isAdmin(net.dv8tion.jda.api.entities.Member member) {
+    private boolean isAdmin(Member member) {
         return member != null && member.hasPermission(Permission.ADMINISTRATOR);
     }
 
     private String capitalize(String s) {
-        if (s == null || s.isEmpty()) {
-            return s;
-        }
+        if (s == null || s.isEmpty()) return s;
         return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
@@ -906,7 +835,6 @@ public class SetupCommand extends ListenerAdapter {
             this.description = description;
         }
     }
-
 
     private static final class CategoryDraft {
         final String id;

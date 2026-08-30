@@ -20,7 +20,7 @@ ZDiscord connects your Minecraft server to Discord. Chat flows both ways, player
 
 | | ZDiscord | DiscordSRV |
 |---|---|---|
-| **Slash commands** | Native JDA 5 slash commands + buttons | Bolted-on text commands |
+| **Slash commands** | Native JDA 6 slash commands + buttons | Bolted-on text commands |
 | **Folia support** | Built-in regionized multithreading | No Folia support |
 | **Modular design** | 15+ toggleable modules | Chat bridge only |
 | **Account linking** | One-time codes + role grants | Clunky multi-step process |
@@ -33,11 +33,12 @@ ZDiscord connects your Minecraft server to Discord. Chat flows both ways, player
 
 - **Chat bridge** — Two-way chat between Minecraft and Discord. Webhooks display player heads as avatars. Linked players show their Discord name and avatar.
 - **Server status** — One Discord message that auto-updates with player count, TPS, and memory usage.
+- **Live stats panel** — A single auto-updating embed combining players online, performance, and the current top players.
 - **Console streaming** — Server log lines forwarded to a Discord channel.
 - **Account linking** — One-time codes link Discord and Minecraft accounts. Enforce link-to-join if you want.
 - **Staff chat** — `/sc` toggles a staff-only channel bridged to Discord.
 - **Tickets** — Players open private support channels via a Discord button or `/ticket`.
-- **Leaderboards** — Kills, deaths, and playtime ranked via `/leaderboard`.
+- **Leaderboards** — Kills, deaths, and playtime ranked via `/leaderboard`. Replies auto-refresh with live data; a panel channel updates itself continuously.
 - **Event messages** — Joins, quits, deaths, and advancements posted to Discord.
 - **Performance monitor** — TPS and memory tracked over time with configurable alerts.
 - **Anti-raid** — Mass-join detection with optional automatic lockdown.
@@ -48,16 +49,19 @@ ZDiscord connects your Minecraft server to Discord. Chat flows both ways, player
 - **Follow system** — Follow players to get DM notifications when they join. `/following` and `/unfollow` manage subscriptions.
 - **Anonymous confessions** — `/confess` posts to a dedicated channel with rate limiting and configurable appearance.
 - **Setup wizard** — `/setup` configures channels from Discord with dropdowns and buttons.
+- **DemonZ integrations** — Optional Onlysleep sleep/night messages and RedstoneReboot restart alerts share the events channel (or dedicated channels).
+- **SkinsRestorer avatars** — Player cards and chat webhooks use the active restored skin when available, with safe Java/Bedrock fallbacks.
 
 ## Requirements
 
 - Java 17 or newer
 - Paper 1.20.4 or newer, Folia, or Spigot 1.20.4 or newer
 - A Discord bot token with **Server Members** and **Message Content** intents enabled
+- MySQL 8.0 or newer when using the optional MySQL storage backend (the JDBC driver is bundled)
 
 ## Installation
 
-1. Download `ZDiscord-1.2.0.jar` from the [Releases](https://github.com/DemonZ-Development/ZDiscord/releases) page.
+1. Download `ZDiscord-1.3.0.jar` from the [Releases](https://github.com/DemonZ-Development/ZDiscord/releases) page.
 2. Place the JAR in your server's `plugins/` directory.
 3. Start the server to generate the default `config.yml` and `messages.yml`.
 4. Open `plugins/ZDiscord/config.yml` and set:
@@ -89,6 +93,7 @@ All configuration lives in `plugins/ZDiscord/config.yml`. Summary of major secti
 | `command-logger` | Watched and critical commands |
 | `staff-chat`, `voice-status` | Staff chat bridge and voice status indicator |
 | `misc` | Update checks, invite link, console role, debug |
+| `integrations` | Optional Onlysleep and RedstoneReboot message bridges |
 
 User-facing strings live in `messages.yml`. They accept `&` colour codes and the `%prefix%` placeholder.
 
@@ -100,6 +105,7 @@ User-facing strings live in `messages.yml`. They accept `&` colour codes and the
 |---|---|---|
 | `/zdiscord reload` | `zdiscord.admin` | Reload configuration |
 | `/zdiscord status` | `zdiscord.admin` | Show bot and platform status |
+| `/zdiscord diagnostics` | `zdiscord.admin` | Show storage, Discord, skin, platform, and module health |
 | `/zdiscord link` | `zdiscord.link` | Generate a link code |
 | `/zdiscord embed <title> <description>` | `zdiscord.embed` | Send a custom embed |
 | `/zdiscord ticket <subject>` | `zdiscord.ticket` | Open a support ticket |
@@ -137,7 +143,14 @@ cd ZDiscord
 mvn clean package
 ```
 
-The shaded JAR is written to `target/ZDiscord-1.2.0.jar`.
+The shaded JAR is written to `target/ZDiscord-1.3.0.jar`.
+
+## Developer API
+
+Other Bukkit plugins can obtain `ZDiscordAPI` through Bukkit's services manager
+or `ZDiscordProvider.get()`. In 1.3.0 the API can also queue plain messages and
+rich `EmbedData` objects to any configured Discord channel path. ZDiscord itself
+uses the same connection for the optional Onlysleep and RedstoneReboot bridges.
 
 ## License
 

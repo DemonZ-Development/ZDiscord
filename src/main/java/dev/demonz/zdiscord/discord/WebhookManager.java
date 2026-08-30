@@ -11,18 +11,29 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
-
+/**
+ * Webhook sending with a global rate-limit gate. Discord only allows ~5
+ * webhook messages per 2 seconds per channel, so sends are spaced out
+ * via a token-slot counter shared across all channels.
+ */
 public class WebhookManager {
 
     private static final Pattern FORBIDDEN_NAME = Pattern.compile("(?i)(discord|clyde)");
     private static final int MAX_SENDS_PER_WINDOW = 4;
     private static final long WINDOW_MS = 2_000L;
+    private static final int MAX_PENDING_SENDS = 500;
 
     private final ZDiscord plugin;
     private final Map<String, WebhookClient> webhookClients = new ConcurrentHashMap<>();
+    // guards webhook creation so two threads can't both create a "ZChat"
+    // webhook for the same channel - the loser would leak an orphan on Discord
+    private final Object createLock = new Object();
     private final AtomicLong nextSlot = new AtomicLong(0);
+    private final AtomicInteger pendingSends = new AtomicInteger();
+    private volatile boolean running = true;
     private final ScheduledExecutorService scheduler = new ScheduledThreadPoolExecutor(1, r -> {
         Thread t = new Thread(r, "ZDiscord-WebhookScheduler");
         t.setDaemon(true);
@@ -34,49 +45,34 @@ public class WebhookManager {
     }
 
     public WebhookClient getOrCreateWebhook(TextChannel channel) {
+        if (!running) return null;
         WebhookClient existing = webhookClients.get(channel.getId());
-        if (existing != null) {
-            return existing;
-        }
+        if (existing != null) return existing;
 
-        WebhookClient client = null;
-        try {
-            var webhooks = channel.retrieveWebhooks().complete();
-            var found = webhooks.stream()
-                    .filter(w -> "ZChat".equals(w.getName()))
-                    .findFirst();
+        synchronized (createLock) {
+            WebhookClient cached = webhookClients.get(channel.getId());
+            if (cached != null) return cached;
 
-            String webhookUrl;
-            if (found.isPresent()) {
-                webhookUrl = found.get().getUrl();
-            } else {
-                var webhook = channel.createWebhook("ZChat").complete();
-                webhookUrl = webhook.getUrl();
+            try {
+                var webhooks = channel.retrieveWebhooks().complete();
+                String webhookUrl = webhooks.stream()
+                        .filter(w -> "ZChat".equals(w.getName()))
+                        .findFirst()
+                        .map(w -> w.getUrl())
+                        .orElseGet(() -> channel.createWebhook("ZChat").complete().getUrl());
+                webhookClients.put(channel.getId(), WebhookClient.withUrl(webhookUrl));
+            } catch (Exception e) {
+                plugin.getLogger().warning("Failed to create webhook for #"
+                        + channel.getName() + ": " + e.getMessage());
             }
-            client = WebhookClient.withUrl(webhookUrl);
-        } catch (Exception e) {
-            plugin.getLogger().warning("Failed to create webhook for #"
-                    + channel.getName() + ": " + e.getMessage());
+            return webhookClients.get(channel.getId());
         }
-
-        if (client != null) {
-            WebhookClient prior = webhookClients.putIfAbsent(channel.getId(), client);
-            if (prior != null) {
-                client.close();
-                client = prior;
-            }
-        }
-        return client;
     }
 
-
     private String sanitizeUsername(String username) {
-        if (username == null || username.isEmpty()) {
-            return "Player";
-        }
+        if (username == null || username.isEmpty()) return "Player";
 
-
-
+        // Discord forbids these names, it'll 400 otherwise
         String sanitized = FORBIDDEN_NAME.matcher(username).replaceAll("Player");
         if (sanitized.length() > 80) {
             sanitized = sanitized.substring(0, 80);
@@ -87,8 +83,13 @@ public class WebhookManager {
         return sanitized;
     }
 
-
     public void sendWebhookMessage(TextChannel channel, String username, String avatarUrl, String message) {
+        if (!running || channel == null || message == null || message.isBlank()) return;
+        if (pendingSends.incrementAndGet() > MAX_PENDING_SENDS) {
+            pendingSends.decrementAndGet();
+            plugin.getLogger().warning("Webhook queue is full; dropping a chat relay message.");
+            return;
+        }
         String safeName = sanitizeUsername(username);
         long delayMs = acquireSlot();
         WebhookMessageBuilder builder = new WebhookMessageBuilder()
@@ -97,17 +98,26 @@ public class WebhookManager {
                 .setContent(message);
 
         Runnable task = () -> {
-            WebhookClient client = getOrCreateWebhook(channel);
-            if (client != null) {
-                doSend(client, channel, builder);
+            try {
+                if (!running) return;
+                WebhookClient client = getOrCreateWebhook(channel);
+                if (client != null) {
+                    doSend(client, channel, builder);
+                }
+            } finally {
+                pendingSends.decrementAndGet();
             }
         };
-        if (delayMs == 0) {
-            plugin.getPlatformAdapter().runAsync(task);
-        } else {
-            scheduler.schedule(
-                    () -> plugin.getPlatformAdapter().runAsync(task),
-                    delayMs, TimeUnit.MILLISECONDS);
+        try {
+            if (delayMs == 0) {
+                plugin.getPlatformAdapter().runAsync(task);
+            } else {
+                scheduler.schedule(() -> plugin.getPlatformAdapter().runAsync(task),
+                        delayMs, TimeUnit.MILLISECONDS);
+            }
+        } catch (RuntimeException e) {
+            pendingSends.decrementAndGet();
+            if (running) plugin.debug("Could not queue webhook message: " + e.getMessage());
         }
     }
 
@@ -119,13 +129,12 @@ public class WebhookManager {
             if (errorMsg.contains("404") || errorMsg.contains("Unknown Webhook")) {
                 webhookClients.remove(channel.getId());
                 plugin.debug("Webhook invalidated for #" + channel.getName()
-                        + " — will be re-created on next message.");
+                         + " - will be re-created on next message.");
             } else {
                 plugin.debug("Webhook send failed: " + errorMsg);
             }
         }
     }
-
 
     private long acquireSlot() {
         long now = System.currentTimeMillis();
@@ -140,14 +149,17 @@ public class WebhookManager {
         }
     }
 
+    public int getWebhookCount() {
+        return webhookClients.size();
+    }
+
     public void shutdown() {
+        running = false;
         scheduler.shutdownNow();
         for (WebhookClient client : webhookClients.values()) {
-            if (client != null) {
-                try {
-                    client.close();
-                } catch (Exception ignored) {
-                }
+            try {
+                client.close();
+            } catch (Exception ignored) {
             }
         }
         webhookClients.clear();

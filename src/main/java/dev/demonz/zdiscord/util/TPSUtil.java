@@ -1,8 +1,8 @@
 package dev.demonz.zdiscord.util;
 
-
 public final class TPSUtil {
-    private static final double[] FALLBACK = { 20.0, 20.0, 20.0 };
+
+    private static final double[] FALLBACK = {20.0, 20.0, 20.0};
     private static volatile Boolean tpsAvailable;
 
     private TPSUtil() {
@@ -14,9 +14,8 @@ public final class TPSUtil {
             available = probe();
             tpsAvailable = available;
         }
-        if (!available) {
-            return FALLBACK.clone();
-        }
+        if (!available) return FALLBACK.clone();
+
         try {
             return ServerBridge.tps();
         } catch (NoSuchMethodError | Exception e) {
@@ -34,6 +33,7 @@ public final class TPSUtil {
         return available;
     }
 
+    // Older Spigot versions throw NoSuchMethodError on Bukkit.getTPS()
     private static boolean probe() {
         try {
             ServerBridge.tps();

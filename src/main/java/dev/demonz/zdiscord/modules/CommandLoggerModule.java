@@ -13,17 +13,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-
 public class CommandLoggerModule implements Listener {
+
+    private static final Set<String> SENSITIVE_COMMANDS = new HashSet<>(Arrays.asList(
+            "login", "register", "changepassword", "password", "lpc", "lac",
+            "authme", "premium", "license", "token", "secret"));
 
     private final ZDiscord plugin;
     private List<String> watchedCommands;
     private List<String> criticalCommands;
     private String channelId;
-
-    private static final Set<String> SENSITIVE_COMMANDS = new HashSet<>(Arrays.asList(
-            "login", "register", "changepassword", "password", "lpc", "lac",
-            "authme", "premium", "license", "token", "secret"));
 
     public CommandLoggerModule(ZDiscord plugin) {
         this.plugin = plugin;
@@ -52,9 +51,11 @@ public class CommandLoggerModule implements Listener {
         }
         String fullCommand = message.substring(1);
         int space = fullCommand.indexOf(' ');
-        String baseCommand = (space == -1 ? fullCommand : fullCommand.substring(0, space)).toLowerCase();
+        String baseCommand = (space == -1 ? fullCommand : fullCommand.substring(0, space))
+                .toLowerCase();
 
-        boolean isCritical = criticalCommands.stream().anyMatch(c -> baseCommand.equals(c.toLowerCase()));
+        boolean isCritical = criticalCommands.stream()
+                .anyMatch(c -> baseCommand.equals(c.toLowerCase()));
         boolean isWatched = isCritical
                 || watchedCommands.stream().anyMatch(c -> baseCommand.equals(c.toLowerCase()));
         if (!isWatched) {

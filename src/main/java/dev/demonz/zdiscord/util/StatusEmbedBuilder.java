@@ -3,9 +3,13 @@ package dev.demonz.zdiscord.util;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.MessageEmbed;
+import org.bukkit.entity.Player;
 
+import java.awt.Color;
 import java.time.Instant;
-
+import java.util.ConcurrentModificationException;
+import java.util.Locale;
+import java.util.function.Supplier;
 
 public final class StatusEmbedBuilder {
 
@@ -22,16 +26,12 @@ public final class StatusEmbedBuilder {
     public static EmbedBuilder builder(StatusContext ctx) {
         EmbedBuilder embed = new EmbedBuilder()
                 .setAuthor(ctx.serverIp == null || ctx.serverIp.isEmpty()
-                                ? "Minecraft Server" : ctx.serverIp,
-                        null,
-                        ctx.guildIconUrl)
-                .setTitle(ctx.online ? ":green_circle: Server Online" : ":red_circle: Server Offline")
-                .setColor(ctx.online ? healthyColor(ctx) : new java.awt.Color(0xE74C3C))
+                                ? "Minecraft Server" : ctx.serverIp, null, ctx.guildIconUrl)
+                .setTitle(ctx.online ? "🟢 Server Online" : "🔴 Server Offline")
+                .setColor(ctx.online ? healthyColor(ctx) : new Color(0xE74C3C))
                 .setThumbnail(ctx.guildIconUrl);
 
-        embed.addField("Status",
-                (ctx.online ? ":white_check_mark: Online" : ":x: Offline"),
-                true);
+        embed.addField("Status", ctx.online ? "✅ Online" : "❌ Offline", true);
 
         if (ctx.online) {
             int memPercent = ctx.maxMemoryMb > 0
@@ -40,37 +40,31 @@ public final class StatusEmbedBuilder {
             if (ctx.showPlayers) {
                 embed.addField("Players",
                         "**" + ctx.onlineCount + "** / " + ctx.maxCount
-                                + "\n`" + playerBar(ctx.onlineCount, ctx.maxCount) + "`",
-                        true);
+                                + "\n`" + playerBar(ctx.onlineCount, ctx.maxCount) + "`", true);
             }
 
             if (ctx.showTps) {
                 embed.addField("TPS",
-                        "`" + String.format("%.1f", ctx.tps) + "` / 20.0"
-                                + (ctx.tps >= ctx.tpsWarning ? "  :white_check_mark:"
-                                        : ctx.tps >= ctx.tpsCritical ? "  :warning:"
-                                                : "  :no_entry:"),
-                        true);
+                        "`" + String.format(Locale.ROOT, "%.1f", ctx.tps) + "` / 20.0"
+                                + (ctx.tps >= ctx.tpsWarning ? "  ✅"
+                                : ctx.tps >= ctx.tpsCritical ? "  ⚠️" : "  ⛔️"), true);
             }
 
             if (ctx.showMemory) {
                 embed.addField("Memory",
-                        String.format("`%dMB` / `%dMB` (%d%%)\n`%s`",
+                        String.format(Locale.ROOT, "`%dMB` / `%dMB` (%d%%)\n`%s`",
                                 ctx.usedMemoryMb, ctx.maxMemoryMb, memPercent,
-                                memoryBar(memPercent)),
-                        false);
+                                memoryBar(memPercent)), false);
             }
 
             if (ctx.showPlayers && ctx.onlineCount > 0 && ctx.playerList != null) {
-                embed.addField(":busts_in_silhouette: Online Players",
-                        ctx.playerList, false);
+                embed.addField("👥 Online Players", ctx.playerList, false);
             }
         }
 
-        embed.setFooter("Auto-updates every " + ctx.updateIntervalSeconds
+        return embed.setFooter("Auto-updates every " + ctx.updateIntervalSeconds
                         + "s \u2022 ZDiscord")
                 .setTimestamp(Instant.now());
-        return embed;
     }
 
     public static MessageEmbed build(StatusContext ctx) {
@@ -78,15 +72,9 @@ public final class StatusEmbedBuilder {
     }
 
     private static String playerBar(int online, int max) {
-        if (max <= 0) {
-            return BAR_EMPTY.repeat(BAR_LENGTH);
-        }
+        if (max <= 0) return BAR_EMPTY.repeat(BAR_LENGTH);
         int filled = (int) Math.round((online / (double) max) * BAR_LENGTH);
-        if (filled < 0) {
-            filled = 0;
-        } else if (filled > BAR_LENGTH) {
-            filled = BAR_LENGTH;
-        }
+        filled = Math.max(0, Math.min(BAR_LENGTH, filled));
         return BAR_FULL.repeat(filled) + BAR_EMPTY.repeat(BAR_LENGTH - filled);
     }
 
@@ -96,29 +84,20 @@ public final class StatusEmbedBuilder {
         return BAR_FULL.repeat(filled) + BAR_EMPTY.repeat(BAR_LENGTH - filled);
     }
 
-    private static java.awt.Color healthyColor(StatusContext ctx) {
-        if (ctx.tps < ctx.tpsCritical) {
-            return new java.awt.Color(0xE74C3C);
-        }
-        if (ctx.tps < ctx.tpsWarning) {
-            return new java.awt.Color(0xF39C12);
-        }
+    private static Color healthyColor(StatusContext ctx) {
+        if (ctx.tps < ctx.tpsCritical) return new Color(0xE74C3C);
+        if (ctx.tps < ctx.tpsWarning) return new Color(0xF39C12);
         if (ctx.maxMemoryMb > 0) {
             int memPercent = (int) ((ctx.usedMemoryMb * 100.0) / ctx.maxMemoryMb);
-            if (memPercent >= 90) {
-                return new java.awt.Color(0xE74C3C);
-            }
-            if (memPercent >= 75) {
-                return new java.awt.Color(0xF39C12);
-            }
+            if (memPercent >= 90) return new Color(0xE74C3C);
+            if (memPercent >= 75) return new Color(0xF39C12);
         }
-        return new java.awt.Color(0x2ECC71);
+        return new Color(0x2ECC71);
     }
-
 
     public static final class StatusContext {
         public String title;
-        public java.awt.Color color;
+        public Color color;
         public String serverIp;
         public boolean online;
         public int onlineCount;
@@ -136,16 +115,11 @@ public final class StatusEmbedBuilder {
         public String guildIconUrl;
         public String botAvatarUrl;
 
-        public static StatusContext capture(java.util.function.Supplier<Guild> guildSupplier,
-                                            String title,
-                                            String colorHex,
-                                            String serverIp,
-                                            int updateInterval,
-                                            boolean showPlayers,
-                                            boolean showTps,
-                                            boolean showMemory,
-                                            double tpsWarning,
-                                            double tpsCritical) {
+        public static StatusContext capture(Supplier<Guild> guildSupplier,
+                                            String title, String colorHex, String serverIp,
+                                            int updateInterval, boolean showPlayers,
+                                            boolean showTps, boolean showMemory,
+                                            double tpsWarning, double tpsCritical) {
             StatusContext ctx = new StatusContext();
             ctx.title = title;
             ctx.color = ColorUtil.parseHex(colorHex);
@@ -169,22 +143,28 @@ public final class StatusEmbedBuilder {
             if (showPlayers && ctx.onlineCount > 0) {
                 StringBuilder list = new StringBuilder();
                 int shown = 0;
-                for (org.bukkit.entity.Player p : ServerBridge.onlinePlayers()) {
-                    if (shown > 0) {
-                        list.append("\n");
+                boolean raced = false;
+                // the live collection can be mutated by joins/quits while we
+                // read it; if that happens just skip the list this refresh
+                try {
+                    for (Player p : ServerBridge.onlinePlayers()) {
+                        if (p == null) continue;
+                        if (shown > 0) list.append("\n");
+                        list.append("`").append(p.getName()).append("`");
+                        if (++shown >= PLAYER_LIST_MAX) break;
                     }
-                    list.append("`").append(p.getName()).append("`");
-                    shown++;
-                    if (shown >= PLAYER_LIST_MAX) {
-                        break;
+                } catch (ConcurrentModificationException e) {
+                    raced = true;
+                }
+                if (raced) {
+                    ctx.playerList = null;
+                } else {
+                    if (ctx.onlineCount > PLAYER_LIST_MAX) {
+                        list.append("\n*...and ")
+                                .append(ctx.onlineCount - PLAYER_LIST_MAX).append(" more*");
                     }
+                    ctx.playerList = list.toString();
                 }
-                if (ctx.onlineCount > PLAYER_LIST_MAX) {
-                    list.append("\n*...and ")
-                            .append(ctx.onlineCount - PLAYER_LIST_MAX)
-                            .append(" more*");
-                }
-                ctx.playerList = list.toString();
             } else {
                 ctx.playerList = null;
             }

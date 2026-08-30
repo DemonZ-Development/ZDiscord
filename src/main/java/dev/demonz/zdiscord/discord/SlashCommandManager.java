@@ -1,28 +1,38 @@
 package dev.demonz.zdiscord.discord;
 
 import dev.demonz.zdiscord.ZDiscord;
+import dev.demonz.zdiscord.modules.FollowModule;
 import dev.demonz.zdiscord.util.ColorUtil;
 import dev.demonz.zdiscord.util.HeadUtil;
 import dev.demonz.zdiscord.util.PlayerProfileBuilder;
+import dev.demonz.zdiscord.util.SkinUtil;
 import dev.demonz.zdiscord.util.StatusEmbedBuilder;
 import dev.demonz.zdiscord.util.TPSUtil;
 import dev.demonz.zdiscord.util.ZLogger;
 import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
+import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
-
 
 public class SlashCommandManager extends ListenerAdapter {
 
@@ -57,15 +67,13 @@ public class SlashCommandManager extends ListenerAdapter {
                         .addOption(OptionType.STRING, "player",
                                 "Player name (omit for yourself)", false),
                 Commands.slash("seen", "When was a player last online?")
-                        .addOption(OptionType.STRING, "player",
-                                "Player name", true),
+                        .addOption(OptionType.STRING, "player", "Player name", true),
                 Commands.slash("following", "List the Minecraft players you follow"),
                 Commands.slash("confess", "Post an anonymous confession to the confessions channel")
                         .addOption(OptionType.STRING, "message",
                                 "What do you want to confess?", true),
                 Commands.slash("unfollow", "Stop following a Minecraft player")
-                        .addOption(OptionType.STRING, "player",
-                                "Player name to unfollow", true))
+                        .addOption(OptionType.STRING, "player", "Player name to unfollow", true))
                 .queue(
                         success -> ZLogger.info(ZLogger.Category.COMMANDS,
                                 "Registered " + success.size() + " slash commands."),
@@ -75,50 +83,22 @@ public class SlashCommandManager extends ListenerAdapter {
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+        // /setup has its own wizard handler
+        if ("setup".equals(event.getName())) return;
 
-
-        if ("setup".equals(event.getName())) {
-            return;
-        }
         switch (event.getName()) {
-            case "status":
-                handleStatus(event);
-                break;
-            case "players":
-                handlePlayers(event);
-                break;
-            case "tps":
-                handleTps(event);
-                break;
-            case "link":
-                handleLink(event);
-                break;
-            case "ticket":
-                handleTicket(event);
-                break;
-            case "panel":
-                handlePanel(event);
-                break;
-            case "leaderboard":
-                handleLeaderboard(event);
-                break;
-            case "profile":
-                handleProfile(event);
-                break;
-            case "seen":
-                handleSeen(event);
-                break;
-            case "following":
-                handleFollowing(event);
-                break;
-            case "confess":
-                handleConfess(event);
-                break;
-            case "unfollow":
-                handleUnfollow(event);
-                break;
-            default:
-                break;
+            case "status" -> handleStatus(event);
+            case "players" -> handlePlayers(event);
+            case "tps" -> handleTps(event);
+            case "link" -> handleLink(event);
+            case "ticket" -> handleTicket(event);
+            case "panel" -> handlePanel(event);
+            case "leaderboard" -> handleLeaderboard(event);
+            case "profile" -> handleProfile(event);
+            case "seen" -> handleSeen(event);
+            case "following" -> handleFollowing(event);
+            case "confess" -> handleConfess(event);
+            case "unfollow" -> handleUnfollow(event);
         }
     }
 
@@ -140,21 +120,33 @@ public class SlashCommandManager extends ListenerAdapter {
     }
 
     private void handlePlayers(SlashCommandInteractionEvent event) {
-        var players = Bukkit.getOnlinePlayers();
-        if (players.isEmpty()) {
+        // snapshot the player list on the main thread - iterating the live
+        // collection from here races with joins/quits
+        List<String> names;
+        try {
+            names = plugin.getPlatformAdapter().supplySync(() -> {
+                List<String> list = new ArrayList<>();
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                    list.add(p.getName());
+                }
+                Collections.sort(list);
+                return list;
+            });
+        } catch (Exception e) {
+            event.reply("Couldn't read the player list right now, try again.")
+                    .setEphemeral(true).queue();
+            return;
+        }
+
+        if (names.isEmpty()) {
             event.reply("No players are currently online.").setEphemeral(true).queue();
             return;
         }
 
-        String playerList = players.stream()
-                .map(Player::getName)
-                .sorted()
-                .collect(Collectors.joining("\n", "", ""));
-
         EmbedBuilder embed = new EmbedBuilder()
                 .setTitle(plugin.getMessageManager().getRaw("slash-players-title")
-                        + " (" + players.size() + "/" + Bukkit.getMaxPlayers() + ")")
-                .setDescription(playerList)
+                        + " (" + names.size() + "/" + Bukkit.getMaxPlayers() + ")")
+                .setDescription(String.join("\n", names))
                 .setColor(ColorUtil.parseHex("#2ECC71"))
                 .setTimestamp(Instant.now());
         event.replyEmbeds(embed.build()).queue();
@@ -184,9 +176,9 @@ public class SlashCommandManager extends ListenerAdapter {
                 .setTitle(plugin.getMessageManager().getRaw("slash-tps-title"))
                 .setColor(color)
                 .addField("TPS (1m / 5m / 15m)",
-                        String.format("`%.2f` / `%.2f` / `%.2f`", tps[0], tps[1], tps[2]), false)
-                .addField("Memory",
-                        usedMb + "MB / " + maxMb + "MB (" + memPercent + "%)", true)
+                        String.format(Locale.ROOT, "`%.2f` / `%.2f` / `%.2f`",
+                                tps[0], tps[1], tps[2]), false)
+                .addField("Memory", usedMb + "MB / " + maxMb + "MB (" + memPercent + "%)", true)
                 .addField("Threads", String.valueOf(Thread.activeCount()), true)
                 .setTimestamp(Instant.now());
         event.replyEmbeds(embed.build()).queue();
@@ -194,10 +186,10 @@ public class SlashCommandManager extends ListenerAdapter {
 
     private void handleLink(SlashCommandInteractionEvent event) {
         if (plugin.getLinkModule() == null) {
-            event.reply("Account linking is disabled in config.yml.")
-                    .setEphemeral(true).queue();
+            event.reply("Account linking is disabled in config.yml.").setEphemeral(true).queue();
             return;
         }
+
         String code = event.getOption("code").getAsString();
         boolean success = plugin.getLinkModule().processLink(
                 event.getUser().getId(), event.getUser().getName(), code);
@@ -216,33 +208,34 @@ public class SlashCommandManager extends ListenerAdapter {
 
     private void handleTicket(SlashCommandInteractionEvent event) {
         if (plugin.getTicketModule() == null) {
-            event.reply("The ticket system is disabled in config.yml.")
-                    .setEphemeral(true).queue();
+            event.reply("The ticket system is disabled in config.yml.").setEphemeral(true).queue();
             return;
         }
+        // channel creation is a blocking REST round trip - keep it off the
+        // gateway thread or every other Discord event stalls behind it
+        User user = event.getUser();
         String subject = event.getOption("subject").getAsString();
-        plugin.getTicketModule().createTicket(event.getUser(), subject, event);
+        plugin.getPlatformAdapter().runAsync(() ->
+                plugin.getTicketModule().createTicket(user, subject, event));
     }
 
     private void handlePanel(SlashCommandInteractionEvent event) {
-        if (event.getMember() == null
-                || !event.getMember().hasPermission(net.dv8tion.jda.api.Permission.ADMINISTRATOR)) {
+        if (event.getMember() == null || !event.getMember().hasPermission(Permission.ADMINISTRATOR)) {
             event.reply("You need **Administrator** permission to post the panel.")
                     .setEphemeral(true).queue();
             return;
         }
         if (plugin.getTicketModule() == null) {
-            event.reply("The ticket system is disabled in config.yml.")
-                    .setEphemeral(true).queue();
+            event.reply("The ticket system is disabled in config.yml.").setEphemeral(true).queue();
             return;
         }
-        if (event.getChannelType() != net.dv8tion.jda.api.entities.channel.ChannelType.TEXT) {
+        if (event.getChannelType() != ChannelType.TEXT) {
             event.reply("The panel can only be posted in a text channel.")
                     .setEphemeral(true).queue();
             return;
         }
-        net.dv8tion.jda.api.entities.channel.concrete.TextChannel channel =
-                event.getChannel().asTextChannel();
+
+        TextChannel channel = event.getChannel().asTextChannel();
         plugin.getTicketModule().postPanel(channel);
         event.reply("Ticket panel posted in " + channel.getAsMention() + ".")
                 .setEphemeral(true).queue();
@@ -250,22 +243,16 @@ public class SlashCommandManager extends ListenerAdapter {
 
     private void handleLeaderboard(SlashCommandInteractionEvent event) {
         if (plugin.getLeaderboardModule() == null) {
-            event.reply("Leaderboards are disabled in config.yml.")
-                    .setEphemeral(true).queue();
+            event.reply("Leaderboards are disabled in config.yml.").setEphemeral(true).queue();
             return;
         }
-        String stat = event.getOption("stat").getAsString();
-        plugin.getLeaderboardModule().sendLeaderboard(event, stat);
+        plugin.getLeaderboardModule().sendLeaderboard(event, event.getOption("stat").getAsString());
     }
 
     private void handleProfile(SlashCommandInteractionEvent event) {
-
-
-
         event.deferReply().queue();
         String queryName = event.getOption("player") == null
-                ? null
-                : event.getOption("player").getAsString();
+                ? null : event.getOption("player").getAsString();
         String discordTag = event.getUser().getAsTag();
 
         plugin.getPlatformAdapter().runAsync(() -> {
@@ -280,21 +267,16 @@ public class SlashCommandManager extends ListenerAdapter {
                 return;
             }
 
-            PlayerProfileBuilder.Profile profile =
-                    PlayerProfileBuilder.build(plugin, target);
-
-
+            PlayerProfileBuilder.Profile profile = PlayerProfileBuilder.build(plugin, target);
             if (profile.discordId != null && plugin.getBotManager().isConnected()) {
                 try {
-                    net.dv8tion.jda.api.entities.User jdaUser =
-                            plugin.getBotManager().getJda()
-                                    .retrieveUserById(profile.discordId).complete();
+                    User jdaUser = plugin.getBotManager().getJda()
+                            .retrieveUserById(profile.discordId).complete();
                     if (jdaUser != null) {
                         profile.discordUsername = jdaUser.getAsTag();
                     }
                 } catch (Exception e) {
-                    plugin.debug("Failed to resolve Discord user for profile: "
-                            + e.getMessage());
+                    plugin.debug("Failed to resolve Discord user for profile: " + e.getMessage());
                 }
             }
 
@@ -303,13 +285,11 @@ public class SlashCommandManager extends ListenerAdapter {
             if (plugin.getFollowModule() != null) {
                 boolean following = plugin.getFollowModule()
                         .isFollowing(profile.uuid, event.getUser().getId());
-                var rows = new java.util.ArrayList<net.dv8tion.jda.api.interactions.components.LayoutComponent>();
-                rows.add(net.dv8tion.jda.api.interactions.components.ActionRow.of(
-                        following
-                                ? plugin.getFollowModule().buildUnfollowButton(profile.uuid)
-                                : plugin.getFollowModule().buildFollowButton(profile.uuid)));
-                event.getHook().sendMessageEmbeds(embed.build())
-                        .addComponents(rows).queue();
+                var rows = new ArrayList<ActionRow>();
+                rows.add(ActionRow.of(following
+                        ? plugin.getFollowModule().buildUnfollowButton(profile.uuid)
+                        : plugin.getFollowModule().buildFollowButton(profile.uuid)));
+                event.getHook().sendMessageEmbeds(embed.build()).addComponents(rows).queue();
             } else {
                 event.getHook().sendMessageEmbeds(embed.build()).queue();
             }
@@ -320,15 +300,10 @@ public class SlashCommandManager extends ListenerAdapter {
         if (queryName != null && !queryName.isEmpty()) {
             return PlayerProfileBuilder.findOfflineByName(queryName);
         }
+        if (plugin.getLinkModule() == null) return null;
 
-        if (plugin.getLinkModule() == null) {
-            return null;
-        }
         UUID mcUuid = plugin.getLinkModule().getPlayerUUID(requesterDiscordId);
-        if (mcUuid == null) {
-            return null;
-        }
-        return Bukkit.getOfflinePlayer(mcUuid);
+        return mcUuid == null ? null : Bukkit.getOfflinePlayer(mcUuid);
     }
 
     private void handleSeen(SlashCommandInteractionEvent event) {
@@ -338,33 +313,31 @@ public class SlashCommandManager extends ListenerAdapter {
             OfflinePlayer target = PlayerProfileBuilder.findOfflineByName(queryName);
             if (target == null) {
                 event.getHook().sendMessage("No player named **" + queryName
-                        + "** has joined this server before.")
-                        .setEphemeral(true).queue();
+                        + "** has joined this server before.").setEphemeral(true).queue();
                 return;
             }
+
             UUID uuid = target.getUniqueId();
             String name = target.getName() != null ? target.getName() : "Unknown";
             long lastSeen = plugin.getStorageManager().getLastSeen(uuid);
             long playtimeSec = plugin.getLeaderboardModule() != null
-                    ? plugin.getLeaderboardModule().getStat(uuid, "playtime")
-                    : 0L;
+                    ? plugin.getLeaderboardModule().getStat(uuid, "playtime") : 0L;
 
             EmbedBuilder embed = new EmbedBuilder()
                     .setAuthor(name + "  \u00B7  Last seen",
                             "https://namemc.com/profile/" + uuid,
-                            HeadUtil.avatar(uuid, HeadUtil.SIZE_SMALL))
+                            SkinUtil.avatar(plugin, uuid, name, HeadUtil.SIZE_SMALL))
                     .setColor(ColorUtil.parseHex("#3498DB"))
                     .setTimestamp(Instant.now());
 
             if (target.isOnline()) {
-                embed.setDescription(":green_circle: **" + name + "** is online right now.");
+                embed.setDescription("🟢 **" + name + "** is online right now.");
             } else if (lastSeen > 0) {
                 embed.setDescription("Last seen: <t:" + (lastSeen / 1000L) + ":R>.")
                         .addField("Last seen", "<t:" + (lastSeen / 1000L) + ":F>", false)
-                        .addField("Total playtime",
-                                PlayerProfileBuilder.formatDuration(playtimeSec), true)
-                        .addField("Sessions", String.valueOf(
-                                plugin.getStorageManager().getSessions(uuid)), true);
+                        .addField("Total playtime", PlayerProfileBuilder.formatDuration(playtimeSec), true)
+                        .addField("Sessions",
+                                String.valueOf(plugin.getStorageManager().getSessions(uuid)), true);
             } else {
                 embed.setDescription("No activity recorded for **" + name + "** yet. "
                         + "This player has never joined the server.");
@@ -382,7 +355,8 @@ public class SlashCommandManager extends ListenerAdapter {
                         .setEphemeral(true).queue();
                 return;
             }
-            java.util.Set<UUID> followed = plugin.getFollowModule().getFollowedPlayers(discordId);
+
+            Set<UUID> followed = plugin.getFollowModule().getFollowedPlayers(discordId);
             if (followed.isEmpty()) {
                 event.getHook().sendMessage(
                         "You aren't following any Minecraft players. "
@@ -390,11 +364,12 @@ public class SlashCommandManager extends ListenerAdapter {
                         .setEphemeral(true).queue();
                 return;
             }
+
             StringBuilder sb = new StringBuilder();
             for (UUID uuid : followed) {
                 OfflinePlayer op = Bukkit.getOfflinePlayer(uuid);
                 String name = op.getName() != null ? op.getName() : uuid.toString();
-                sb.append(":small_blue_diamond: **").append(name).append("**")
+                sb.append("🔹 **").append(name).append("**")
                         .append("  (`").append(uuid).append("`)\n");
             }
             EmbedBuilder embed = new EmbedBuilder()
@@ -410,17 +385,14 @@ public class SlashCommandManager extends ListenerAdapter {
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
         String id = event.getComponentId();
-        if (id == null) {
-            return;
-        }
 
         if (plugin.getLeaderboardModule() != null
                 && plugin.getLeaderboardModule().handleButtonInteraction(event)) {
             return;
         }
 
-        if (id.startsWith(dev.demonz.zdiscord.modules.FollowModule.FOLLOW_BUTTON_ID)
-                || id.startsWith(dev.demonz.zdiscord.modules.FollowModule.UNFOLLOW_BUTTON_ID)) {
+        if (id.startsWith(FollowModule.FOLLOW_BUTTON_ID)
+                || id.startsWith(FollowModule.UNFOLLOW_BUTTON_ID)) {
             if (plugin.getFollowModule() != null) {
                 plugin.getFollowModule().handleFollowButton(event);
             } else {
@@ -431,10 +403,8 @@ public class SlashCommandManager extends ListenerAdapter {
 
     @Override
     public void onStringSelectInteraction(StringSelectInteractionEvent event) {
-
-        if (plugin.getLeaderboardModule() != null
-                && plugin.getLeaderboardModule().handleSelectInteraction(event)) {
-            return;
+        if (plugin.getLeaderboardModule() != null) {
+            plugin.getLeaderboardModule().handleSelectInteraction(event);
         }
     }
 
@@ -448,11 +418,11 @@ public class SlashCommandManager extends ListenerAdapter {
                         .setEphemeral(true).queue();
                 return;
             }
+
             OfflinePlayer target = PlayerProfileBuilder.findOfflineByName(queryName);
             if (target == null) {
                 event.getHook().sendMessage("No player named **" + queryName
-                        + "** has joined this server before.")
-                        .setEphemeral(true).queue();
+                        + "** has joined this server before.").setEphemeral(true).queue();
                 return;
             }
             if (!plugin.getFollowModule().isFollowing(target.getUniqueId(), discordId)) {
@@ -460,14 +430,14 @@ public class SlashCommandManager extends ListenerAdapter {
                         .setEphemeral(true).queue();
                 return;
             }
+
             plugin.getFollowModule().unfollow(target.getUniqueId(), discordId);
-            event.getHook().sendMessage(":no_bell: You are no longer following **"
+            event.getHook().sendMessage("🔕 You are no longer following **"
                     + queryName + "**.").setEphemeral(true).queue();
         });
     }
 
     private void handleConfess(SlashCommandInteractionEvent event) {
-        String message = event.getOption("message").getAsString();
-        plugin.getConfessionModule().postFromDiscord(event, message);
+        plugin.getConfessionModule().postFromDiscord(event, event.getOption("message").getAsString());
     }
 }

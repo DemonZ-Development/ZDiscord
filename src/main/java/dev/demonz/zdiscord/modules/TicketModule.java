@@ -10,27 +10,28 @@ import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.concrete.Category;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
-import net.dv8tion.jda.api.interactions.components.buttons.Button;
-import net.dv8tion.jda.api.interactions.components.selections.StringSelectMenu;
+import net.dv8tion.jda.api.components.actionrow.ActionRow;
+import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.components.selections.StringSelectMenu;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 
 import java.time.Instant;
 import java.util.ArrayList;
-
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-
 public class TicketModule {
 
     public static final String PANEL_BUTTON_ID = "zdiscord_create_ticket";
     public static final String PANEL_SELECT_ID = "zdiscord_ticket_category";
+    public static final String OWNER_TOPIC_PREFIX = "zdticket:";
     private static final String SNOWFLAKE_PATTERN = "\\d{17,20}";
 
     private final ZDiscord plugin;
@@ -43,8 +44,8 @@ public class TicketModule {
 
     public void init() {
         ticketCounter.set(plugin.getStorageManager().getDataInt("ticket-counter", 0));
-        String openData = plugin.getStorageManager().getData("open-tickets", "");
         openTicketsByUser.clear();
+        String openData = plugin.getStorageManager().getData("open-tickets", "");
         if (!openData.isEmpty()) {
             for (String entry : openData.split(";")) {
                 int eq = entry.indexOf('=');
@@ -67,8 +68,6 @@ public class TicketModule {
     public void reload() {
     }
 
-
-
     public void createTicketFromMC(Player player, String subject) {
         if (plugin.getLinkModule() == null) {
             player.sendMessage(plugin.getMessageManager().get("link-required"));
@@ -90,13 +89,14 @@ public class TicketModule {
                     ? subject
                     : (cat != null ? cat.label : "Support");
             TextChannel channel = createTicketChannel(
-                    player.getName(), effectiveSubject, categoryId, discordId);
+                    player.getName(), effectiveSubject, categoryId,
+                    discordId, player.getUniqueId().toString());
             if (channel != null) {
                 markOpened(player.getUniqueId().toString());
                 if (discordId != null) {
                     markOpened(discordId);
                 }
-                plugin.getPlatformAdapter().runSync(() -> player.sendMessage(
+                plugin.getPlatformAdapter().runForEntity(player, () -> player.sendMessage(
                         plugin.getMessageManager().get("ticket-created",
                                 "%channel%", channel.getName())));
             }
@@ -131,11 +131,13 @@ public class TicketModule {
                 ? subject
                 : (finalCat != null ? finalCat.label : "Support");
         TextChannel channel = createTicketChannel(
-                user.getName(), effectiveSubject, finalCategory, user.getId());
+                user.getName(), effectiveSubject, finalCategory, user.getId(), user.getId());
         if (channel == null) {
             return "Failed to create ticket. Please contact an admin.";
         }
         markOpened(user.getId());
+        plugin.getLogger().info("Ticket #" + ticketCounter.get() + " opened for " + user.getName()
+                + " (category " + finalCategory + ", channel " + channel.getId() + ")");
         return "Ticket created. See " + channel.getAsMention();
     }
 
@@ -149,15 +151,13 @@ public class TicketModule {
             return "That ticket category is no longer available.";
         }
         TextChannel channel = createTicketChannel(
-                user.getName(), cat.label, cat.id, user.getId());
+                user.getName(), cat.label, cat.id, user.getId(), user.getId());
         if (channel == null) {
             return "Failed to create ticket. Please contact an admin.";
         }
         markOpened(user.getId());
         return "Ticket created. See " + channel.getAsMention();
     }
-
-
 
     public static final class TicketCategory {
         public final String id;
@@ -180,9 +180,7 @@ public class TicketModule {
         return loadCategories(plugin.getConfigManager().getConfig());
     }
 
-
-    public static Map<String, TicketCategory> loadCategories(
-            org.bukkit.configuration.ConfigurationSection root) {
+    public static Map<String, TicketCategory> loadCategories(ConfigurationSection root) {
         Map<String, TicketCategory> out = new LinkedHashMap<>();
         if (root == null) {
             return out;
@@ -255,8 +253,6 @@ public class TicketModule {
         }
     }
 
-
-
     private boolean canCreate(String mcKey, String discordId) {
         int max = plugin.getConfigManager().getInt("tickets.max-per-user", 3);
         if (openTicketsByUser.getOrDefault(mcKey, 0) >= max) {
@@ -274,14 +270,15 @@ public class TicketModule {
     }
 
     private TextChannel createTicketChannel(String username, String subject,
-                                            String categoryId, String discordId) {
+                                            String categoryId, String discordId,
+                                            String ownerKey) {
         Guild guild = plugin.getBotManager().getGuild();
         if (guild == null) {
             return null;
         }
 
-        String categoryChannelId = plugin.getConfigManager().getString("channels.ticket-category");
         Category category = null;
+        String categoryChannelId = plugin.getConfigManager().getString("channels.ticket-category");
         if (isUsableSnowflake(categoryChannelId)) {
             category = guild.getCategoryById(categoryChannelId);
         }
@@ -291,11 +288,12 @@ public class TicketModule {
 
         TicketCategory cat = getCategory(categoryId);
 
-        String channelName = "ticket-" + String.format("%04d", currentTicket)
+        String channelName = "ticket-" + String.format(Locale.ROOT, "%04d", currentTicket)
                 + "-" + username.toLowerCase().replaceAll("[^a-z0-9-]", "");
 
         try {
-            var builder = guild.createTextChannel(channelName);
+            var builder = guild.createTextChannel(channelName)
+                    .setTopic(OWNER_TOPIC_PREFIX + ownerKey);
             if (category != null) {
                 builder = builder.setParent(category);
             }
@@ -341,11 +339,8 @@ public class TicketModule {
         String categoryLabel = cat != null ? cat.label : "Support";
 
         EmbedBuilder embed = new EmbedBuilder()
-                .setAuthor("Support Ticket", null,
-                        channel.getGuild().getIconUrl() != null
-                                ? channel.getGuild().getIconUrl()
-                                : null)
-                .setTitle(":ticket: " + categoryLabel)
+                .setAuthor("Support Ticket", null, channel.getGuild().getIconUrl())
+                .setTitle("🎫 " + categoryLabel)
                 .setDescription(
                         "Hello **" + username + "**, a staff member will be with you shortly.\n"
                                 + "Please describe your issue in detail and avoid pinging staff.")
@@ -357,15 +352,12 @@ public class TicketModule {
                 .setTimestamp(Instant.now());
 
         channel.sendMessageEmbeds(embed.build())
-                .setActionRow(
+                .setComponents(ActionRow.of(
                         Button.danger(PANEL_BUTTON_ID + ":close", "\u274c Close Ticket"),
                         Button.success(PANEL_BUTTON_ID + ":claim", "\u2705 Claim Ticket"),
-                        Button.secondary(PANEL_BUTTON_ID + ":transcript", "\ud83d\uudcdd Transcript"))
+                        Button.secondary(PANEL_BUTTON_ID + ":transcript", "\ud83d\udcdd Transcript")))
                 .queue();
     }
-
-
-
 
     public void postPanel(TextChannel channel) {
         if (channel == null) {
@@ -393,18 +385,16 @@ public class TicketModule {
                 "tickets.panel.footer", "ZDiscord Ticket System");
 
         Guild guild = channel.getGuild();
-        String iconUrl = guild.getIconUrl() != null
-                ? guild.getIconUrl() + "?size=256"
-                : null;
+        String iconUrl = guild.getIconUrl() != null ? guild.getIconUrl() + "?size=256" : null;
 
         EmbedBuilder embed = new EmbedBuilder()
                 .setAuthor(guild.getName(), null, iconUrl)
-                .setTitle(":ticket: " + title)
+                .setTitle("🎫 " + title)
                 .setDescription(description)
                 .setColor(safeParseHex(colorHex, 0x5865F2))
-                .addField(":busts_in_silhouette: Members", String.valueOf(guild.getMemberCount()), true)
-                .addField(":hash: Channels", String.valueOf(guild.getTextChannels().size()), true)
-                .addField(":closed_lock_with_key: Privacy",
+                .addField("👥 Members", String.valueOf(guild.getMemberCount()), true)
+                .addField("#️⃣ Channels", String.valueOf(guild.getTextChannels().size()), true)
+                .addField("🔐 Privacy",
                         "Tickets are private to you and staff.", true)
                 .setFooter(footer)
                 .setTimestamp(Instant.now());
@@ -424,7 +414,7 @@ public class TicketModule {
                     .append(c.label).append("** \u2014 ")
                     .append(c.description).append("\n");
         }
-        embed.addField(":sparkles: Categories", categoryList.toString(), false);
+        embed.addField("✨ Categories", categoryList.toString(), false);
 
         StringSelectMenu.Builder menu = StringSelectMenu.create(PANEL_SELECT_ID)
                 .setPlaceholder("Select a ticket category")
@@ -438,25 +428,45 @@ public class TicketModule {
             menu.addOption(label, c.id, desc);
         }
 
-        List<net.dv8tion.jda.api.interactions.components.LayoutComponent> rows = new ArrayList<>();
-        rows.add(net.dv8tion.jda.api.interactions.components.ActionRow.of(menu.build()));
-        rows.add(net.dv8tion.jda.api.interactions.components.ActionRow.of(
-                Button.primary(PANEL_BUTTON_ID + ":quick", "\u26a1 Quick Open")));
+        List<ActionRow> rows = new ArrayList<>();
+        rows.add(ActionRow.of(menu.build()));
+        rows.add(ActionRow.of(Button.primary(PANEL_BUTTON_ID + ":quick", "\u26a1 Quick Open")));
 
         channel.sendMessageEmbeds(embed.build()).setComponents(rows).queue();
     }
 
-
-
-    public void onTicketClose(String userId) {
-        decrementCount(userId);
+    /**
+     * Decrements the open-ticket counter for whoever owned the ticket
+     * (a Discord id or a Minecraft uuid) plus their linked counterpart.
+     */
+    public void onTicketClose(String ownerKey) {
+        decrementCount(ownerKey);
         if (plugin.getLinkModule() != null) {
-            UUID mcId = plugin.getLinkModule().getPlayerUUID(userId);
-            if (mcId != null) {
-                decrementCount(mcId.toString());
+            if (isUuid(ownerKey)) {
+                String discordId = plugin.getLinkModule()
+                        .getDiscordId(UUID.fromString(ownerKey));
+                if (discordId != null) {
+                    decrementCount(discordId);
+                }
+            } else {
+                UUID mcId = plugin.getLinkModule().getPlayerUUID(ownerKey);
+                if (mcId != null) {
+                    decrementCount(mcId.toString());
+                }
             }
         }
         saveOpenTickets();
+        plugin.getLogger().info("Ticket closed for owner " + ownerKey
+                + "; open tickets left: " + openTicketsByUser.size());
+    }
+
+    private static boolean isUuid(String value) {
+        try {
+            UUID.fromString(value);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     private void decrementCount(String userId) {

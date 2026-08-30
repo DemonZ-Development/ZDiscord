@@ -16,7 +16,7 @@ Chat bridge, tickets, status, account linking, anti-raid, player profiles, confe
 
 ZDiscord bridges your Minecraft server and Discord guild. Chat flows both ways, players see server status from Discord, and staff manage tickets from a dropdown panel.
 
-Uses JDA 5 with real slash commands and button interactions. Works on Paper, Folia, and Spigot — no extra setup per platform. Pick from 15+ modules in config; flip off whatever you won't use.
+Uses JDA 6 with real slash commands and button interactions. Works on Paper, Folia, and Spigot — no extra setup per platform. Pick from 15+ modules in config; flip off whatever you won't use.
 
 ### Features
 
@@ -46,7 +46,7 @@ Uses JDA 5 with real slash commands and button interactions. Works on Paper, Fol
 
 ### Installation
 
-1. Download `ZDiscord-1.2.0.jar` from the downloads section.
+1. Download `ZDiscord-1.3.0.jar` from the downloads section.
 2. Place the JAR in your server's `plugins/` directory.
 3. Start the server to generate the default `config.yml` and `messages.yml`.
 4. Open `plugins/ZDiscord/config.yml` and set:

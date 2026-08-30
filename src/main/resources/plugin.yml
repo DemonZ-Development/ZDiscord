@@ -13,11 +13,16 @@ softdepend:
   - LuckPerms
   - Vault
   - Essentials
+  - SkinsRestorer
+  - Floodgate
+  - Geyser-Spigot
+  - Onlysleep
+  - RedstoneReboot
 
 commands:
   zdiscord:
     description: ZDiscord admin command
-    usage: /<command> [reload|status|link|embed|ticket|panel|lockdown|update|dump]
+    usage: /<command> [reload|status|diagnostics|link|embed|ticket|panel|lockdown|update|dump]
     permission: zdiscord.admin
     aliases: [zd]
   discord:

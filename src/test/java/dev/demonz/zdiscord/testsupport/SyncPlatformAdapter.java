@@ -3,7 +3,6 @@ package dev.demonz.zdiscord.testsupport;
 import dev.demonz.zdiscord.platform.PlatformAdapter;
 import org.bukkit.entity.Entity;
 
-
 public final class SyncPlatformAdapter implements PlatformAdapter {
 
     public static final SyncPlatformAdapter INSTANCE = new SyncPlatformAdapter();

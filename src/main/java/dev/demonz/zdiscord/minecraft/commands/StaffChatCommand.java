@@ -10,7 +10,6 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 
-
 public class StaffChatCommand implements CommandExecutor, Listener {
 
     private final ZDiscord plugin;
@@ -22,7 +21,7 @@ public class StaffChatCommand implements CommandExecutor, Listener {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!(sender instanceof Player)) {
+        if (!(sender instanceof Player player)) {
             sender.sendMessage(plugin.getMessageManager().get("player-only"));
             return true;
         }
@@ -34,8 +33,6 @@ public class StaffChatCommand implements CommandExecutor, Listener {
             sender.sendMessage("Staff chat is disabled in config.yml.");
             return true;
         }
-
-        Player player = (Player) sender;
 
         if (args.length == 0) {
             plugin.getStaffChatModule().toggle(player.getUniqueId());
@@ -50,14 +47,11 @@ public class StaffChatCommand implements CommandExecutor, Listener {
         return true;
     }
 
+    // Legacy (Spigot) chat hook for toggled staff chat; Paper uses PaperStaffChatListener.
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onChat(AsyncPlayerChatEvent event) {
-        if (plugin.getStaffChatModule() == null) {
-            return;
-        }
-        if (!plugin.getStaffChatModule().isToggled(event.getPlayer().getUniqueId())) {
-            return;
-        }
+        if (plugin.getStaffChatModule() == null) return;
+        if (!plugin.getStaffChatModule().isToggled(event.getPlayer().getUniqueId())) return;
 
         event.setCancelled(true);
         Player player = event.getPlayer();

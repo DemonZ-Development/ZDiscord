@@ -16,7 +16,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-
 class ConfigManagerTest {
 
     private static InputStream defaultConfig() {
@@ -69,7 +68,6 @@ class ConfigManagerTest {
     void readsTicketCategories(@TempDir Path tmp) {
         ConfigManager mgr = newManager(tmp.toFile());
 
-
         var categories = mgr.getConfig().getMapList("tickets.categories");
         assertFalse(categories.isEmpty(),
                 "Default config should include ticket categories");
@@ -87,7 +85,6 @@ class ConfigManagerTest {
 
     @Test
     void migrationIsIdempotent(@TempDir Path tmp) throws IOException {
-
         Path cfg = Paths.get(tmp.toString(), "config.yml");
         Files.writeString(cfg, "config-version: 0\nbot:\n  token: old-token\n");
 

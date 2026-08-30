@@ -16,7 +16,7 @@ public class ConfessCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!(sender instanceof Player)) {
+        if (!(sender instanceof Player player)) {
             sender.sendMessage(plugin.getMessageManager().get("player-only"));
             return true;
         }
@@ -29,8 +29,7 @@ public class ConfessCommand implements CommandExecutor {
             return true;
         }
 
-        plugin.getConfessionModule().postFromMinecraft(
-                (Player) sender, String.join(" ", args));
+        plugin.getConfessionModule().postFromMinecraft(player, String.join(" ", args));
         return true;
     }
 }

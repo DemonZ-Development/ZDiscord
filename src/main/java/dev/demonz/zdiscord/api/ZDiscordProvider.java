@@ -7,7 +7,6 @@ public final class ZDiscordProvider {
     private ZDiscordProvider() {
     }
 
-
     public static ZDiscordAPI get() {
         if (instance == null) {
             throw new IllegalStateException(
@@ -17,16 +16,13 @@ public final class ZDiscordProvider {
         return instance;
     }
 
-
     public static boolean isAvailable() {
         return instance != null;
     }
 
-
     public static void register(ZDiscordAPI api) {
         instance = api;
     }
-
 
     public static void unregister() {
         instance = null;

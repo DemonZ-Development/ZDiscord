@@ -6,7 +6,7 @@
 
     <groupId>dev.demonz</groupId>
     <artifactId>ZDiscord</artifactId>
-    <version>1.2.0</version>
+    <version>1.3.0</version>
     <packaging>jar</packaging>
 
     <name>ZDiscord</name>
@@ -16,8 +16,7 @@
     <properties>
         <java.version>17</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>${java.version}</maven.compiler.source>
-        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
     </properties>
 
     <repositories>
@@ -57,7 +56,7 @@
         <dependency>
             <groupId>net.dv8tion</groupId>
             <artifactId>JDA</artifactId>
-            <version>5.2.1</version>
+            <version>6.5.0</version>
             <exclusions>
                 <exclusion>
                     <groupId>club.minnced</groupId>
@@ -70,12 +69,21 @@
             <groupId>club.minnced</groupId>
             <artifactId>discord-webhooks</artifactId>
             <version>0.8.4</version>
+            <!-- JDA 6 already provides the current OkHttp JVM runtime. Keeping
+                 the webhook library's older okhttp artifact would put two
+                 generations of the same okhttp3 classes in the shaded JAR. -->
+            <exclusions>
+                <exclusion>
+                    <groupId>com.squareup.okhttp3</groupId>
+                    <artifactId>okhttp</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
             <groupId>org.bstats</groupId>
             <artifactId>bstats-bukkit</artifactId>
-            <version>3.0.2</version>
+            <version>3.2.1</version>
             <scope>compile</scope>
         </dependency>
 
@@ -102,11 +110,21 @@
         <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
-            <version>5.1.0</version>
+            <version>7.1.0</version>
             <scope>compile</scope>
         </dependency>
 
-        <!-- SLF4J backend for JDA. JDA 5.x pulls slf4j-api 2.0.x, so the
+        <!-- HikariCP is a connection pool, not a JDBC driver. Bundle the
+             official Connector/J runtime so MySQL storage works on a clean
+             Paper/Spigot installation without a server-provided driver. -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <version>26.7.0</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- SLF4J backend for JDA. JDA 6.x uses slf4j-api 2.0.x, so the
              binding must also be 2.0.x (1.7.x uses a static binder that
              slf4j-api 2.0 cannot discover, which produces
              "No SLF4J providers were found" and falls back to a NOP
@@ -117,8 +135,15 @@
              Must be compile scope so it is shaded into the jar. -->
         <dependency>
             <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.18</version>
+            <scope>compile</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
             <artifactId>slf4j-jdk14</artifactId>
-            <version>2.0.13</version>
+            <version>2.0.18</version>
             <scope>compile</scope>
         </dependency>
 
@@ -126,7 +151,7 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>5.10.2</version>
+            <version>6.1.3</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -144,17 +169,18 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.13.0</version>
+                <version>3.15.0</version>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <release>${java.version}</release>
+                    <proc>none</proc>
+                    <showDeprecation>true</showDeprecation>
                 </configuration>
             </plugin>
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.2.5</version>
+                <version>3.5.6</version>
                 <configuration>
                     <argLine>-Xmx1024m</argLine>
                     <trimStackTrace>false</trimStackTrace>
@@ -167,7 +193,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.6.0</version>
+                <version>3.6.2</version>
                 <configuration>
                     <createDependencyReducedPom>false</createDependencyReducedPom>
                     <relocations>
@@ -188,12 +214,20 @@
                             <shadedPattern>dev.demonz.zdiscord.libs.hikari</shadedPattern>
                         </relocation>
                         <relocation>
+                            <pattern>com.mysql</pattern>
+                            <shadedPattern>dev.demonz.zdiscord.libs.mysql</shadedPattern>
+                        </relocation>
+                        <relocation>
                             <pattern>org.json.simple</pattern>
                             <shadedPattern>dev.demonz.zdiscord.libs.json</shadedPattern>
                         </relocation>
                         <!-- JDA transitive deps — relocating these prevents
                              classpath conflicts with co-resident plugins
                              (Essentials, DiscordSRV, etc. all ship okhttp/jackson). -->
+                        <relocation>
+                            <pattern>org.slf4j</pattern>
+                            <shadedPattern>dev.demonz.zdiscord.libs.slf4j</shadedPattern>
+                        </relocation>
                         <relocation>
                             <pattern>okhttp3</pattern>
                             <shadedPattern>dev.demonz.zdiscord.libs.okhttp3</shadedPattern>
@@ -207,12 +241,31 @@
                             <shadedPattern>dev.demonz.zdiscord.libs.jackson</shadedPattern>
                         </relocation>
                         <relocation>
+                            <pattern>com.google</pattern>
+                            <shadedPattern>dev.demonz.zdiscord.libs.google</shadedPattern>
+                        </relocation>
+                        <relocation>
                             <pattern>com.neovisionaries.ws</pattern>
                             <shadedPattern>dev.demonz.zdiscord.libs.nvws</shadedPattern>
                         </relocation>
                         <relocation>
                             <pattern>gnu.trove</pattern>
                             <shadedPattern>dev.demonz.zdiscord.libs.trove</shadedPattern>
+                        </relocation>
+                        <relocation>
+                            <pattern>org.apache.commons.collections4</pattern>
+                            <shadedPattern>dev.demonz.zdiscord.libs.collections4</shadedPattern>
+                        </relocation>
+                        <relocation>
+                            <pattern>org.json</pattern>
+                            <shadedPattern>dev.demonz.zdiscord.libs.orgjson</shadedPattern>
+                            <excludes>
+                                <exclude>org.json.simple.**</exclude>
+                            </excludes>
+                        </relocation>
+                        <relocation>
+                            <pattern>kotlin</pattern>
+                            <shadedPattern>dev.demonz.zdiscord.libs.kotlin</shadedPattern>
                         </relocation>
                     </relocations>
                     <filters>

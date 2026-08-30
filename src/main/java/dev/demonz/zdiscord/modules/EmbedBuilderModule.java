@@ -5,8 +5,8 @@ import dev.demonz.zdiscord.util.ColorUtil;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import org.bukkit.command.CommandSender;
-import java.time.Instant;
 
+import java.time.Instant;
 
 public class EmbedBuilderModule {
 
@@ -27,7 +27,8 @@ public class EmbedBuilderModule {
             sender.sendMessage("Could not find the target channel.");
             return;
         }
-        send(sender, channel, build(title, description, colorHex, null, null, "ZDiscord - Custom Embed"));
+        send(sender, channel, build(title, description, colorHex,
+                null, null, "ZDiscord - Custom Embed"));
     }
 
     public void createRichEmbed(CommandSender sender, String title, String description,

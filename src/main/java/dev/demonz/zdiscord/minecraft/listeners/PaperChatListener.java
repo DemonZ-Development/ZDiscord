@@ -8,7 +8,6 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 
-
 public class PaperChatListener implements Listener {
 
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
@@ -21,7 +20,6 @@ public class PaperChatListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onChat(AsyncChatEvent event) {
-        String message = PLAIN.serialize(event.message());
-        ChatBridge.forward(plugin, event.getPlayer(), message);
+        ChatBridge.forward(plugin, event.getPlayer(), PLAIN.serialize(event.message()));
     }
 }

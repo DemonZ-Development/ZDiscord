@@ -5,22 +5,24 @@ import dev.demonz.zdiscord.util.ColorUtil;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
-
 
 public class ConsoleModule {
 
     private static final long FLUSH_INTERVAL_TICKS = 40L;
     private static final int MAX_BATCH_CHARS = 1900;
     private static final int MAX_LINE_CHARS = 200;
+    private static final int MAX_BUFFER_LINES = 5_000;
     private static final Pattern SENSITIVE_PATTERN = Pattern.compile(
             "(?i)(password|token|secret|key|credential|auth)[=: ]+\\S+");
 
     private final ZDiscord plugin;
     private final ConcurrentLinkedQueue<String> buffer = new ConcurrentLinkedQueue<>();
+    private final AtomicInteger bufferedLines = new AtomicInteger();
     private ConsoleHandler handler;
     private Logger registeredLogger;
     private volatile boolean running = true;
@@ -38,7 +40,6 @@ public class ConsoleModule {
         handler = new ConsoleHandler();
         registeredLogger = plugin.getServer().getLogger();
         if (registeredLogger != null) {
-
             for (Handler h : registeredLogger.getHandlers()) {
                 if (h instanceof ConsoleHandler) {
                     registeredLogger.removeHandler(h);
@@ -47,7 +48,8 @@ public class ConsoleModule {
             registeredLogger.addHandler(handler);
         }
 
-        plugin.getPlatformAdapter().runAsyncTimer(this::flushBuffer, FLUSH_INTERVAL_TICKS, FLUSH_INTERVAL_TICKS);
+        plugin.getPlatformAdapter().runAsyncTimer(
+                this::flushBuffer, FLUSH_INTERVAL_TICKS, FLUSH_INTERVAL_TICKS);
         plugin.debug("Console output streaming enabled.");
     }
 
@@ -59,12 +61,14 @@ public class ConsoleModule {
         TextChannel channel = plugin.getBotManager().getTextChannel("channels.console");
         if (channel == null) {
             buffer.clear();
+            bufferedLines.set(0);
             return;
         }
 
         StringBuilder batch = new StringBuilder();
         String line;
         while ((line = buffer.poll()) != null) {
+            bufferedLines.updateAndGet(value -> Math.max(0, value - 1));
             if (line.length() > MAX_LINE_CHARS) {
                 line = line.substring(0, MAX_LINE_CHARS - 3) + "...";
             }
@@ -80,7 +84,8 @@ public class ConsoleModule {
     }
 
     private void sendBatch(TextChannel channel, String content) {
-        channel.sendMessage("```\n" + content + "```").queue(
+        String safe = content.replace("```", "``\u200B`").replace("@", "@\u200B");
+        channel.sendMessage("```\n" + safe + "```").queue(
                 s -> { },
                 err -> plugin.debug("Console batch failed: " + err.getMessage()));
     }
@@ -112,6 +117,10 @@ public class ConsoleModule {
                 return;
             }
             buffer.add(msg);
+            int size = bufferedLines.incrementAndGet();
+            while (size > MAX_BUFFER_LINES && buffer.poll() != null) {
+                size = bufferedLines.decrementAndGet();
+            }
         }
 
         @Override

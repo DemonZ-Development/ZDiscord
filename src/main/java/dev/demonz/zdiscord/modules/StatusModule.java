@@ -3,12 +3,12 @@ package dev.demonz.zdiscord.modules;
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.util.StatusEmbedBuilder;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.logging.Level;
-
 
 public class StatusModule {
 
@@ -24,9 +24,7 @@ public class StatusModule {
         statusMessageId = loadMessageId();
 
         int interval = plugin.getConfigManager().getInt("status.update-interval", 30);
-        long ticks = interval * 20L;
-
-        plugin.getPlatformAdapter().runAsyncTimer(this::updateStatus, 100L, ticks);
+        plugin.getPlatformAdapter().runTimer(this::updateStatus, 100L, interval * 20L);
     }
 
     private void updateStatus() {
@@ -40,18 +38,8 @@ public class StatusModule {
             return;
         }
 
-        StatusEmbedBuilder.StatusContext ctx = StatusEmbedBuilder.StatusContext.capture(
-                plugin.getBotManager()::getGuild,
-                plugin.getConfigManager().getString("status.embed.title", "Server Status"),
-                plugin.getConfigManager().getString("status.embed.color", "#5865F2"),
-                plugin.getConfigManager().getString("status.embed.server-ip", "play.yourserver.com"),
-                plugin.getConfigManager().getInt("status.update-interval", 30),
-                plugin.getConfigManager().getBoolean("status.embed.show-players", true),
-                plugin.getConfigManager().getBoolean("status.embed.show-tps", true),
-                plugin.getConfigManager().getBoolean("status.embed.show-memory", true),
-                plugin.getConfigManager().getDouble("performance.tps-warning", 18.0),
-                plugin.getConfigManager().getDouble("performance.tps-critical", 15.0));
-
+        StatusEmbedBuilder.StatusContext ctx = captureContext(
+                plugin.getConfigManager().getString("status.embed.color", "#5865F2"));
         if (statusMessageId != null && !statusMessageId.isEmpty()) {
             channel.editMessageEmbedsById(statusMessageId, StatusEmbedBuilder.build(ctx)).queue(
                     success -> { },
@@ -69,12 +57,24 @@ public class StatusModule {
     private void sendNewStatus(TextChannel channel, StatusEmbedBuilder.StatusContext ctx) {
         channel.sendMessageEmbeds(StatusEmbedBuilder.build(ctx)).queue(
                 message -> {
-                    if (message != null) {
-                        statusMessageId = message.getId();
-                        persistMessageId(statusMessageId);
-                    }
+                    statusMessageId = message.getId();
+                    persistMessageId(statusMessageId);
                 },
                 error -> plugin.debug("Failed to send status embed: " + error.getMessage()));
+    }
+
+    private StatusEmbedBuilder.StatusContext captureContext(String color) {
+        return StatusEmbedBuilder.StatusContext.capture(
+                plugin.getBotManager()::getGuild,
+                plugin.getConfigManager().getString("status.embed.title", "Server Status"),
+                color,
+                plugin.getConfigManager().getString("status.embed.server-ip", "play.yourserver.com"),
+                plugin.getConfigManager().getInt("status.update-interval", 30),
+                plugin.getConfigManager().getBoolean("status.embed.show-players", true),
+                plugin.getConfigManager().getBoolean("status.embed.show-tps", true),
+                plugin.getConfigManager().getBoolean("status.embed.show-memory", true),
+                plugin.getConfigManager().getDouble("performance.tps-warning", 18.0),
+                plugin.getConfigManager().getDouble("performance.tps-critical", 15.0));
     }
 
     private File dataFile() {
@@ -128,6 +128,7 @@ public class StatusModule {
             return;
         }
 
+        // flip the panel to an offline state so nobody thinks the server is still up
         StatusEmbedBuilder.StatusContext ctx = StatusEmbedBuilder.StatusContext.capture(
                 plugin.getBotManager()::getGuild,
                 plugin.getConfigManager().getString("status.embed.title", "Server Status"),
@@ -138,7 +139,7 @@ public class StatusModule {
                 18.0, 15.0);
         ctx.online = false;
         ctx.onlineCount = 0;
-        ctx.maxCount = BukkitMaxPlayers();
+        ctx.maxCount = maxPlayers();
 
         try {
             channel.editMessageEmbedsById(statusMessageId, StatusEmbedBuilder.build(ctx)).queue(
@@ -149,9 +150,9 @@ public class StatusModule {
         }
     }
 
-    private static int BukkitMaxPlayers() {
+    private static int maxPlayers() {
         try {
-            return org.bukkit.Bukkit.getMaxPlayers();
+            return Bukkit.getMaxPlayers();
         } catch (Exception e) {
             return 0;
         }

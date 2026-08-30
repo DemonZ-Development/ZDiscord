@@ -7,7 +7,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 
-
+// Legacy chat handling for Spigot; Paper uses PaperChatListener instead.
 public class ChatListener implements Listener {
 
     private final ZDiscord plugin;

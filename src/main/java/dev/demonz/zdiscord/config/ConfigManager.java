@@ -15,11 +15,15 @@ import java.util.List;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 
-
 public class ConfigManager {
 
+    public static final int CURRENT_VERSION = 11;
 
-    public static final int CURRENT_VERSION = 6;
+    // defaults that used to ship in config.yml; if a user never touched them
+    // we swap them for "auto" so SkinsRestorer/Geyser avatars kick in
+    private static final List<String> LEGACY_AVATAR_DEFAULTS = List.of(
+            "https://mc-heads.net/avatar/%uuid%/128",
+            "https://crafatar.com/avatars/%uuid%?overlay=true");
 
     private final File dataFolder;
     private final Logger logger;
@@ -27,18 +31,11 @@ public class ConfigManager {
     private final File configFile;
     private FileConfiguration config;
 
-
     public ConfigManager(ZDiscord plugin) {
-        this(
-                plugin.getDataFolder(),
-                plugin.getLogger(),
-                () -> plugin.getResource("config.yml"));
+        this(plugin.getDataFolder(), plugin.getLogger(), () -> plugin.getResource("config.yml"));
     }
 
-
-    public ConfigManager(File dataFolder,
-                         Logger logger,
-                         Supplier<InputStream> defaultResource) {
+    public ConfigManager(File dataFolder, Logger logger, Supplier<InputStream> defaultResource) {
         this.dataFolder = dataFolder;
         this.logger = logger;
         this.defaultResource = defaultResource;
@@ -50,15 +47,12 @@ public class ConfigManager {
     }
 
     private void saveDefaultConfig() {
-        if (configFile.exists()) {
-            return;
-        }
+        if (configFile.exists()) return;
         if (!dataFolder.exists() && !dataFolder.mkdirs()) {
             logger.warning("Could not create data folder: " + dataFolder);
         }
-        if (defaultResource == null) {
-            return;
-        }
+        if (defaultResource == null) return;
+
         try (InputStream in = defaultResource.get()) {
             if (in != null) {
                 Files.copy(in, configFile.toPath());
@@ -68,11 +62,10 @@ public class ConfigManager {
         }
     }
 
+    // New schema versions just merge in missing keys, existing values are never overwritten
     private void migrateIfNeeded() {
         int current = config.getInt("config-version", 0);
-        if (current >= CURRENT_VERSION) {
-            return;
-        }
+        if (current >= CURRENT_VERSION) return;
 
         logger.info("Configuration is at v" + current
                 + "; current schema is v" + CURRENT_VERSION + ". Merging in any new keys.");
@@ -84,6 +77,10 @@ public class ConfigManager {
             }
 
             FileConfiguration defaults = YamlConfiguration.loadConfiguration(new InputStreamReader(defStream));
+            if (current < 8 && LEGACY_AVATAR_DEFAULTS.contains(config.getString("chat.avatar-url", ""))) {
+                config.set("chat.avatar-url", "auto");
+                logger.info("chat.avatar-url switched to \"auto\" (per-player skin avatars).");
+            }
             for (String key : defaults.getKeys(true)) {
                 if (!config.contains(key)) {
                     config.set(key, defaults.get(key));
@@ -109,8 +106,7 @@ public class ConfigManager {
     public void reload() {
         config = YamlConfiguration.loadConfiguration(configFile);
 
-
-
+        // copyDefaults so any key missing from the user's file gets the shipped default
         try (InputStream defStream = defaultResource == null ? null : defaultResource.get()) {
             if (defStream != null) {
                 YamlConfiguration defaults = YamlConfiguration.loadConfiguration(new InputStreamReader(defStream));
@@ -162,7 +158,6 @@ public class ConfigManager {
         return config.getStringList(path);
     }
 
-
     public void save() {
         try {
             config.save(configFile);
@@ -171,11 +166,10 @@ public class ConfigManager {
         }
     }
 
+    // Filter out unfilled placeholder roles ("YOUR_ROLE_ID" etc.) from the ticket config
     private void sanitizePlaceholders() {
         List<String> roles = config.getStringList("tickets.support-roles");
-        if (roles.isEmpty()) {
-            return;
-        }
+        if (roles.isEmpty()) return;
 
         List<String> clean = new ArrayList<>();
         boolean changed = false;

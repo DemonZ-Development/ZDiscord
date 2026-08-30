@@ -9,7 +9,6 @@ import java.io.File;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
-
 public class MessageManager {
 
     private final ZDiscord plugin;
@@ -28,12 +27,15 @@ public class MessageManager {
         }
         messages = YamlConfiguration.loadConfiguration(messagesFile);
 
-        InputStream defStream = plugin.getResource("messages.yml");
-        if (defStream != null) {
-            YamlConfiguration defaults = YamlConfiguration.loadConfiguration(
-                    new InputStreamReader(defStream));
-            messages.setDefaults(defaults);
-            messages.options().copyDefaults(true);
+        try (InputStream defStream = plugin.getResource("messages.yml")) {
+            if (defStream != null) {
+                YamlConfiguration defaults = YamlConfiguration.loadConfiguration(
+                        new InputStreamReader(defStream, java.nio.charset.StandardCharsets.UTF_8));
+                messages.setDefaults(defaults);
+                messages.options().copyDefaults(true);
+            }
+        } catch (java.io.IOException e) {
+            plugin.getLogger().warning("Failed to load default messages.yml: " + e.getMessage());
         }
     }
 
@@ -41,13 +43,11 @@ public class MessageManager {
         loadMessages();
     }
 
-
     public String get(String key) {
         String msg = messages.getString(key, "&cMissing message: " + key);
         String prefix = messages.getString("prefix", "&bZDiscord &8> &7");
         return ChatColor.translateAlternateColorCodes('&', msg.replace("%prefix%", prefix));
     }
-
 
     public String get(String key, String... replacements) {
         String msg = get(key);
@@ -59,7 +59,6 @@ public class MessageManager {
         }
         return msg;
     }
-
 
     public String getRaw(String key) {
         String msg = messages.getString(key, key);

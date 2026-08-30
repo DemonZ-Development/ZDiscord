@@ -11,7 +11,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-
 public class VoiceStatusModule extends ListenerAdapter {
 
     private final ZDiscord plugin;
@@ -67,14 +66,19 @@ public class VoiceStatusModule extends ListenerAdapter {
         }
         plugin.getPlatformAdapter().runSync(() -> {
             Player player = Bukkit.getPlayer(playerUUID);
-            if (player == null || !player.isOnline()) {
+            if (player == null) {
                 return;
             }
-            if (joined) {
-                player.setPlayerListName(player.getName() + " \u00A7b(V)");
-            } else {
-                player.setPlayerListName(player.getName());
-            }
+            plugin.getPlatformAdapter().runForEntity(player, () -> {
+                if (!player.isOnline()) {
+                    return;
+                }
+                if (joined) {
+                    player.setPlayerListName(player.getName() + " \u00A7b(V)");
+                } else {
+                    player.setPlayerListName(player.getName());
+                }
+            });
         });
     }
 

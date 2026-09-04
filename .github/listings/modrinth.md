@@ -18,25 +18,26 @@ Server-side
 
 ## Short description (max 100 chars)
 
-Discord integration for Paper, Folia, and Spigot. Chat bridge, tickets, leaderboards, anti-raid, player profiles, confessions.
+Discord chat, status, tickets, account linking, and player tools for Paper, Folia, and Spigot.
 
 ## Long description
 
-ZDiscord bridges your Minecraft server and Discord guild. Chat flows both ways, players see server status from Discord, and staff manage tickets from a dropdown panel.
+ZDiscord brings day-to-day Minecraft server activity into Discord. Players can chat across both platforms, check who is online, link their accounts, open tickets, and view profiles or leaderboards. Staff get the same bridge for console output, alerts, and private staff chat.
 
-### Why ZDiscord?
+### How it fits your server
 
-Uses JDA 6 with real slash commands and button interactions. Works on Paper, Folia, and Spigot — no extra setup per platform. Pick from 15+ modules in config; flip off whatever you won't use.
+It uses JDA 6 slash commands, buttons, and menus. The same JAR runs on Paper, Folia, and Spigot, and each module can be switched on or off in the configuration.
 
 ### Features
 
-- **Chat bridge** — Two-way chat between Minecraft and Discord. Webhooks display player heads as avatars. Linked players show their Discord name and avatar.
-- **Server status** — One Discord message that auto-updates with player count, TPS, and memory usage.
+- **Chat bridge** — Two-way chat with reply context and webhook avatars. SkinsRestorer is used when available, with Java and Bedrock fallbacks.
+- **Server status** — A Discord message that updates itself with player count, TPS, and memory usage.
+- **Live stats** — One updating panel for online players, performance, and current leaders.
 - **Console streaming** — Server log lines forwarded to a Discord channel.
 - **Account linking** — One-time codes link Discord and Minecraft accounts. Enforce link-to-join if you want.
 - **Staff chat** — `/sc` toggles a staff-only channel bridged to Discord.
 - **Tickets** — Players open private support channels via a Discord button or `/ticket`.
-- **Leaderboards** — Kills, deaths, and playtime ranked via `/leaderboard`.
+- **Leaderboards** — Kills, deaths, and playtime with paging, stat switching, and timed refreshes.
 - **Event messages** — Joins, quits, deaths, and advancements posted to Discord.
 - **Performance monitor** — TPS and memory tracked over time with configurable alerts.
 - **Anti-raid** — Mass-join detection with optional automatic lockdown.
@@ -46,29 +47,28 @@ Uses JDA 6 with real slash commands and button interactions. Works on Paper, Fol
 - **Player profiles** — `/profile [player]` renders a rich embed with avatar, NameMC link, stats, and a follow button.
 - **Follow system** — Follow players to get DM notifications when they join. `/following` and `/unfollow` manage subscriptions.
 - **Anonymous confessions** — `/confess` posts to a dedicated channel with rate limiting and configurable appearance.
-- **Setup wizard** — `/setup` configures channels from Discord with dropdowns and buttons.
+- **Setup wizard** — `/setup` configures channels and roles from Discord.
+- **Plugin bridges** — Optional Onlysleep and RedstoneReboot messages use ZDiscord's existing connection.
 
 ### Requirements
 
 - Java 17 or newer
 - Paper 1.20.4 or newer, Folia, or Spigot 1.20.4 or newer
 - A Discord bot token with **Server Members** and **Message Content** intents enabled
+- MySQL 8.0 or newer only when using the optional MySQL storage backend
 
 ### Installation
 
-1. Download `ZDiscord-1.3.0.jar` from the releases page.
+1. Download `ZDiscord-1.3.1.jar` from the releases page.
 2. Place the JAR in your server's `plugins/` directory.
 3. Start the server to generate the default `config.yml` and `messages.yml`.
-4. Open `plugins/ZDiscord/config.yml` and set:
-   - `bot.token` — your bot token
-   - `bot.guild-id` — your Discord server ID
-   - `channels.chat` — the channel ID for chat bridge
+4. Open `plugins/ZDiscord/config.yml` and set your bot token and Discord server ID.
 5. Restart the server.
-6. Run `/setup` in Discord to configure the remaining channels.
+6. Run `/setup` in Discord to choose channels and roles.
 
 ### Configuration
 
-All configuration lives in `plugins/ZDiscord/config.yml`. User-facing strings are in `messages.yml`. See the wiki for a full reference.
+All settings live in `plugins/ZDiscord/config.yml`. User-facing Minecraft text is in `messages.yml`. YAML storage works without a database; MySQL is available when you need shared or larger-scale storage. See the wiki for the full reference.
 
 ### License
 
@@ -83,7 +83,3 @@ Apache License 2.0
 ## Tags
 
 `paper` `folia` `spigot` `discord` `chat` `tickets` `linking` `anti-raid` `utility`
-
-## Donation / sponsor links
-
-(Optional — list your Ko-fi, GitHub Sponsors, etc. here.)

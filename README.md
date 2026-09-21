@@ -6,7 +6,7 @@
 
 Discord integration for Minecraft servers.
 
-[Releases](https://github.com/DemonZ-Development/ZDiscord/releases) · [Wiki](https://github.com/DemonZ-Development/ZDiscord/wiki) · [Issues](https://github.com/DemonZ-Development/ZDiscord/issues)
+[Releases](https://github.com/DemonZ-Development/ZDiscord/releases) · [Wiki](https://github.com/DemonZ-Development/ZDiscord/wiki) · [Issues](https://github.com/DemonZ-Development/ZDiscord/issues) · [Website](https://demonz.org)
 
 </div>
 
@@ -48,6 +48,7 @@ ZDiscord connects your Minecraft server to Discord. Chat flows both ways, player
 - **Player profiles** — `/profile [player]` renders a rich embed with avatar, NameMC link, stats, and a follow button.
 - **Follow system** — Follow players to get DM notifications when they join. `/following` and `/unfollow` manage subscriptions.
 - **Anonymous confessions** — `/confess` posts to a dedicated channel with rate limiting and configurable appearance.
+- **CraftyAI assistant** — Query your CraftyAI instance directly from Discord with `/crafty`, featuring private replies, role restrictions, and rate limits.
 - **Setup wizard** — `/setup` configures channels from Discord with dropdowns and buttons.
 - **DemonZ integrations** — Optional Onlysleep sleep/night messages and RedstoneReboot restart alerts share the events channel (or dedicated channels).
 - **SkinsRestorer avatars** — Player cards and chat webhooks use the active restored skin when available, with safe Java/Bedrock fallbacks.
@@ -61,7 +62,7 @@ ZDiscord connects your Minecraft server to Discord. Chat flows both ways, player
 
 ## Installation
 
-1. Download `ZDiscord-1.3.1.jar` from the [Releases](https://github.com/DemonZ-Development/ZDiscord/releases) page.
+1. Download `ZDiscord-1.4.0.jar` from the [Releases](https://github.com/DemonZ-Development/ZDiscord/releases) page.
 2. Place the JAR in your server's `plugins/` directory.
 3. Start the server to generate the default `config.yml` and `messages.yml`.
 4. Open `plugins/ZDiscord/config.yml` and set:
@@ -133,6 +134,7 @@ User-facing strings live in `messages.yml`. They accept `&` colour codes and the
 | `/following` | List players you follow |
 | `/unfollow <player>` | Stop following a player |
 | `/confess <message>` | Post an anonymous confession |
+| `/crafty <question>` | Ask a question via CraftyAI |
 | `/setup` | Open the setup wizard |
 
 ## Building
@@ -143,7 +145,7 @@ cd ZDiscord
 mvn clean package
 ```
 
-The shaded JAR is written to `target/ZDiscord-1.3.1.jar`.
+The shaded JAR is written to `target/ZDiscord-1.4.0.jar`.
 
 ## Developer API
 
@@ -155,3 +157,5 @@ uses the same connection for the optional Onlysleep and RedstoneReboot bridges.
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE).
+
+Made by [**DemonZ Development**](https://demonz.org)

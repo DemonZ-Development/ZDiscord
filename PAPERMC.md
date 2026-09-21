@@ -48,6 +48,7 @@ On Discord, members can use `/status`, `/players`, `/tps`, `/link`, `/ticket`, `
 
 ## Links
 
+- [Website](https://demonz.org)
 - [Source code](https://github.com/DemonZ-Development/ZDiscord)
 - [Issues](https://github.com/DemonZ-Development/ZDiscord/issues)
 - [Wiki](https://github.com/DemonZ-Development/ZDiscord/wiki)

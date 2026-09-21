@@ -2,6 +2,18 @@
 
 All notable changes to ZDiscord are documented here.
 
+## [1.4.0] - 2026-09-22
+
+### Added
+- Optional CraftyAI integration via `/crafty` slash command for asking questions from Discord with private replies, rate limiting, and role/channel allowlists.
+
+### Changed
+- Configuration schema version bumped to 12.
+- Updated official website links to demonz.org.
+
+### Fixed
+- Fixed an infinite loop in `LeaderboardModule` that could freeze the server thread when recording stats for a player without prior entries.
+
 ## [1.3.1] - 2026-08-30
 
 ### Fixed

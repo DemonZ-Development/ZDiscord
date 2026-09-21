@@ -51,6 +51,8 @@ public class SlashCommandManager extends ListenerAdapter {
 
         guild.updateCommands().addCommands(
                 Commands.slash("status", "View the Minecraft server status"),
+                Commands.slash("crafty", "Ask CraftyAI a Minecraft or community question")
+                        .addOption(OptionType.STRING, "question", "Your question (sent to CraftyAI)", true),
                 Commands.slash("players", "View online players"),
                 Commands.slash("tps", "View server performance (TPS and memory)"),
                 Commands.slash("link", "Link your Discord account to Minecraft")
@@ -86,6 +88,7 @@ public class SlashCommandManager extends ListenerAdapter {
         if ("setup".equals(event.getName())) return;
 
         switch (event.getName()) {
+            case "crafty" -> plugin.getCraftyAIModule().handle(event);
             case "status" -> handleStatus(event);
             case "players" -> handlePlayers(event);
             case "tps" -> handleTps(event);

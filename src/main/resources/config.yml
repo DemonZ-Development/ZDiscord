@@ -1,4 +1,15 @@
-config-version: 11
+config-version: 12
+
+# /crafty sends the supplied question to CraftyAI and replies privately.
+# Requires the CraftyAI Gateway version providing /v1/developer/chat.
+# Uses the key's existing request/token quotas; never executes game actions.
+craftyai:
+  enabled: false
+  endpoint: "https://craftyai-gateway.craftyauth.workers.dev/v1/developer/chat"
+  api-key: ""
+  # Empty lists allow all channels/roles in bot.guild-id when enabled.
+  allowed-channels: []
+  allowed-roles: []
 
 storage:
   # yaml = flatfile. mysql = requires MySQL 8.0+ (the JDBC driver is bundled).

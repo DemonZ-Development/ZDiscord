@@ -53,6 +53,8 @@ import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class ZDiscord extends JavaPlugin {
+    private dev.demonz.zdiscord.modules.CraftyAIModule craftyAIModule;
+    public dev.demonz.zdiscord.modules.CraftyAIModule getCraftyAIModule() { return craftyAIModule; }
 
     private static final String ASYNC_CHAT_EVENT = "io.papermc.paper.event.player.AsyncChatEvent";
 
@@ -107,6 +109,7 @@ public class ZDiscord extends JavaPlugin {
 
         botManager = new BotManager(this);
         confessionModule = new ConfessionModule(this);
+        craftyAIModule = new dev.demonz.zdiscord.modules.CraftyAIModule(this);
         slashCommandManager = new SlashCommandManager(this);
         setupCommand = new SetupCommand(this);
         if (!botManager.connect()) {
@@ -141,6 +144,7 @@ public class ZDiscord extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (craftyAIModule != null) craftyAIModule.close();
         ZLogger.info(ZLogger.Category.SYSTEM, "Shutting down ZDiscord...");
 
         ZDiscordProvider.unregister();
@@ -322,6 +326,7 @@ public class ZDiscord extends JavaPlugin {
 
     public void reload() {
         configManager.reload();
+        if (craftyAIModule != null) craftyAIModule.reload();
         messageManager.reload();
         ZLogger.init(getLogger(), configManager.getConfig());
         if (ZLogger.isDebugMode()) {

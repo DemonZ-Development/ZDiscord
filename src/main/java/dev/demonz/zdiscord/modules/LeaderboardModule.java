@@ -168,17 +168,31 @@ public class LeaderboardModule {
         var playerStats = statsCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>());
 
         while (true) {
-            long current = playerStats.getOrDefault(stat, 0L);
+            Long currentObj = playerStats.get(stat);
+            long current = currentObj == null ? 0L : currentObj;
             long updated = current + amount;
-            ZDiscordStatUpdateEvent event = new ZDiscordStatUpdateEvent(
-                    uuid, stat, current, updated, !Bukkit.isPrimaryThread());
-            Bukkit.getPluginManager().callEvent(event);
-            if (event.isCancelled()) {
-                return;
+            if (Bukkit.getServer() != null) {
+                ZDiscordStatUpdateEvent event = new ZDiscordStatUpdateEvent(
+                        uuid, stat, current, updated, !Bukkit.isPrimaryThread());
+                Bukkit.getPluginManager().callEvent(event);
+                if (event.isCancelled()) {
+                    return;
+                }
             }
-            if (playerStats.replace(stat, current, updated)) {
-                plugin.getStorageManager().saveStat(uuid, stat, updated);
-                return;
+            if (currentObj == null) {
+                if (playerStats.putIfAbsent(stat, updated) == null) {
+                    if (plugin != null && plugin.getStorageManager() != null) {
+                        plugin.getStorageManager().saveStat(uuid, stat, updated);
+                    }
+                    return;
+                }
+            } else {
+                if (playerStats.replace(stat, current, updated)) {
+                    if (plugin != null && plugin.getStorageManager() != null) {
+                        plugin.getStorageManager().saveStat(uuid, stat, updated);
+                    }
+                    return;
+                }
             }
         }
     }
@@ -186,14 +200,18 @@ public class LeaderboardModule {
     public void setStat(UUID uuid, String stat, long value) {
         var playerStats = statsCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>());
         long old = playerStats.getOrDefault(stat, 0L);
-        ZDiscordStatUpdateEvent event = new ZDiscordStatUpdateEvent(
-                uuid, stat, old, value, !Bukkit.isPrimaryThread());
-        Bukkit.getPluginManager().callEvent(event);
-        if (event.isCancelled()) {
-            return;
+        if (Bukkit.getServer() != null) {
+            ZDiscordStatUpdateEvent event = new ZDiscordStatUpdateEvent(
+                    uuid, stat, old, value, !Bukkit.isPrimaryThread());
+            Bukkit.getPluginManager().callEvent(event);
+            if (event.isCancelled()) {
+                return;
+            }
         }
         playerStats.put(stat, value);
-        plugin.getStorageManager().saveStat(uuid, stat, value);
+        if (plugin != null && plugin.getStorageManager() != null) {
+            plugin.getStorageManager().saveStat(uuid, stat, value);
+        }
     }
 
     public long getStat(UUID uuid, String stat) {

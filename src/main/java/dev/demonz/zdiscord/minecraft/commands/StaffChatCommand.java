@@ -48,6 +48,7 @@ public class StaffChatCommand implements CommandExecutor, Listener {
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    @SuppressWarnings("deprecation")
     public void onChat(AsyncPlayerChatEvent event) {
         if (plugin.getStaffChatModule() == null) return;
         if (!plugin.getStaffChatModule().isToggled(event.getPlayer().getUniqueId())) return;

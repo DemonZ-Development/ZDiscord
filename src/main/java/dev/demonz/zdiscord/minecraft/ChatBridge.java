@@ -12,6 +12,7 @@ public final class ChatBridge {
     private ChatBridge() {
     }
 
+    @SuppressWarnings("deprecation")
     public static void forward(ZDiscord plugin, Player player, String rawMessage) {
         if (plugin == null || player == null || rawMessage == null) return;
 

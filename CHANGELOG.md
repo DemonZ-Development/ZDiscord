@@ -2,6 +2,11 @@
 
 All notable changes to ZDiscord are documented here.
 
+## [1.4.1] - 2026-10-03
+
+### Added
+- A secret Halloween easter egg was added.
+
 ## [1.4.0] - 2026-09-22
 
 ### Added

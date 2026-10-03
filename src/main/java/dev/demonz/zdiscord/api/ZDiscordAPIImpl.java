@@ -9,7 +9,6 @@ import dev.demonz.zdiscord.modules.LeaderboardModule;
 import dev.demonz.zdiscord.modules.LinkModule;
 import dev.demonz.zdiscord.util.PlayerProfileBuilder;
 import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
@@ -99,6 +98,7 @@ public final class ZDiscordAPIImpl implements ZDiscordAPI {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public String getPluginVersion() {
         return plugin.getDescription().getVersion();
     }

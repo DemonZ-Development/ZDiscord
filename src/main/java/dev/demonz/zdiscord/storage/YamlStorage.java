@@ -2,7 +2,6 @@ package dev.demonz.zdiscord.storage;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.platform.PlatformAdapter;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;

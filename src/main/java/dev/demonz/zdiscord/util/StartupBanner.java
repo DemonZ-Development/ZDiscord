@@ -12,6 +12,7 @@ public final class StartupBanner {
     private StartupBanner() {
     }
 
+    @SuppressWarnings("deprecation")
     public static void print(ZDiscord plugin, long startupMs) {
         Logger log = plugin.getLogger();
         String version = plugin.getDescription().getVersion();

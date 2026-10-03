@@ -42,6 +42,7 @@ public final class PlayerProfileBuilder {
         return p;
     }
 
+    @SuppressWarnings("deprecation")
     public static EmbedBuilder toEmbed(ZDiscord plugin, Profile profile, String requestedBy) {
         String avatarSmall = SkinUtil.avatar(plugin, profile.uuid, profile.name, HeadUtil.SIZE_SMALL);
         String avatarLarge = SkinUtil.avatar(plugin, profile.uuid, profile.name, HeadUtil.SIZE_LARGE);

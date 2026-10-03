@@ -15,6 +15,7 @@ public class LinkEnforcementListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
+    @SuppressWarnings("deprecation")
     public void onLogin(PlayerLoginEvent event) {
         if (plugin.getLinkModule() == null) return;
         if (!plugin.getConfigManager().getBoolean("linking.required", false)) return;

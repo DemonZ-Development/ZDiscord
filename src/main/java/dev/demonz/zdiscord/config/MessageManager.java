@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
+@SuppressWarnings("deprecation")
 public class MessageManager {
 
     private final ZDiscord plugin;

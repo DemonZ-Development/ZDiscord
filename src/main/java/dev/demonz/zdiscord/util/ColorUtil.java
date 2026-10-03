@@ -3,10 +3,14 @@ package dev.demonz.zdiscord.util;
 import org.bukkit.ChatColor;
 
 import java.awt.Color;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+@SuppressWarnings("deprecation")
 public final class ColorUtil {
 
     private static final Color DEFAULT = new Color(0x5865F2);
+    private static final Pattern HEX_PATTERN = Pattern.compile("&#([A-Fa-f0-9]{6})");
 
     private ColorUtil() {
     }
@@ -30,6 +34,22 @@ public final class ColorUtil {
         String stripped = ChatColor.stripColor(text);
         if (stripped == null) return "";
         return stripped.replaceAll("&[0-9a-fk-orA-FK-OR]", "");
+    }
+
+    public static String colorize(String text) {
+        if (text == null || text.isEmpty()) return text == null ? "" : text;
+        Matcher matcher = HEX_PATTERN.matcher(text);
+        StringBuilder sb = new StringBuilder();
+        while (matcher.find()) {
+            String hex = matcher.group(1);
+            StringBuilder replacement = new StringBuilder("\u00A7x");
+            for (char c : hex.toCharArray()) {
+                replacement.append('\u00A7').append(Character.toLowerCase(c));
+            }
+            matcher.appendReplacement(sb, replacement.toString());
+        }
+        matcher.appendTail(sb);
+        return ChatColor.translateAlternateColorCodes('&', sb.toString());
     }
 
     /**

@@ -10,6 +10,7 @@ public final class PlaceholderUtil {
     private PlaceholderUtil() {
     }
 
+    @SuppressWarnings("deprecation")
     public static String resolve(String text, Player player) {
         if (text == null) return "";
         text = replaceCommon(text);

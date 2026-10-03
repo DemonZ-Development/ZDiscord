@@ -44,6 +44,8 @@ import dev.demonz.zdiscord.storage.MySQLStorage;
 import dev.demonz.zdiscord.storage.StorageManager;
 import dev.demonz.zdiscord.storage.YamlStorage;
 import dev.demonz.zdiscord.util.StartupBanner;
+import dev.demonz.zdiscord.util.ColorUtil;
+import dev.demonz.zdiscord.util.HalloweenEasterEgg;
 import dev.demonz.zdiscord.util.SkinUtil;
 import dev.demonz.zdiscord.util.UpdateChecker;
 import dev.demonz.zdiscord.util.ZLogger;
@@ -86,8 +88,10 @@ public class ZDiscord extends JavaPlugin {
     private FollowModule followModule;
     private ConfessionModule confessionModule;
     private IntegrationModule integrationModule;
+    private volatile HalloweenEasterEgg halloween;
 
     @Override
+    @SuppressWarnings("deprecation")
     public void onEnable() {
         instance = this;
         long start = System.currentTimeMillis();
@@ -140,10 +144,15 @@ public class ZDiscord extends JavaPlugin {
 
         long elapsed = System.currentTimeMillis() - start;
         StartupBanner.print(this, elapsed);
+        halloween = new HalloweenEasterEgg("ZDiscord", getLogger()::info, () ->
+                platformAdapter.runSync(() -> getServer().getOnlinePlayers().forEach(player ->
+                        platformAdapter.runForEntity(player, () -> greetHalloween(player)))));
+        halloween.start();
     }
 
     @Override
     public void onDisable() {
+        if (halloween != null) halloween.close();
         if (craftyAIModule != null) craftyAIModule.close();
         ZLogger.info(ZLogger.Category.SYSTEM, "Shutting down ZDiscord...");
 
@@ -175,6 +184,15 @@ public class ZDiscord extends JavaPlugin {
 
         ZLogger.info(ZLogger.Category.SYSTEM, "ZDiscord shut down.");
         instance = null;
+    }
+
+    public void greetHalloween(org.bukkit.entity.Player player) {
+        HalloweenEasterEgg current = halloween;
+        if (current != null && player.isOnline()
+                && (player.isOp() || player.hasPermission("zdiscord.admin"))) {
+            current.greetPlayer(player.getUniqueId(), message -> player.sendMessage(
+                    ColorUtil.colorize("&6[ZDiscord] &e" + message)));
+        }
     }
 
     private void detectPlatform() {

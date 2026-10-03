@@ -104,4 +104,28 @@ class ColorUtilTest {
     void toDiscordMarkdownHandlesNull() {
         assertEquals("", ColorUtil.toDiscordMarkdown(null));
     }
+
+    @Test
+    void colorizeTranslatesAmpersandCodes() {
+        assertEquals("\u00A76[ZDiscord] \u00A7eHappy Halloween!",
+                ColorUtil.colorize("&6[ZDiscord] &eHappy Halloween!"));
+    }
+
+    @Test
+    void colorizeTranslatesHexCodes() {
+        assertEquals("\u00A7x\u00A7f\u00A7f\u00A7a\u00A7a\u00A70\u00A70Gold",
+                ColorUtil.colorize("&#ffaa00Gold"));
+    }
+
+    @Test
+    void colorizeHandlesNullAndEmpty() {
+        assertEquals("", ColorUtil.colorize(null));
+        assertEquals("", ColorUtil.colorize(""));
+    }
+
+    @Test
+    void colorizeLeavesPlainTextAlone() {
+        assertEquals("Plain text without colors",
+                ColorUtil.colorize("Plain text without colors"));
+    }
 }

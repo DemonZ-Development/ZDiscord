@@ -50,7 +50,6 @@ public final class IntegrationModule {
         unregisterRedstoneAdapter();
     }
 
-    @SuppressWarnings("unchecked")
     private void hookOnlysleep() {
         if (!plugin.getConfigManager().getBoolean("integrations.onlysleep.enabled", true)) return;
 

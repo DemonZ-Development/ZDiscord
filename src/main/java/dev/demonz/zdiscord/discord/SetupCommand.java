@@ -43,6 +43,7 @@ import java.util.Map;
  * category manager (add / edit / remove / reorder) driven by buttons,
  * dropdowns and modals.
  */
+@SuppressWarnings("deprecation")
 public class SetupCommand extends ListenerAdapter {
 
     private final ZDiscord plugin;
@@ -52,7 +53,6 @@ public class SetupCommand extends ListenerAdapter {
     private static final String CHANNEL_MENU_PREFIX = "zdiscord_setup_channel:";
 
     private static final String TICKET_CATEGORY_MENU_ID = "zdiscord_setup_ticket_cat_menu";
-    private static final String TICKET_CATEGORY_PREFIX = "zdiscord_setup_ticket_cat:";
     private static final String TICKET_CATEGORY_MODAL_PREFIX = "zdiscord_setup_ticket_modal:";
 
     private static final String BTN_ADD = "zdiscord_setup_ticket_add";
@@ -835,6 +835,7 @@ public class SetupCommand extends ListenerAdapter {
     }
 
     private static final class CategoryDraft {
+        @SuppressWarnings("unused")
         final String id;
         final String label;
         final String description;

@@ -12,6 +12,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+@SuppressWarnings("deprecation")
 public class AntiRaidModule {
 
     private final ZDiscord plugin;

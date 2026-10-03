@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+@SuppressWarnings("deprecation")
 public class UpdateChecker implements Listener {
 
     private static final String PROJECT_SLUG = "zdiscord";
@@ -40,7 +41,6 @@ public class UpdateChecker implements Listener {
 
     private final ZDiscord plugin;
     private volatile String latestVersion;
-    private volatile String latestVersionTitle;
     private volatile String releaseDate;
     private volatile boolean updateAvailable;
     private volatile int lastCheckErrorCount;
@@ -77,7 +77,6 @@ public class UpdateChecker implements Listener {
 
             JSONObject latest = (JSONObject) versions.get(0);
             latestVersion = (String) latest.get("version_number");
-            latestVersionTitle = (String) latest.get("name");
             releaseDate = (String) latest.get("date_published");
 
             String currentVersion = plugin.getDescription().getVersion();

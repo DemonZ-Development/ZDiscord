@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
+@SuppressWarnings("deprecation")
 public class DiscordChatListener extends ListenerAdapter {
 
     private static final Set<String> NEVER_ALLOWED_CONSOLE_COMMANDS = Set.of(

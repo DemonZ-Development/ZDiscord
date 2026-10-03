@@ -31,8 +31,10 @@ public class JoinQuitListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @SuppressWarnings("deprecation")
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        plugin.greetHalloween(player);
         UUID uuid = player.getUniqueId();
         long now = System.currentTimeMillis();
 

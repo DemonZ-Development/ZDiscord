@@ -11,6 +11,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+@SuppressWarnings("deprecation")
 public class VoiceStatusModule extends ListenerAdapter {
 
     private final ZDiscord plugin;

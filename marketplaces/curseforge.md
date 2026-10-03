@@ -1,6 +1,6 @@
 ZDiscord connects Minecraft and Discord directly. Players chat across both platforms, check who is online, link accounts, open tickets, and view profiles or leaderboards. Staff use the same connection for console logs, alerts, and private staff chat.
 
-Commands use native Discord slash commands, buttons, and selection menus. One JAR runs on Paper, Folia, and Spigot. You can toggle each module in the configuration.
+Commands use native Discord slash commands, buttons, and selection menus. One JAR runs on Paper, Folia, and Spigot across Minecraft 1.20.4 through 26.3. You can toggle each module in the configuration.
 
 ### Features
 
@@ -27,7 +27,7 @@ Commands use native Discord slash commands, buttons, and selection menus. One JA
 ### Requirements
 
 - Java 17 or newer
-- Paper 1.20.4 or newer, Folia, or Spigot 1.20.4 or newer
+- Paper, Folia, or Spigot for Minecraft 1.20.4 through 26.3
 - A Discord bot token with **Server Members** and **Message Content** intents enabled
 - MySQL 8.0 or newer only when using the optional MySQL storage backend
 

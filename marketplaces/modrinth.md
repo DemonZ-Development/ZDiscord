@@ -35,7 +35,7 @@ Commands use native Discord slash commands, buttons, and selection menus. One JA
 
 ### Installation
 
-1. Download `ZDiscord-1.4.1.jar` from the releases page.
+1. Download `ZDiscord-1.4.2.jar` from the releases page.
 2. Place the JAR in your server's `plugins/` directory.
 3. Start the server to generate the default `config.yml` and `messages.yml`.
 4. Open `plugins/ZDiscord/config.yml` and set your bot token and Discord server ID.

@@ -14,6 +14,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
@@ -58,16 +59,26 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
     private void sendHelp(CommandSender sender) {
         sender.sendMessage("");
         sender.sendMessage("ZDiscord commands:");
-        sender.sendMessage("  /zdiscord reload");
-        sender.sendMessage("  /zdiscord status");
-        sender.sendMessage("  /zdiscord diagnostics");
-        sender.sendMessage("  /zdiscord link");
-        sender.sendMessage("  /zdiscord embed <title> <description>");
-        sender.sendMessage("  /zdiscord ticket <subject>");
-        sender.sendMessage("  /zdiscord panel");
-        sender.sendMessage("  /zdiscord lockdown");
-        sender.sendMessage("  /zdiscord update [check|dismiss]");
-        sender.sendMessage("  /zdiscord dump");
+        if (sender.hasPermission("zdiscord.admin")) {
+            sender.sendMessage("  /zdiscord reload");
+            sender.sendMessage("  /zdiscord status");
+            sender.sendMessage("  /zdiscord diagnostics");
+        }
+        if (sender.hasPermission("zdiscord.link")) {
+            sender.sendMessage("  /zdiscord link");
+        }
+        if (sender.hasPermission("zdiscord.embed")) {
+            sender.sendMessage("  /zdiscord embed <title> <description>");
+        }
+        if (sender.hasPermission("zdiscord.ticket")) {
+            sender.sendMessage("  /zdiscord ticket <subject>");
+        }
+        if (sender.hasPermission("zdiscord.admin")) {
+            sender.sendMessage("  /zdiscord panel");
+            sender.sendMessage("  /zdiscord lockdown");
+            sender.sendMessage("  /zdiscord update [check|dismiss]");
+            sender.sendMessage("  /zdiscord dump");
+        }
         sender.sendMessage("");
     }
 
@@ -416,11 +427,22 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> subs = Arrays.asList("reload", "status", "diagnostics", "link",
-                    "embed", "ticket", "panel", "lockdown", "update", "dump");
+            List<String> subs = new ArrayList<>();
+            if (sender.hasPermission("zdiscord.admin")) {
+                subs.addAll(Arrays.asList("reload", "status", "diagnostics", "panel", "lockdown", "update", "dump"));
+            }
+            if (sender.hasPermission("zdiscord.link")) {
+                subs.add("link");
+            }
+            if (sender.hasPermission("zdiscord.embed")) {
+                subs.add("embed");
+            }
+            if (sender.hasPermission("zdiscord.ticket")) {
+                subs.add("ticket");
+            }
             return subs.stream().filter(s -> s.startsWith(args[0].toLowerCase())).toList();
         }
-        if (args.length == 2 && "update".equalsIgnoreCase(args[0])) {
+        if (args.length == 2 && "update".equalsIgnoreCase(args[0]) && sender.hasPermission("zdiscord.admin")) {
             return Arrays.asList("check", "dismiss").stream()
                     .filter(s -> s.startsWith(args[1].toLowerCase())).toList();
         }

@@ -46,6 +46,7 @@ class ConfigManagerTest {
         ConfigManager mgr = newManager(tmp.toFile());
         boolean status = mgr.getBoolean("status.enabled", true);
         assertTrue(status, "Default status.enabled should be true");
+        assertTrue(mgr.getBoolean("chat.enabled", true), "Default chat.enabled should be true");
     }
 
     @Test

@@ -11,6 +11,7 @@ import dev.demonz.zdiscord.discord.SlashCommandManager;
 import dev.demonz.zdiscord.discord.WebhookManager;
 import dev.demonz.zdiscord.minecraft.commands.ConfessCommand;
 import dev.demonz.zdiscord.minecraft.commands.DiscordCommand;
+import dev.demonz.zdiscord.minecraft.commands.LinkCommand;
 import dev.demonz.zdiscord.minecraft.commands.StaffChatCommand;
 import dev.demonz.zdiscord.minecraft.commands.ZDiscordCommand;
 import dev.demonz.zdiscord.minecraft.listeners.AdvancementListener;
@@ -88,6 +89,7 @@ public class ZDiscord extends JavaPlugin {
     private FollowModule followModule;
     private ConfessionModule confessionModule;
     private IntegrationModule integrationModule;
+    private JoinQuitListener joinQuitListener;
     private volatile HalloweenEasterEgg halloween;
 
     @Override
@@ -144,6 +146,11 @@ public class ZDiscord extends JavaPlugin {
 
         long elapsed = System.currentTimeMillis() - start;
         StartupBanner.print(this, elapsed);
+        platformAdapter.runTimer(() -> {
+            if (joinQuitListener != null) {
+                joinQuitListener.flushPlaytime();
+            }
+        }, 1200L, 1200L);
         halloween = new HalloweenEasterEgg("ZDiscord", getLogger()::info, () ->
                 platformAdapter.runSync(() -> getServer().getOnlinePlayers().forEach(player ->
                         platformAdapter.runForEntity(player, () -> greetHalloween(player)))));
@@ -160,6 +167,10 @@ public class ZDiscord extends JavaPlugin {
         getServer().getServicesManager().unregisterAll(this);
 
         if (integrationModule != null) integrationModule.shutdown();
+
+        if (joinQuitListener != null) {
+            joinQuitListener.flushPlaytime();
+        }
 
         if (statusModule != null) statusModule.shutdown();
         if (liveStatsModule != null) liveStatsModule.shutdown();
@@ -306,7 +317,9 @@ public class ZDiscord extends JavaPlugin {
         if (!paperModern) {
             getServer().getPluginManager().registerEvents(new ChatListener(this), this);
         }
-        getServer().getPluginManager().registerEvents(new JoinQuitListener(this), this);
+        joinQuitListener = new JoinQuitListener(this);
+        joinQuitListener.initOnlinePlayers();
+        getServer().getPluginManager().registerEvents(joinQuitListener, this);
         getServer().getPluginManager().registerEvents(new DeathListener(this), this);
         getServer().getPluginManager().registerEvents(new AdvancementListener(this), this);
 
@@ -327,6 +340,10 @@ public class ZDiscord extends JavaPlugin {
             ZDiscordCommand executor = new ZDiscordCommand(this);
             zd.setExecutor(executor);
             zd.setTabCompleter(executor);
+        }
+        PluginCommand link = getCommand("link");
+        if (link != null) {
+            link.setExecutor(new LinkCommand(this));
         }
         PluginCommand discord = getCommand("discord");
         if (discord != null) {
@@ -350,6 +367,10 @@ public class ZDiscord extends JavaPlugin {
         if (ZLogger.isDebugMode()) {
             ZLogger.info(ZLogger.Category.SYSTEM,
                     "Debug logging is on (logging.debug: true) - expect verbose output.");
+        }
+
+        if (joinQuitListener != null) {
+            joinQuitListener.flushPlaytime();
         }
 
         if (statusModule != null) statusModule.reload();
@@ -469,6 +490,10 @@ public class ZDiscord extends JavaPlugin {
 
     public IntegrationModule getIntegrationModule() {
         return integrationModule;
+    }
+
+    public JoinQuitListener getJoinQuitListener() {
+        return joinQuitListener;
     }
 
     public void debug(String message) {

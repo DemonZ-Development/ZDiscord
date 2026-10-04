@@ -15,6 +15,7 @@ public final class ChatBridge {
     @SuppressWarnings("deprecation")
     public static void forward(ZDiscord plugin, Player player, String rawMessage) {
         if (plugin == null || player == null || rawMessage == null) return;
+        if (!plugin.getConfigManager().getBoolean("chat.enabled", true)) return;
 
         if (!plugin.getBotManager().isConnected()) {
             plugin.debug("Chat bridge: bot is not connected; skipping MC->Discord for " + player.getName());

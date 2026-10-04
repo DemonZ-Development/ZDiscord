@@ -52,6 +52,9 @@ public class DiscordChatListener extends ListenerAdapter {
     }
 
     private void handleChatMessage(MessageReceivedEvent event) {
+        if (!plugin.getConfigManager().getBoolean("chat.enabled", true)) {
+            return;
+        }
         Member member = event.getMember();
         String name = member != null ? member.getEffectiveName() : event.getAuthor().getName();
         String message = event.getMessage().getContentDisplay();

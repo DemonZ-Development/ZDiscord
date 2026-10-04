@@ -24,6 +24,7 @@ public class JoinQuitListener implements Listener {
 
     private final ZDiscord plugin;
     private final Map<UUID, Long> joinTimestamps = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> lastFlushTimestamps = new ConcurrentHashMap<>();
     private final Set<UUID> knownPlayers = ConcurrentHashMap.newKeySet();
 
     public JoinQuitListener(ZDiscord plugin) {
@@ -55,6 +56,7 @@ public class JoinQuitListener implements Listener {
         });
 
         joinTimestamps.put(uuid, now);
+        lastFlushTimestamps.put(uuid, now);
 
         if (plugin.getBotManager() != null
                 && plugin.getBotManager().isConnected()
@@ -99,8 +101,12 @@ public class JoinQuitListener implements Listener {
         }
 
         Long joinTime = joinTimestamps.remove(uuid);
-        if (joinTime != null && plugin.getLeaderboardModule() != null) {
-            long sessionSeconds = (now - joinTime) / 1000L;
+        Long lastFlush = lastFlushTimestamps.remove(uuid);
+        if (lastFlush == null) {
+            lastFlush = joinTime;
+        }
+        if (lastFlush != null && plugin.getLeaderboardModule() != null) {
+            long sessionSeconds = (now - lastFlush) / 1000L;
             if (sessionSeconds > 0) {
                 plugin.getLeaderboardModule().incrementStatBy(uuid, "playtime", sessionSeconds);
             }
@@ -196,5 +202,37 @@ public class JoinQuitListener implements Listener {
             channel = plugin.getBotManager().getTextChannel("channels.chat");
         }
         return channel;
+    }
+
+    public void initOnlinePlayers() {
+        long now = System.currentTimeMillis();
+        for (Player player : plugin.getServer().getOnlinePlayers()) {
+            joinTimestamps.putIfAbsent(player.getUniqueId(), now);
+            lastFlushTimestamps.putIfAbsent(player.getUniqueId(), now);
+        }
+    }
+
+    public void flushPlaytime() {
+        if (plugin.getLeaderboardModule() == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        for (Player player : plugin.getServer().getOnlinePlayers()) {
+            UUID uuid = player.getUniqueId();
+            Long lastCheck = lastFlushTimestamps.get(uuid);
+            if (lastCheck == null) {
+                lastCheck = joinTimestamps.get(uuid);
+            }
+            if (lastCheck != null) {
+                long sessionSeconds = (now - lastCheck) / 1000L;
+                if (sessionSeconds > 0) {
+                    plugin.getLeaderboardModule().incrementStatBy(uuid, "playtime", sessionSeconds);
+                    lastFlushTimestamps.put(uuid, now);
+                }
+            } else {
+                joinTimestamps.put(uuid, now);
+                lastFlushTimestamps.put(uuid, now);
+            }
+        }
     }
 }

@@ -115,6 +115,10 @@ public class LeaderboardModule {
 
     private void updatePanel() {
         if (!running) return;
+        if (plugin.getJoinQuitListener() != null) {
+            plugin.getJoinQuitListener().flushPlaytime();
+        }
+        sortedCache.clear();
         TextChannel channel = plugin.getBotManager().getTextChannel("leaderboard.panel-channel");
         if (channel == null) {
             return;
@@ -184,6 +188,7 @@ public class LeaderboardModule {
                     if (plugin != null && plugin.getStorageManager() != null) {
                         plugin.getStorageManager().saveStat(uuid, stat, updated);
                     }
+                    sortedCache.remove(stat.toLowerCase(Locale.ROOT));
                     return;
                 }
             } else {
@@ -191,6 +196,7 @@ public class LeaderboardModule {
                     if (plugin != null && plugin.getStorageManager() != null) {
                         plugin.getStorageManager().saveStat(uuid, stat, updated);
                     }
+                    sortedCache.remove(stat.toLowerCase(Locale.ROOT));
                     return;
                 }
             }
@@ -212,6 +218,7 @@ public class LeaderboardModule {
         if (plugin != null && plugin.getStorageManager() != null) {
             plugin.getStorageManager().saveStat(uuid, stat, value);
         }
+        sortedCache.remove(stat.toLowerCase(Locale.ROOT));
     }
 
     public long getStat(UUID uuid, String stat) {
@@ -255,7 +262,11 @@ public class LeaderboardModule {
     }
 
     public void sendLeaderboard(SlashCommandInteractionEvent event, String stat) {
+        if (plugin.getJoinQuitListener() != null) {
+            plugin.getJoinQuitListener().flushPlaytime();
+        }
         String key = stat.toLowerCase(Locale.ROOT);
+        sortedCache.remove(key);
         EmbedBuilder embed = buildLeaderboardEmbed(key, 0, perPage, event.getUser().getName());
         List<ActionRow> components = buildLeaderboardComponents(key, 0, getTotalPages(key));
         event.replyEmbeds(embed.build()).addComponents(components).queue(
@@ -306,7 +317,11 @@ public class LeaderboardModule {
             return;
         }
 
+        if (plugin.getJoinQuitListener() != null) {
+            plugin.getJoinQuitListener().flushPlaytime();
+        }
         String stat = board.stat;
+        sortedCache.remove(stat.toLowerCase(Locale.ROOT));
         int page = board.page;
         EmbedBuilder embed = buildLeaderboardEmbed(stat, page, perPage, null);
         List<ActionRow> components =
@@ -334,6 +349,10 @@ public class LeaderboardModule {
         }
         if (id.startsWith(BTN_REFRESH_PREFIX)) {
             String stat = id.substring(BTN_REFRESH_PREFIX.length());
+            if (plugin.getJoinQuitListener() != null) {
+                plugin.getJoinQuitListener().flushPlaytime();
+            }
+            sortedCache.remove(stat.toLowerCase(Locale.ROOT));
             trackLiveBoardState(event.getMessage().getId(), stat, 0);
             EmbedBuilder embed = buildLeaderboardEmbed(stat, 0, perPage,
                     event.getUser().getName());

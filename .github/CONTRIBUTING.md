@@ -20,7 +20,7 @@ cd ZDiscord
 mvn clean package
 ```
 
-The shaded JAR is written to `target/ZDiscord-1.4.1.jar`. The build runs
+The shaded JAR is written to `target/ZDiscord-1.4.2.jar`. The build runs
 tests automatically during the `test` phase.
 
 ## Running tests

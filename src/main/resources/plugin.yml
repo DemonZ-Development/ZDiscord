@@ -21,10 +21,13 @@ softdepend:
 
 commands:
   zdiscord:
-    description: ZDiscord admin command
+    description: ZDiscord command
     usage: /<command> [reload|status|diagnostics|link|embed|ticket|panel|lockdown|update|dump]
-    permission: zdiscord.admin
     aliases: [zd]
+  link:
+    description: Link your Minecraft account to Discord
+    usage: /<command>
+    permission: zdiscord.link
   discord:
     description: Shows the Discord server invite link
     usage: /<command>

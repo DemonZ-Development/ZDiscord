@@ -2,6 +2,21 @@
 
 All notable changes to ZDiscord are documented here.
 
+## [1.4.2] - 2026-10-05
+
+### Added
+- Added standalone `/link` in-game command as a direct shortcut for `/zdiscord link`.
+- Added `chat.enabled` boolean option in `config.yml` to allow toggling the chat bridge without clearing the configured channel ID.
+
+### Changed
+- Configuration schema version bumped to 13.
+- In-game `/zdiscord` help and tab completion now filter subcommands based on player permissions.
+
+### Fixed
+- Fixed `/zdiscord link` permission check blocking players without `zdiscord.admin` from generating account linking codes.
+- Fixed playtime leaderboard stats not updating while players remain connected online. Active session playtime is now flushed periodically and on server reload/shutdown.
+- Fixed stale leaderboard cached rankings when clicking the Discord refresh button or when stats are updated.
+
 ## [1.4.1] - 2026-10-03
 
 ### Added

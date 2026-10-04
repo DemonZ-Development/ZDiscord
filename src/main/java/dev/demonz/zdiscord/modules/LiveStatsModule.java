@@ -51,6 +51,9 @@ public class LiveStatsModule {
 
     private void update() {
         if (!running) return;
+        if (plugin.getJoinQuitListener() != null) {
+            plugin.getJoinQuitListener().flushPlaytime();
+        }
         TextChannel channel = plugin.getBotManager().getTextChannel("live-stats.channel");
         if (channel == null) {
             return;

@@ -27,6 +27,7 @@ import dev.demonz.zdiscord.modules.ConfessionModule;
 import dev.demonz.zdiscord.modules.ConsoleModule;
 import dev.demonz.zdiscord.modules.EmbedBuilderModule;
 import dev.demonz.zdiscord.modules.FollowModule;
+import dev.demonz.zdiscord.modules.HalloweenModule;
 import dev.demonz.zdiscord.modules.LeaderboardModule;
 import dev.demonz.zdiscord.modules.LinkModule;
 import dev.demonz.zdiscord.modules.IntegrationModule;
@@ -46,7 +47,6 @@ import dev.demonz.zdiscord.storage.StorageManager;
 import dev.demonz.zdiscord.storage.YamlStorage;
 import dev.demonz.zdiscord.util.StartupBanner;
 import dev.demonz.zdiscord.util.ColorUtil;
-import dev.demonz.zdiscord.util.HalloweenEasterEgg;
 import dev.demonz.zdiscord.util.SkinUtil;
 import dev.demonz.zdiscord.util.UpdateChecker;
 import dev.demonz.zdiscord.util.ZLogger;
@@ -89,8 +89,8 @@ public class ZDiscord extends JavaPlugin {
     private FollowModule followModule;
     private ConfessionModule confessionModule;
     private IntegrationModule integrationModule;
+    private HalloweenModule halloweenModule;
     private JoinQuitListener joinQuitListener;
-    private volatile HalloweenEasterEgg halloween;
 
     @Override
     @SuppressWarnings("deprecation")
@@ -115,6 +115,10 @@ public class ZDiscord extends JavaPlugin {
 
         botManager = new BotManager(this);
         confessionModule = new ConfessionModule(this);
+        if (configManager.getBoolean("halloween.enabled", true)) {
+            halloweenModule = new HalloweenModule(this);
+            halloweenModule.init();
+        }
         craftyAIModule = new dev.demonz.zdiscord.modules.CraftyAIModule(this);
         slashCommandManager = new SlashCommandManager(this);
         setupCommand = new SetupCommand(this);
@@ -151,15 +155,11 @@ public class ZDiscord extends JavaPlugin {
                 joinQuitListener.flushPlaytime();
             }
         }, 1200L, 1200L);
-        halloween = new HalloweenEasterEgg("ZDiscord", getLogger()::info, () ->
-                platformAdapter.runSync(() -> getServer().getOnlinePlayers().forEach(player ->
-                        platformAdapter.runForEntity(player, () -> greetHalloween(player)))));
-        halloween.start();
     }
 
     @Override
     public void onDisable() {
-        if (halloween != null) halloween.close();
+        if (halloweenModule != null) halloweenModule.shutdown();
         if (craftyAIModule != null) craftyAIModule.close();
         ZLogger.info(ZLogger.Category.SYSTEM, "Shutting down ZDiscord...");
 
@@ -198,11 +198,8 @@ public class ZDiscord extends JavaPlugin {
     }
 
     public void greetHalloween(org.bukkit.entity.Player player) {
-        HalloweenEasterEgg current = halloween;
-        if (current != null && player.isOnline()
-                && (player.isOp() || player.hasPermission("zdiscord.admin"))) {
-            current.greetPlayer(player.getUniqueId(), message -> player.sendMessage(
-                    ColorUtil.colorize("&6[ZDiscord] &e" + message)));
+        if (halloweenModule != null) {
+            halloweenModule.greetPlayer(player);
         }
     }
 
@@ -386,6 +383,15 @@ public class ZDiscord extends JavaPlugin {
         if (followModule != null) followModule.reload();
         if (integrationModule != null) integrationModule.reload();
 
+        if (configManager.getBoolean("halloween.enabled", true)) {
+            if (halloweenModule == null) {
+                halloweenModule = new HalloweenModule(this);
+            }
+            halloweenModule.reload();
+        } else {
+            halloweenModule = null;
+        }
+
         if (botManager != null && botManager.isConnected()) {
             botManager.updateActivity();
         }
@@ -490,6 +496,10 @@ public class ZDiscord extends JavaPlugin {
 
     public IntegrationModule getIntegrationModule() {
         return integrationModule;
+    }
+
+    public HalloweenModule getHalloweenModule() {
+        return halloweenModule;
     }
 
     public JoinQuitListener getJoinQuitListener() {

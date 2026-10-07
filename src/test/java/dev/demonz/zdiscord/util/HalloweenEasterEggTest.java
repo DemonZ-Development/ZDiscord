@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.MonthDay;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
@@ -114,16 +116,127 @@ class HalloweenEasterEggTest {
         }
     }
 
+    @Test
+    void openingBoundaryFiresOnceAndOnlyOnce() {
+        try (Fixture f = new Fixture("2026-10-31T12:00:00Z", "UTC")) {
+            f.egg.start();
+            assertEquals(List.of("2026-10-31"), f.opens);
+            assertTrue(f.finales.isEmpty());
+
+            f.scheduler.periodic.run();
+            f.scheduler.periodic.run();
+            assertEquals(List.of("2026-10-31"), f.opens);
+        }
+    }
+
+    @Test
+    void finaleFiresTheDayAfterAMultiDayWindowCloses() {
+        HalloweenWindow window = HalloweenWindow.of(MonthDay.of(10, 28), MonthDay.of(11, 2));
+        try (Fixture f = new Fixture("2026-11-02T12:00:00Z", "UTC", window)) {
+            f.egg.start();
+            assertEquals(List.of("2026-10-28"), f.opens);
+            assertTrue(f.finales.isEmpty());
+
+            f.clock.instant = Instant.parse("2026-11-03T12:00:00Z");
+            f.scheduler.periodic.run();
+            assertEquals(List.of("2026-10-28..2026-11-02"), f.finales);
+
+            f.scheduler.periodic.run();
+            assertEquals(1, f.finales.size());
+        }
+    }
+
+    @Test
+    void everyDayOfAMultiDayWindowCountsAsActive() {
+        HalloweenWindow window = HalloweenWindow.of(MonthDay.of(10, 30), MonthDay.of(11, 1));
+        try (Fixture f = new Fixture("2026-10-30T12:00:00Z", "UTC", window)) {
+            f.egg.start();
+            f.clock.instant = Instant.parse("2026-10-31T12:00:00Z");
+            f.scheduler.periodic.run();
+            f.clock.instant = Instant.parse("2026-11-01T12:00:00Z");
+            f.scheduler.periodic.run();
+
+            assertEquals(3, f.notifications.get());
+            assertEquals(List.of("2026-10-30"), f.opens);
+        }
+    }
+
+    @Test
+    void aFailingPhaseCallbackDoesNotStopTheScheduler() {
+        try (Fixture f = new Fixture("2026-10-31T12:00:00Z", "UTC")) {
+            HalloweenEasterEgg broken = new HalloweenEasterEgg(f.clock, f.scheduler,
+                    f.console::add, f.notifications::incrementAndGet,
+                    HalloweenWindow.DEFAULT, new HalloweenEasterEgg.PhaseListener() {
+                        @Override
+                        public void onWindowOpen(LocalDate windowStart) {
+                            throw new IllegalStateException("boom");
+                        }
+                    });
+            broken.start();
+            assertTrue(f.console.stream().anyMatch(m -> m.contains("boom")));
+            assertEquals(1, f.notifications.get());
+            broken.close();
+        }
+    }
+
+    @Test
+    void countdownHookReportsEveryLeadUpDay() {
+        try (Fixture f = new Fixture("2026-10-01T12:00:00Z", "UTC")) {
+            f.egg.start();
+            assertEquals(List.of("30->2026-10-31"), f.countdowns);
+
+            f.clock.instant = Instant.parse("2026-10-02T12:00:00Z");
+            f.scheduler.periodic.run();
+            assertEquals(List.of("30->2026-10-31", "29->2026-10-31"), f.countdowns);
+        }
+    }
+
+    @Test
+    void countdownStopsOnceTheWindowIsOpen() {
+        try (Fixture f = new Fixture("2026-10-30T12:00:00Z", "UTC")) {
+            f.egg.start();
+            assertEquals(List.of("1->2026-10-31"), f.countdowns);
+
+            f.clock.instant = Instant.parse("2026-10-31T12:00:00Z");
+            f.scheduler.periodic.run();
+            assertEquals(List.of("1->2026-10-31"), f.countdowns);
+            assertEquals(List.of("2026-10-31"), f.opens);
+        }
+    }
+
     private static final class Fixture implements AutoCloseable {
         final MutableClock clock;
         final RecordingScheduler scheduler = new RecordingScheduler();
         final List<String> console = new ArrayList<>();
         final AtomicInteger notifications = new AtomicInteger();
+        final List<String> opens = new ArrayList<>();
+        final List<String> finales = new ArrayList<>();
+        final List<String> countdowns = new ArrayList<>();
         final HalloweenEasterEgg egg;
 
         Fixture(String instant, String zone) {
+            this(instant, zone, HalloweenWindow.DEFAULT);
+        }
+
+        Fixture(String instant, String zone, HalloweenWindow window) {
             clock = new MutableClock(Instant.parse(instant), ZoneId.of(zone));
-            egg = new HalloweenEasterEgg(clock, scheduler, console::add, notifications::incrementAndGet);
+            egg = new HalloweenEasterEgg(clock, scheduler, console::add,
+                    notifications::incrementAndGet, window, new HalloweenEasterEgg.PhaseListener() {
+                        @Override
+                        public void onWindowOpen(LocalDate windowStart) {
+                            opens.add(windowStart.toString());
+                        }
+
+                        @Override
+                        public void onFinale(LocalDate windowStart, LocalDate windowEnd) {
+                            finales.add(windowStart + ".." + windowEnd);
+                        }
+
+                        @Override
+                        public void onCountdown(int daysRemaining, LocalDate windowStart) {
+                            countdowns.add(daysRemaining + "->" + windowStart);
+                        }
+                    });
         }
 
         @Override public void close() { egg.close(); }

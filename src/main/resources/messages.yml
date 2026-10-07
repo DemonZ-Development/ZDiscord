@@ -42,6 +42,13 @@ status-tps-bad: "%tps%"
 embed-created: "%prefix%&aEmbed sent to &b#%channel%"
 embed-no-title: "%prefix%&cPlease provide a title for your embed."
 
+# ── Halloween event ──────────────────────────────────────
+halloween-in-game-open: "%prefix%&6🎃 &eThe Halloween hunt is open! &7Mob kills now count toward the crown."
+halloween-in-game-greeting: "%prefix%&6🎃 &eHappy Halloween! &7The hunt is open - go claim the crown."
+halloween-in-game-finale: "%prefix%&6🎃 &eThe hunt has ended. &7Check the standings for the winner."
+halloween-in-game-countdown: "%prefix%&6🎃 &e%days% &7day(s) until the Halloween hunt opens. &7Get your shovel ready."
+halloween-in-game-milestone: "%prefix%&6🎃 &e%player% &7has downed &e%kills% &7mobs this hunt!"
+
 # ── Slash command responses ───────────────────────────────
 slash-status-title: "Server Status"
 slash-players-title: "Online Players"

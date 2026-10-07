@@ -2,6 +2,25 @@
 
 All notable changes to ZDiscord are documented here.
 
+## [1.4.3] - 2026-10-07
+
+### Added
+- **Halloween event** — A configurable seasonal mob hunt, promoted from the old secret Oct 31 easter egg. The date window is set with `halloween.window-start` / `halloween.window-end` (`MM-DD`; an end that sorts before the start wraps into the next year, so `10-28` to `11-02` is a five-day hunt). Mob kills during the window are tallied under a separate `halloween_kills` stat, ranked with a winner crowned in a finale embed once it closes. PvP kills do not count.
+- **Countdown announcements** — Enabled by default. Posts once a day in Discord and broadcasts in-game during the final `halloween.countdown.days` days before the window opens, with the top milestone shown so there is something to chase. Set `halloween.countdown.days: 0` to silence it.
+- **Live standings panel** — A self-refreshing embed of the current rankings, shown for the duration of the window so the channel reacts to kills on its own. Configure with `halloween.live-panel`.
+- **Milestone announcements** — The channel reacts the first time a player crosses each kill count in `halloween.milestones` (25/50/100/250/500 by default), including how far the player is from the next one.
+- **Boss bonus** — The ender dragon, wither and elder guardian count for `halloween.boss-multiplier` kills (5 by default) instead of 1.
+- **Rewards** — `halloween.rewards.winner` and `halloween.rewards.participant` dispatch console commands when the window closes, with `%player%` and `%uuid%` placeholders. Only players with at least one kill are paid.
+- New Discord slash command `/halloween` shows the current event state, standings, and countdown.
+- The countdown, opening announcement, closing winner, and join-time greeting are all sent to regular players, not just operators.
+
+### Changed
+- Configuration schema version bumped to 15.
+- The startup banner now counts 17 modules, including the Halloween event.
+
+### Fixed
+- The event tally is keyed to the window it belongs to, so restarting the server mid-event no longer wipes the standings.
+
 ## [1.4.2] - 2026-10-05
 
 ### Added

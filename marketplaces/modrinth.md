@@ -24,6 +24,7 @@ Commands use native Discord slash commands, buttons, and selection menus. One JA
 - **Follow system**: Get DM notifications when followed players join. Manage subscriptions with `/following` and `/unfollow`.
 - **Anonymous confessions**: `/confess` posts to a designated channel with cooldowns and customizable embeds.
 - **Setup wizard**: `/setup` configures channels and roles directly from Discord.
+- **Halloween event**: A configurable seasonal mob hunt with a daily countdown, live standings panel, milestone callouts, and a boss bonus. Rewards are dispatched at the finale. Disable with `halloween.enabled: false`.
 - **Plugin bridges**: Forwards Onlysleep and RedstoneReboot messages through your existing bot connection.
 
 ### Requirements
@@ -35,7 +36,7 @@ Commands use native Discord slash commands, buttons, and selection menus. One JA
 
 ### Installation
 
-1. Download `ZDiscord-1.4.2.jar` from the releases page.
+1. Download `ZDiscord-1.4.3.jar` from the releases page.
 2. Place the JAR in your server's `plugins/` directory.
 3. Start the server to generate the default `config.yml` and `messages.yml`.
 4. Open `plugins/ZDiscord/config.yml` and set your bot token and Discord server ID.

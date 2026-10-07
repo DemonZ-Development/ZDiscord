@@ -17,7 +17,7 @@ import java.util.logging.Logger;
 
 public class ConfigManager {
 
-    public static final int CURRENT_VERSION = 13;
+    public static final int CURRENT_VERSION = 15;
 
     private static final List<String> LEGACY_AVATAR_DEFAULTS = List.of(
             "https://mc-heads.net/avatar/%uuid%/128",

@@ -75,7 +75,8 @@ public class SlashCommandManager extends ListenerAdapter {
                         .addOption(OptionType.STRING, "message",
                                 "What do you want to confess?", true),
                 Commands.slash("unfollow", "Stop following a Minecraft player")
-                        .addOption(OptionType.STRING, "player", "Player name to unfollow", true))
+                        .addOption(OptionType.STRING, "player", "Player name to unfollow", true),
+                Commands.slash("halloween", "Halloween event status and standings"))
                 .queue(
                         success -> ZLogger.info(ZLogger.Category.COMMANDS,
                                 "Registered " + success.size() + " slash commands."),
@@ -101,7 +102,17 @@ public class SlashCommandManager extends ListenerAdapter {
             case "following" -> handleFollowing(event);
             case "confess" -> handleConfess(event);
             case "unfollow" -> handleUnfollow(event);
+            case "halloween" -> handleHalloween(event);
         }
+    }
+
+    private void handleHalloween(SlashCommandInteractionEvent event) {
+        var halloween = plugin.getHalloweenModule();
+        if (halloween == null) {
+            event.reply("The Halloween event is disabled in config.yml.").setEphemeral(true).queue();
+            return;
+        }
+        event.replyEmbeds(halloween.buildStandingsEmbed().build()).queue();
     }
 
     private void handleStatus(SlashCommandInteractionEvent event) {

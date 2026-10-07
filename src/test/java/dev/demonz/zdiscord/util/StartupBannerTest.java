@@ -8,11 +8,12 @@ class StartupBannerTest {
 
     @Test
     void moduleCountIncludesRecentlyAddedModules() {
-        Object[] modules = new Object[16];
+        Object[] modules = new Object[17];
         modules[1] = new Object();
         modules[14] = new Object();
         modules[15] = new Object();
+        modules[16] = new Object();
 
-        assertEquals(new StartupBanner.ModuleCount(3, 16), StartupBanner.countModules(modules));
+        assertEquals(new StartupBanner.ModuleCount(4, 17), StartupBanner.countModules(modules));
     }
 }

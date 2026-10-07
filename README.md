@@ -22,7 +22,7 @@ ZDiscord connects your Minecraft server to Discord. Chat flows both ways, player
 |---|---|---|
 | **Slash commands** | Native JDA 6 slash commands + buttons | Bolted-on text commands |
 | **Folia support** | Built-in regionized multithreading | No Folia support |
-| **Modular design** | 15+ toggleable modules | Chat bridge only |
+| **Modular design** | 16+ toggleable modules | Chat bridge only |
 | **Account linking** | One-time codes + role grants | Clunky multi-step process |
 | **Ticket system** | Built-in dropdown panel with categories | Requires separate plugin |
 | **Config migration** | Automatic schema upgrades | Manual editing |
@@ -52,6 +52,7 @@ ZDiscord connects your Minecraft server to Discord. Chat flows both ways, player
 - **Setup wizard** — `/setup` configures channels from Discord with dropdowns and buttons.
 - **DemonZ integrations** — Optional Onlysleep sleep/night messages and RedstoneReboot restart alerts share the events channel (or dedicated channels).
 - **SkinsRestorer avatars** — Player cards and chat webhooks use the active restored skin when available, with safe Java/Bedrock fallbacks.
+- **Halloween event** — A configurable seasonal mob hunt. Kills during the date window are tallied separately, teased by a daily countdown, tracked on a self-refreshing standings panel, and rewarded at the finale. Survives restarts mid-event. Disable with `halloween.enabled: false`.
 
 ## Requirements
 
@@ -62,7 +63,7 @@ ZDiscord connects your Minecraft server to Discord. Chat flows both ways, player
 
 ## Installation
 
-1. Download `ZDiscord-1.4.2.jar` from the [Releases](https://github.com/DemonZ-Development/ZDiscord/releases) page.
+1. Download `ZDiscord-1.4.3.jar` from the [Releases](https://github.com/DemonZ-Development/ZDiscord/releases) page.
 2. Place the JAR in your server's `plugins/` directory.
 3. Start the server to generate the default `config.yml` and `messages.yml`.
 4. Open `plugins/ZDiscord/config.yml` and set:
@@ -90,6 +91,7 @@ All configuration lives in `plugins/ZDiscord/config.yml`. Summary of major secti
 | `performance` | TPS and memory alert thresholds |
 | `tickets` | Categories, panel appearance, support roles |
 | `confessions` | Confession channel, cooldown, and color |
+| `halloween` | Seasonal event window, channel, styling, and standings size |
 | `follow` | Enable/disable follow features |
 | `command-logger` | Watched and critical commands |
 | `staff-chat`, `voice-status` | Staff chat bridge and voice status indicator |
@@ -134,6 +136,7 @@ User-facing strings live in `messages.yml`. They accept `&` colour codes and the
 | `/following` | List players you follow |
 | `/unfollow <player>` | Stop following a player |
 | `/confess <message>` | Post an anonymous confession |
+| `/halloween` | Halloween event status and current standings |
 | `/crafty <question>` | Ask a question via CraftyAI |
 | `/setup` | Open the setup wizard |
 
@@ -145,7 +148,7 @@ cd ZDiscord
 mvn clean package
 ```
 
-The shaded JAR is written to `target/ZDiscord-1.4.2.jar`.
+The shaded JAR is written to `target/ZDiscord-1.4.3.jar`.
 
 ## Developer API
 

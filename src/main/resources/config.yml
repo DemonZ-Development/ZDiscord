@@ -1,4 +1,4 @@
-config-version: 13
+config-version: 15
 
 # /crafty sends the supplied question to CraftyAI and replies privately.
 # Requires the CraftyAI Gateway version providing /v1/developer/chat.
@@ -289,6 +289,55 @@ confessions:
   color: "#9B59B6"
   # Seconds between confessions per user.
   cooldown: 300
+
+# Seasonal Halloween event. The window is expressed as MM-DD; a window whose
+# end sorts before its start wraps into the following year (10-28 to 11-02 is
+# a five-day hunt). Both default to a single day, 10-31.
+#
+# Mob kills during the window are tallied separately from normal kills and
+# ranked at the end. The tally resets when a new window opens and survives
+# server restarts within the same window.
+halloween:
+  enabled: true
+  window-start: "10-31"
+  window-end: "10-31"
+  # Where the countdown, announcements and standings panel go. Blank uses
+  # channels.events.
+  channel: ""
+  color: "#E67E22"
+  # Broadcast messages in-game as well as to Discord.
+  greet-players: true
+  # Post the winner embed when the window closes.
+  announce-finale: true
+  # Heading shown above the standings leaderboard.
+  trophy-title: "Graveyard King"
+  # How many players to rank.
+  top-n: 5
+  # Announce the countdown once a day during the days before the window
+  # opens. Set days: 0 to silence it entirely.
+  countdown:
+    enabled: true
+    days: 7
+  # Self-refreshing standings embed, shown for the whole window so the
+  # channel reacts to kills without anyone posting manually.
+  live-panel:
+    enabled: true
+    update-interval: 60
+  # Announce the first time someone crosses each of these kill counts.
+  milestones:
+    - 25
+    - 50
+    - 100
+    - 250
+    - 500
+  # Bosses (ender dragon, wither, elder guardian) count for this many
+  # instead of 1. Set to 1 to disable the bonus.
+  boss-multiplier: 5
+  # Console commands run when the window closes. %player% and %uuid% are
+  # replaced. Rewards are only paid for players with at least one kill.
+  rewards:
+    winner: []
+    participant: []
 
 api:
   # Enables the Bukkit API other plugins can hook into.

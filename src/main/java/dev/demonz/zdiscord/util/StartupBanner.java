@@ -42,7 +42,8 @@ public final class StartupBanner {
                 plugin.getConsoleModule(),
                 plugin.getFollowModule(),
                 plugin.getConfessionModule(),
-                plugin.getIntegrationModule()
+                plugin.getIntegrationModule(),
+                plugin.getHalloweenModule()
         );
         String storage = plugin.getStorageManager() != null
                 ? plugin.getStorageManager().getTypeName() : "none";

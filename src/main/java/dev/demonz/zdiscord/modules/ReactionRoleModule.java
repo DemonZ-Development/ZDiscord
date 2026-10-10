@@ -6,6 +6,7 @@ import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionRemoveEvent;
+import net.dv8tion.jda.api.events.message.react.GenericMessageReactionEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -13,9 +14,13 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
+import java.util.function.Consumer;
+import org.bukkit.configuration.ConfigurationSection;
+import net.dv8tion.jda.api.entities.emoji.Emoji;
 
 public class ReactionRoleModule {
 
@@ -23,8 +28,10 @@ public class ReactionRoleModule {
 
     private final ZDiscord plugin;
     private final File dataFile;
-    private final Map<String, Map<String, RoleMapping>> mappings = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, RoleMapping>> storedMappings = new ConcurrentHashMap<>();
+    private volatile Map<String, Map<String, RoleMapping>> mappings = Map.of();
     private FileConfiguration data;
+    private volatile boolean running;
 
     public ReactionRoleModule(ZDiscord plugin) {
         this.plugin = plugin;
@@ -32,10 +39,11 @@ public class ReactionRoleModule {
     }
 
     public void init() {
+        running = true;
         loadData();
     }
 
-    private void loadData() {
+    private synchronized void loadData() {
         if (!dataFile.exists()) {
             try {
                 dataFile.getParentFile().mkdirs();
@@ -47,15 +55,14 @@ public class ReactionRoleModule {
             }
         }
         data = YamlConfiguration.loadConfiguration(dataFile);
-        mappings.clear();
+        storedMappings.clear();
 
         var messages = data.getConfigurationSection("messages");
-        if (messages == null) {
-            return;
-        }
-        for (String messageId : messages.getKeys(false)) {
+        if (messages != null) for (String messageId : messages.getKeys(false)) {
             Map<String, RoleMapping> emojiMap = new ConcurrentHashMap<>();
-            for (String emoji : messages.getConfigurationSection(messageId).getKeys(false)) {
+            var messageSection = messages.getConfigurationSection(messageId);
+            if (messageSection == null) continue;
+            for (String emoji : messageSection.getKeys(false)) {
                 String path = "messages." + messageId + "." + emoji;
                 String roleId = data.getString(path + ".role-id");
                 String permission = data.getString(path + ".permission", "");
@@ -68,49 +75,86 @@ public class ReactionRoleModule {
                 }
                 emojiMap.put(emoji, new RoleMapping(roleId, permission));
             }
-            mappings.put(messageId, emojiMap);
+            storedMappings.put(messageId, emojiMap);
         }
+        refreshMappings();
     }
 
-    public void addMapping(String messageId, String emoji, String roleId, String permission) {
+    private void refreshMappings() {
+        Map<String, Map<String, RoleMapping>> combined = new HashMap<>();
+        storedMappings.forEach((message, entries) -> combined.put(message, new HashMap<>(entries)));
+        loadConfiguredMappings(plugin.getConfigManager().getConfig(), plugin.getLogger()::warning)
+                .forEach((message, entries) -> combined.computeIfAbsent(message, ignored -> new HashMap<>()).putAll(entries));
+        combined.replaceAll((message, entries) -> Map.copyOf(entries));
+        mappings = Map.copyOf(combined);
+    }
+
+    static Map<String, Map<String, RoleMapping>> loadConfiguredMappings(ConfigurationSection config, Consumer<String> warn) {
+        Map<String, Map<String, RoleMapping>> result = new HashMap<>();
+        for (Map<?, ?> entry : config.getMapList("reaction-roles.mappings")) {
+            String message = string(entry, "message-id");
+            String role = string(entry, "role-id");
+            String emoji = string(entry, "emoji");
+            String permission = string(entry, "minecraft-permission");
+            if (permission.isEmpty()) permission = string(entry, "permission");
+            if (!TicketModule.isUsableSnowflake(message) || !TicketModule.isUsableSnowflake(role)
+                    || emoji.isBlank() || (!permission.isEmpty() && !PERMISSION_PATTERN.matcher(permission).matches())) {
+                warn.accept("Skipping invalid reaction-roles.mappings entry for message " + message);
+                continue;
+            }
+            try { emoji = Emoji.fromFormatted(emoji).getAsReactionCode(); }
+            catch (IllegalArgumentException invalid) {
+                warn.accept("Skipping invalid reaction-role emoji for message " + message);
+                continue;
+            }
+            result.computeIfAbsent(message, ignored -> new HashMap<>()).put(emoji, new RoleMapping(role, permission));
+        }
+        return result;
+    }
+
+    private static String string(Map<?, ?> entry, String key) {
+        Object value = entry.get(key);
+        return value == null ? "" : value.toString().trim();
+    }
+
+    public synchronized void addMapping(String messageId, String emoji, String roleId, String permission) {
         if (permission != null && !permission.isEmpty()
                 && !PERMISSION_PATTERN.matcher(permission).matches()) {
             plugin.getLogger().warning("Invalid permission format rejected: " + permission);
             return;
         }
-        mappings.computeIfAbsent(messageId, k -> new ConcurrentHashMap<>())
+        storedMappings.computeIfAbsent(messageId, k -> new ConcurrentHashMap<>())
                 .put(emoji, new RoleMapping(roleId, permission));
+        refreshMappings();
         saveData();
     }
 
     public void onReactionAdd(MessageReactionAddEvent event) {
-        RoleMapping mapping = lookup(event.getMessageId(),
-                event.getReaction().getEmoji().getAsReactionCode());
-        if (mapping == null) {
-            return;
-        }
-        Guild guild = event.getGuild();
-        Member member = event.getMember();
-        if (guild == null || member == null) {
-            return;
-        }
-        applyRole(guild, member, mapping.roleId, true);
-        applyPermission(event.getUserId(), mapping.permission, true);
+        handleReaction(event, true);
     }
 
     public void onReactionRemove(MessageReactionRemoveEvent event) {
-        RoleMapping mapping = lookup(event.getMessageId(),
-                event.getReaction().getEmoji().getAsReactionCode());
-        if (mapping == null) {
-            return;
-        }
-        Guild guild = event.getGuild();
-        Member member = guild != null ? guild.getMemberById(event.getUserId()) : null;
-        if (guild == null || member == null) {
-            return;
-        }
-        applyRole(guild, member, mapping.roleId, false);
-        applyPermission(event.getUserId(), mapping.permission, false);
+        handleReaction(event, false);
+    }
+
+    private void handleReaction(GenericMessageReactionEvent event, boolean add) {
+        if (!running || !event.isFromGuild() || !event.getGuild().getId().equals(
+                plugin.getConfigManager().getString("bot.guild-id"))) return;
+        String emoji = event.getEmoji().getAsReactionCode();
+        RoleMapping mapping = lookup(event.getMessageId(), emoji);
+        if (mapping == null) return;
+        Consumer<Member> apply = member -> {
+            if (!running || member.getUser().isBot() || mapping != lookup(event.getMessageId(), emoji)) return;
+            try {
+                applyRole(event.getGuild(), member, mapping.roleId, add);
+                applyPermission(event.getUserId(), mapping.permission, add);
+            } catch (RuntimeException error) {
+                plugin.getLogger().warning("Reaction-role update failed: " + error.getMessage());
+            }
+        };
+        if (event.getMember() != null) apply.accept(event.getMember());
+        else event.retrieveMember().queue(apply,
+                error -> plugin.debug("Could not retrieve reaction-role member: " + error.getMessage()));
     }
 
     private RoleMapping lookup(String messageId, String emoji) {
@@ -132,7 +176,8 @@ public class ReactionRoleModule {
                             + " to " + member.getEffectiveName()),
                     error -> plugin.debug("Failed to add role: " + error.getMessage()));
         } else {
-            guild.removeRoleFromMember(member, role).queue();
+            guild.removeRoleFromMember(member, role).queue(null,
+                    error -> plugin.debug("Failed to remove role: " + error.getMessage()));
         }
     }
 
@@ -152,8 +197,10 @@ public class ReactionRoleModule {
                 () -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command));
     }
 
-    private void saveData() {
-        for (Map.Entry<String, Map<String, RoleMapping>> msgEntry : mappings.entrySet()) {
+    private synchronized void saveData() {
+        if (data == null) return;
+        data.set("messages", null);
+        for (Map.Entry<String, Map<String, RoleMapping>> msgEntry : storedMappings.entrySet()) {
             for (Map.Entry<String, RoleMapping> emojiEntry : msgEntry.getValue().entrySet()) {
                 String path = "messages." + msgEntry.getKey() + "." + emojiEntry.getKey();
                 data.set(path + ".role-id", emojiEntry.getValue().roleId);
@@ -168,10 +215,13 @@ public class ReactionRoleModule {
     }
 
     public void shutdown() {
+        running = false;
         saveData();
     }
 
-    private static final class RoleMapping {
+    public void reload() { loadData(); }
+
+    static final class RoleMapping {
         final String roleId;
         final String permission;
 

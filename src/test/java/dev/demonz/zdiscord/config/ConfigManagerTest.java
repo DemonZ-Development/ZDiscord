@@ -113,4 +113,41 @@ class ConfigManagerTest {
         assertEquals(1, roles.size());
         assertEquals("123456789012345678", roles.get(0));
     }
+
+    @Test
+    void halloweenDefaultsKeepCosmeticsOptIn(@TempDir Path tmp) {
+        ConfigManager mgr = newManager(tmp.toFile());
+
+        assertTrue(mgr.getBoolean("halloween.enabled", false));
+        assertFalse(mgr.getBoolean("halloween.cosmetics.enabled", true));
+        assertFalse(mgr.getBoolean("halloween.hunting.count-spawner-mobs", true));
+        assertEquals(java.util.List.of("CREATIVE", "SPECTATOR"),
+                mgr.getStringList("halloween.hunting.excluded-game-modes"));
+        assertEquals("server", mgr.getString("halloween.timezone"));
+    }
+
+    @Test
+    void halloweenMigrationPreservesExistingControls(@TempDir Path tmp) throws IOException {
+        Files.writeString(tmp.resolve("config.yml"), """
+                config-version: 15
+                halloween:
+                  enabled: false
+                  window-start: '10-20'
+                  color: '#A04000'
+                  countdown:
+                    days: 0
+                  rewards:
+                    winner: ['give %player% diamond 1']
+                """);
+        ConfigManager mgr = newManager(tmp.toFile());
+
+        assertFalse(mgr.getBoolean("halloween.enabled", true));
+        assertEquals("10-20", mgr.getString("halloween.window-start"));
+        assertEquals("#A04000", mgr.getString("halloween.color"));
+        assertEquals(0, mgr.getInt("halloween.countdown.days", 7));
+        assertEquals(java.util.List.of("give %player% diamond 1"),
+                mgr.getStringList("halloween.rewards.winner"));
+        assertFalse(mgr.getBoolean("halloween.cosmetics.enabled", true));
+        assertEquals(ConfigManager.CURRENT_VERSION, mgr.getInt("config-version", 0));
+    }
 }

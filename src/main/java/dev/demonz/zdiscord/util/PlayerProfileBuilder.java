@@ -49,6 +49,7 @@ public final class PlayerProfileBuilder {
         String color = plugin.getConfigManager().getString("profile.embed.color", "#9B59B6");
 
         EmbedBuilder embed = new EmbedBuilder()
+                .setTitle(plugin.getMessageManager().getRaw("slash-profile-title"))
                 .setAuthor(profile.name + "  ·  Player profile",
                         "https://namemc.com/profile/" + profile.uuid, avatarSmall)
                 .setThumbnail(avatarLarge)
@@ -57,16 +58,15 @@ public final class PlayerProfileBuilder {
                         + "  •  ZDiscord v" + plugin.getDescription().getVersion(), null)
                 .setTimestamp(Instant.now());
 
-        String statusEmoji = profile.online ? "🟢" : "🔴";
         String statusText = profile.online ? "Online" : "Offline";
-        embed.addField("👤 Identity",
+        embed.addField("Identity",
                 "**Name:** `" + profile.name + "`\n"
                         + "**UUID:** `" + profile.uuid + "`\n"
-                        + "**Status:** " + statusEmoji + " " + statusText, false);
+                        + "**Status:** " + statusText, false);
 
         String linkedLine = profile.discordId != null
-                ? "🔗 Linked to Discord" : "🚫 Not linked";
-        embed.addField("📊 Activity",
+                ? "Linked to Discord" : "Not linked";
+        embed.addField("Activity",
                 "**First seen:** " + formatDate(profile.firstJoinMs) + "\n"
                         + "**Last seen:** " + formatDate(profile.lastSeenMs) + "\n"
                         + "**Sessions:** " + profile.sessions + "\n"
@@ -76,12 +76,12 @@ public final class PlayerProfileBuilder {
         double kd = profile.deaths > 0
                 ? Math.round((double) profile.kills / profile.deaths * 100.0) / 100.0
                 : profile.kills;
-        embed.addField("⚔️ Combat",
+        embed.addField("Combat",
                 "**Kills:** " + profile.kills + "\n"
                         + "**Deaths:** " + profile.deaths + "\n"
                         + "**K/D Ratio:** " + String.format(Locale.ROOT, "%.2f", kd), true);
 
-        embed.addField("🏆 Achievements & Social",
+        embed.addField("Achievements & Social",
                 "**Advancements:** " + profile.advancementCount + "\n"
                         + "**Followers:** " + profile.followerCount, true);
 
@@ -89,7 +89,7 @@ public final class PlayerProfileBuilder {
             String label = profile.discordUsername != null
                     ? profile.discordUsername + "  (`" + profile.discordId + "`)"
                     : "`" + profile.discordId + "`";
-            embed.addField("🌐 Discord", label, false);
+            embed.addField("Discord", label, false);
         }
         return embed;
     }

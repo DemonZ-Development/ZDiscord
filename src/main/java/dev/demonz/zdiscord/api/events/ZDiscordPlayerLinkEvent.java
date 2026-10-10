@@ -14,7 +14,7 @@ public class ZDiscordPlayerLinkEvent extends Event {
     private final boolean linked;
 
     public ZDiscordPlayerLinkEvent(UUID playerUUID, String discordId, boolean linked) {
-        super(true);
+        super(org.bukkit.Bukkit.getServer() != null && !org.bukkit.Bukkit.isPrimaryThread());
         this.playerUUID = playerUUID;
         this.discordId = discordId;
         this.linked = linked;

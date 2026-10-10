@@ -2,7 +2,6 @@ package dev.demonz.zdiscord.modules;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.api.events.ZDiscordFollowEvent;
-import dev.demonz.zdiscord.storage.StorageManager;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.components.buttons.Button;
@@ -11,8 +10,6 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 
 import java.time.Instant;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -25,65 +22,38 @@ public class FollowModule {
     public static final String UNFOLLOW_BUTTON_ID = "zdiscord:unfollow";
 
     private final ZDiscord plugin;
-    private final Map<UUID, Set<String>> followers = new HashMap<>();
+    private final FollowerStore followers;
     private final Map<UUID, Long> lastJoinNotification = new ConcurrentHashMap<>();
 
     public FollowModule(ZDiscord plugin) {
         this.plugin = plugin;
-    }
-
-    public void init() {
-    }
-
-    public void reload() {
-        synchronized (followers) {
-            followers.clear();
-        }
-    }
-
-    public void shutdown() {
+        this.followers = new FollowerStore(plugin.getStorageManager());
     }
 
     public boolean isFollowing(UUID playerUUID, String discordId) {
-        synchronized (followers) {
-            return followers.getOrDefault(playerUUID, Set.of()).contains(discordId);
-        }
+        return followers.contains(playerUUID, discordId);
     }
 
     public int getFollowerCount(UUID playerUUID) {
-        synchronized (followers) {
-            Set<String> cached = followers.get(playerUUID);
-            if (cached != null) {
-                return cached.size();
-            }
-        }
-        return plugin.getStorageManager().getFollowers(playerUUID).size();
+        return followers.followers(playerUUID).size();
+    }
+
+    public Set<String> getFollowers(UUID playerUUID) {
+        return followers.followers(playerUUID);
     }
 
     public Set<UUID> getFollowedPlayers(String discordId) {
-        return plugin.getStorageManager().getFollowedPlayers(discordId);
+        return followers.followedPlayers(discordId);
     }
 
     public void follow(UUID playerUUID, String discordId) {
-        synchronized (followers) {
-            followers.computeIfAbsent(playerUUID, k -> new HashSet<>()).add(discordId);
-        }
-        plugin.getStorageManager().addFollower(playerUUID, discordId);
+        if (!followers.follow(playerUUID, discordId)) return;
         Bukkit.getPluginManager().callEvent(
                 new ZDiscordFollowEvent(playerUUID, discordId, true));
     }
 
     public void unfollow(UUID playerUUID, String discordId) {
-        synchronized (followers) {
-            Set<String> set = followers.get(playerUUID);
-            if (set != null) {
-                set.remove(discordId);
-                if (set.isEmpty()) {
-                    followers.remove(playerUUID);
-                }
-            }
-        }
-        plugin.getStorageManager().removeFollower(playerUUID, discordId);
+        if (!followers.unfollow(playerUUID, discordId)) return;
         Bukkit.getPluginManager().callEvent(
                 new ZDiscordFollowEvent(playerUUID, discordId, false));
     }
@@ -93,16 +63,18 @@ public class FollowModule {
             return;
         }
         UUID uuid = player.getUniqueId();
-        Set<String> followerIds = loadFollowersFromStorage(uuid);
+        String name = player.getName();
+        plugin.getPlatformAdapter().runAsync(() -> notifyFollowers(uuid, name));
+    }
+
+    private void notifyFollowers(UUID uuid, String name) {
+        Set<String> followerIds = followers.followers(uuid);
         if (followerIds.isEmpty()) {
             return;
         }
 
-        synchronized (followers) {
-            followers.put(uuid, new HashSet<>(followerIds));
-        }
+        if (plugin.getBotManager() == null || !plugin.getBotManager().isConnected()) return;
 
-        String name = player.getName();
         long cooldownMs = plugin.getConfigManager().getInt(
                 "follow.join-notification-cooldown", 300) * 1000L;
         long now = System.currentTimeMillis();
@@ -120,9 +92,9 @@ public class FollowModule {
             try {
                 plugin.getBotManager().getJda().retrieveUserById(discordId).queue(
                         user -> {
-                            if (user == null) return;
+                            if (user == null || user.isBot()) return;
                             EmbedBuilder embed = new EmbedBuilder()
-                                    .setTitle("👋 " + name + " just logged in")
+                                    .setTitle(name + " just logged in")
                                     .setDescription("**" + name
                                             + "** has just joined the Minecraft server.")
                                     .setColor(0x2ECC71)
@@ -145,14 +117,6 @@ public class FollowModule {
                         "Follow dispatch failed for " + discordId, e);
             }
         }
-    }
-
-    private Set<String> loadFollowersFromStorage(UUID uuid) {
-        StorageManager sm = plugin.getStorageManager();
-        if (sm == null) {
-            return Set.of();
-        }
-        return sm.getFollowers(uuid);
     }
 
     public void handleFollowButton(ButtonInteractionEvent event) {
@@ -183,11 +147,11 @@ public class FollowModule {
 
         if (doFollow) {
             follow(target, discordId);
-            event.reply("🔔 You will now be notified when **" + name
+            event.reply("You will now be notified when **" + name
                     + "** joins the server.").setEphemeral(true).queue();
         } else {
             unfollow(target, discordId);
-            event.reply("🔕 You will no longer be notified when **" + name
+            event.reply("You will no longer be notified when **" + name
                     + "** joins the server.").setEphemeral(true).queue();
         }
     }

@@ -2,9 +2,9 @@ package dev.demonz.zdiscord.discord.listeners;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.modules.TicketModule;
+import dev.demonz.zdiscord.discord.TicketTranscriptService;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
-import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent;
@@ -12,10 +12,6 @@ import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.InteractionHook;
-import net.dv8tion.jda.api.utils.FileUpload;
-
-import java.nio.charset.StandardCharsets;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 public class TicketButtonListener extends ListenerAdapter {
@@ -32,7 +28,11 @@ public class TicketButtonListener extends ListenerAdapter {
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
         String id = event.getComponentId();
-        if (!id.startsWith(TicketModule.PANEL_BUTTON_ID)) return;
+        if (!id.startsWith(TicketModule.PANEL_BUTTON_ID + ":")) return;
+        if (!isConfiguredGuild(event)) {
+            event.reply("Use ticket controls in the configured Discord server.").setEphemeral(true).queue();
+            return;
+        }
         if (plugin.getTicketModule() == null) {
             event.reply("The ticket system is disabled.").setEphemeral(true).queue();
             return;
@@ -43,12 +43,17 @@ public class TicketButtonListener extends ListenerAdapter {
             case "close" -> handleClose(event);
             case "claim" -> handleClaim(event);
             case "transcript" -> handleTranscript(event);
+            default -> event.reply("This ticket control is no longer available.").setEphemeral(true).queue();
         }
     }
 
     @Override
     public void onStringSelectInteraction(StringSelectInteractionEvent event) {
         if (!TicketModule.PANEL_SELECT_ID.equals(event.getComponentId())) return;
+        if (!isConfiguredGuild(event) || event.getValues().isEmpty()) {
+            event.reply("Use ticket controls in the configured Discord server.").setEphemeral(true).queue();
+            return;
+        }
         if (plugin.getTicketModule() == null) {
             event.reply("The ticket system is disabled.").setEphemeral(true).queue();
             return;
@@ -80,9 +85,14 @@ public class TicketButtonListener extends ListenerAdapter {
     }
 
     private void completeTicketCreate(InteractionHook hook, User user, String categoryId) {
+        TicketModule tickets = plugin.getTicketModule();
+        if (tickets == null) {
+            hook.editOriginal("The ticket system is disabled.").queue();
+            return;
+        }
         plugin.getPlatformAdapter().runAsync(() -> {
-            String message = plugin.getTicketModule().createTicketForCategory(user, categoryId);
-            hook.sendMessage(message).queue();
+            String message = tickets.createTicketForCategory(user, categoryId);
+            hook.editOriginal(message).queue();
         });
     }
 
@@ -101,25 +111,18 @@ public class TicketButtonListener extends ListenerAdapter {
             return;
         }
 
-        event.reply(plugin.getMessageManager().get(
-                "ticket-closed-message", "%staff%", event.getMember().getEffectiveName())).queue();
-
-        if (plugin.getTicketModule() != null) {
-            String ownerKey = ticketOwnerFromTopic(channel);
-            if (ownerKey != null) {
-                plugin.getTicketModule().onTicketClose(ownerKey);
-            } else {
-                decrementForTicketCreator(channel);
-            }
+        TicketModule tickets = plugin.getTicketModule();
+        if (tickets == null || !tickets.beginClose(channel.getId())) {
+            event.reply("This ticket is already closing or is no longer tracked.").setEphemeral(true).queue();
+            return;
         }
-
-        plugin.getPlatformAdapter().runLater(
-                () -> channel.delete().reason("Ticket closed by "
-                        + event.getMember().getEffectiveName()).queue(
-                        success -> plugin.debug("Ticket channel " + channel.getName() + " deleted."),
-                        error -> plugin.getLogger().warning("Failed to delete ticket channel: "
-                                + error.getMessage())),
-                DELETE_DELAY_TICKS);
+        event.reply(plugin.getMessageManager().get(
+                "ticket-closed-message", "%staff%", event.getMember().getEffectiveName())).queue(ignored -> {
+            try { plugin.getPlatformAdapter().runLater(
+                () -> tickets.deleteClosingTicket(channel, "Ticket closed by "
+                        + event.getMember().getEffectiveName()), DELETE_DELAY_TICKS); }
+            catch (RuntimeException error) { tickets.finishClose(channel.getId(), false); }
+        }, error -> tickets.finishClose(channel.getId(), false));
     }
 
     private void handleClaim(ButtonInteractionEvent event) {
@@ -137,8 +140,23 @@ public class TicketButtonListener extends ListenerAdapter {
             return;
         }
 
-        event.reply(plugin.getMessageManager().get(
-                "ticket-claimed", "%staff%", event.getMember().getEffectiveName())).queue();
+        TicketModule tickets = plugin.getTicketModule();
+        String staffId = event.getUser().getId();
+        String name = event.getMember().getEffectiveName();
+        event.deferReply(true).queue(hook -> plugin.getPlatformAdapter().runAsync(() -> {
+            var claim = tickets.claimTicket(channel.getId(), staffId);
+            if (claim.staffId() == null) {
+                hook.editOriginal("This ticket is closing or is no longer tracked.").queue();
+            } else if (!claim.newlyClaimed()) {
+                hook.editOriginal("This ticket is already assigned to <@" + claim.staffId() + ">.")
+                        .setAllowedMentions(java.util.Collections.emptyList()).queue();
+            } else {
+                channel.sendMessage(plugin.getMessageManager().get(
+                        "ticket-claimed", "%staff%", name)).setAllowedMentions(java.util.Collections.emptyList())
+                        .queue(ignored -> hook.editOriginal("Ticket assigned to you.").queue(),
+                                error -> hook.editOriginal("Ticket assigned to you, but the public announcement could not be sent.").queue());
+            }
+        }));
     }
 
     private void handleTranscript(ButtonInteractionEvent event) {
@@ -156,49 +174,28 @@ public class TicketButtonListener extends ListenerAdapter {
             return;
         }
 
-        event.deferReply().setEphemeral(true).queue();
-
-        if (channel.getLatestMessageId() == null) {
-            event.getHook().sendMessage("Nothing to transcribe - this channel "
-                    + "has no messages yet.").setEphemeral(true).queue();
-            return;
-        }
-
-        channel.getHistoryBefore(channel.getLatestMessageId(), 100).queue(
-                history -> {
-                    StringBuilder sb = new StringBuilder();
-                    sb.append("# Ticket Transcript - ").append(channel.getName()).append("\n\n");
-
-                    List<Message> messages = history.getRetrievedHistory();
-                    for (int i = messages.size() - 1; i >= 0; i--) {
-                        Message msg = messages.get(i);
-                        String timestamp = msg.getTimeCreated()
-                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-                        sb.append("**").append(msg.getAuthor().getEffectiveName())
-                                .append("** (").append(timestamp).append("):\n")
-                                .append(msg.getContentDisplay()).append("\n\n");
+        event.deferReply(true).queue(hook -> TicketTranscriptService.export(channel, plugin.getPlatformAdapter()::runAsync)
+                .whenComplete((result, error) -> {
+                    if (error != null) {
+                        plugin.getLogger().warning("Ticket transcript failed for " + channel.getId() + ": " + error.getMessage());
+                        hook.editOriginal("Could not finish the transcript. Check the bot's history and attachment permissions; any uploaded parts remain in this channel.").queue();
+                    } else if (result.messages() == 0) {
+                        hook.editOriginal("Nothing to transcribe — this channel has no messages yet.").queue();
+                    } else {
+                        hook.editOriginal("Transcript generated: " + result.messages() + " messages in "
+                                + result.urls().size() + " file(s), posted in " + channel.getAsMention() + ".").queue();
                     }
-
-                    byte[] bytes = sb.toString().getBytes(StandardCharsets.UTF_8);
-                    channel.sendFiles(FileUpload.fromData(bytes,
-                            "transcript-" + channel.getName() + ".md")).queue(
-                            msg -> {
-                                String url = msg.getAttachments().isEmpty()
-                                        ? "No attachment URL" : msg.getAttachments().get(0).getUrl();
-                                event.getHook().sendMessage("Transcript generated: " + url)
-                                        .setEphemeral(true).queue();
-                            },
-                            err -> event.getHook().sendMessage(
-                                    "Failed to upload transcript: " + err.getMessage())
-                                    .setEphemeral(true).queue());
-                },
-                err -> event.getHook().sendMessage(
-                        "Failed to fetch message history: " + err.getMessage())
-                        .setEphemeral(true).queue());
+                }));
     }
 
     private boolean isTicketChannel(TextChannel channel) {
-        return channel != null && channel.getName().startsWith("ticket-");
+        return channel != null && plugin.getTicketModule() != null
+                && plugin.getTicketModule().isOpenTicket(channel.getId());
+    }
+
+    private boolean isConfiguredGuild(GenericInteractionCreateEvent event) {
+        return event.getGuild() != null && event.getGuild().getId().equals(
+                plugin.getConfigManager().getString("bot.guild-id"));
     }
 
     private boolean isSupport(Member member) {
@@ -213,21 +210,4 @@ public class TicketButtonListener extends ListenerAdapter {
         return false;
     }
 
-    private String ticketOwnerFromTopic(TextChannel channel) {
-        String topic = channel.getTopic();
-        if (topic == null || !topic.startsWith(TicketModule.OWNER_TOPIC_PREFIX)) {
-            return null;
-        }
-        return topic.substring(TicketModule.OWNER_TOPIC_PREFIX.length());
-    }
-
-    private void decrementForTicketCreator(TextChannel channel) {
-        for (var override : channel.getMemberPermissionOverrides()) {
-            Member member = override.getMember();
-            if (member != null && !member.getUser().isBot()) {
-                plugin.getTicketModule().onTicketClose(member.getId());
-                return;
-            }
-        }
-    }
 }

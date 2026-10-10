@@ -35,6 +35,7 @@ public class YamlStorage implements StorageManager {
     private final PlatformAdapter platform;
     private final BooleanSupplier enabledSupplier;
     private volatile boolean running = true;
+    private PlatformAdapter.TaskHandle flushTimer;
 
     private final Section links = new Section("linked accounts");
     private final Section stats = new Section("leaderboard data");
@@ -69,7 +70,7 @@ public class YamlStorage implements StorageManager {
         advancements.load("advancement_unlocks.yml");
         follows.load("player_follows.yml");
 
-        platform.runAsyncTimer(this::flushDirtySections, 100L, 100L);
+        flushTimer = platform.scheduleAsyncTimer(this::flushDirtySections, 100L, 100L);
         logger.info("Storage: YAML file storage");
     }
 
@@ -83,6 +84,7 @@ public class YamlStorage implements StorageManager {
     @Override
     public void shutdown() {
         running = false;
+        if (flushTimer != null) flushTimer.cancel();
         for (Section s : sections()) {
             s.flush();
         }
@@ -459,14 +461,16 @@ public class YamlStorage implements StorageManager {
         }
 
         <T> T apply(Function<YamlConfiguration, T> change) {
+            T result;
             lock.writeLock().lock();
             try {
-                T result = change.apply(config);
+                result = change.apply(config);
                 dirty = true;
-                return result;
             } finally {
                 lock.writeLock().unlock();
             }
+            if (!flushIsScheduled()) flush();
+            return result;
         }
 
         void flush() {

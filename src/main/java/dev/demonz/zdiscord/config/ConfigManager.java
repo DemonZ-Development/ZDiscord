@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
@@ -17,7 +18,7 @@ import java.util.logging.Logger;
 
 public class ConfigManager {
 
-    public static final int CURRENT_VERSION = 15;
+    public static final int CURRENT_VERSION = 16;
 
     private static final List<String> LEGACY_AVATAR_DEFAULTS = List.of(
             "https://mc-heads.net/avatar/%uuid%/128",
@@ -27,7 +28,7 @@ public class ConfigManager {
     private final Logger logger;
     private final Supplier<InputStream> defaultResource;
     private final File configFile;
-    private FileConfiguration config;
+    private volatile FileConfiguration config;
 
     public ConfigManager(ZDiscord plugin) {
         this(plugin.getDataFolder(), plugin.getLogger(), () -> plugin.getResource("config.yml"));
@@ -73,30 +74,39 @@ public class ConfigManager {
                 return;
             }
 
-            FileConfiguration defaults = YamlConfiguration.loadConfiguration(new InputStreamReader(defStream));
+            FileConfiguration defaults = YamlConfiguration.loadConfiguration(new InputStreamReader(defStream, StandardCharsets.UTF_8));
+            config.options().copyDefaults(false);
             if (current < 8 && LEGACY_AVATAR_DEFAULTS.contains(config.getString("chat.avatar-url", ""))) {
                 config.set("chat.avatar-url", "auto");
                 logger.info("chat.avatar-url switched to \"auto\" (per-player skin avatars).");
             }
             for (String key : defaults.getKeys(true)) {
-                if (!config.contains(key)) {
-                    config.set(key, defaults.get(key));
+                if (!config.isSet(key)) {
+                    if (defaults.isConfigurationSection(key)) {
+                        config.createSection(key);
+                    } else {
+                        config.set(key, defaults.get(key));
+                    }
                 }
             }
+            config.options().copyDefaults(true);
             config.set("config-version", CURRENT_VERSION);
             config.save(configFile);
             logger.info("Configuration migration complete. New defaults have been added; existing values preserved.");
         } catch (IOException e) {
             logger.severe("Failed to write migrated config: " + e.getMessage());
-            logger.severe("A backup of your existing config has been written to config.yml.bak");
             try {
                 Files.copy(configFile.toPath(),
                         new File(configFile.getParentFile(), "config.yml.bak").toPath(),
                         StandardCopyOption.REPLACE_EXISTING);
-            } catch (IOException ignored) {
+                logger.severe("A backup of your existing config has been written to config.yml.bak");
+            } catch (IOException backupError) {
+                logger.severe("Could not back up config.yml: " + backupError.getMessage());
             }
         } catch (Exception e) {
             logger.warning("Failed to read default config for migration: " + e.getMessage());
+        } finally {
+            config.options().copyDefaults(true);
         }
     }
 
@@ -105,7 +115,7 @@ public class ConfigManager {
 
         try (InputStream defStream = defaultResource == null ? null : defaultResource.get()) {
             if (defStream != null) {
-                YamlConfiguration defaults = YamlConfiguration.loadConfiguration(new InputStreamReader(defStream));
+                YamlConfiguration defaults = YamlConfiguration.loadConfiguration(new InputStreamReader(defStream, StandardCharsets.UTF_8));
                 config.setDefaults(defaults);
                 config.options().copyDefaults(true);
             }

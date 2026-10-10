@@ -33,7 +33,8 @@ public final class ColorUtil {
         if (text == null) return "";
         String stripped = ChatColor.stripColor(text);
         if (stripped == null) return "";
-        return stripped.replaceAll("&[0-9a-fk-orA-FK-OR]", "");
+        return HEX_PATTERN.matcher(stripped).replaceAll("")
+                .replaceAll("&[0-9a-fk-orA-FK-OR]", "");
     }
 
     public static String colorize(String text) {
@@ -58,6 +59,7 @@ public final class ColorUtil {
      */
     public static String toDiscordMarkdown(String text) {
         if (text == null || text.isEmpty()) return text == null ? "" : text;
+        text = HEX_PATTERN.matcher(text).replaceAll("");
 
         StringBuilder out = new StringBuilder(text.length());
         boolean bold = false, italic = false, underline = false, strike = false;
@@ -65,7 +67,12 @@ public final class ColorUtil {
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
             if ((c == '&' || c == '\u00A7') && i + 1 < text.length()) {
-                char code = Character.toLowerCase(text.charAt(++i));
+                char code = Character.toLowerCase(text.charAt(i + 1));
+                if ("0123456789abcdefklmnorx".indexOf(code) < 0) {
+                    out.append(c);
+                    continue;
+                }
+                i++;
                 switch (code) {
                     case 'l' -> { out.append("**"); bold = !bold; }
                     case 'o' -> { out.append("*"); italic = !italic; }

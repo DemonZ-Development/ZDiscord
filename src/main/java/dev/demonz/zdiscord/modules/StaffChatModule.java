@@ -16,7 +16,7 @@ public class StaffChatModule extends ListenerAdapter {
 
     private final ZDiscord plugin;
     private final Set<UUID> toggledPlayers = ConcurrentHashMap.newKeySet();
-    private String channelId;
+    private volatile String channelId;
 
     public StaffChatModule(ZDiscord plugin) {
         this.plugin = plugin;

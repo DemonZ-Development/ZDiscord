@@ -33,10 +33,6 @@ public class DeathListener implements Listener {
             }
         }
 
-        if (plugin.getHalloweenModule() != null) {
-            plugin.getHalloweenModule().recordKill(player);
-        }
-
         if (!plugin.getBotManager().isConnected()) return;
         if (!plugin.getConfigManager().getBoolean("events.death.enabled", true)) return;
 

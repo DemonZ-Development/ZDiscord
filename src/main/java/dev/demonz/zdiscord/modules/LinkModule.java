@@ -7,83 +7,59 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class LinkModule {
 
-    private static final long LINK_EXPIRY_MS = 5L * 60L * 1000L;
-
     private final ZDiscord plugin;
-    private final Map<String, PendingLink> pendingLinks = new ConcurrentHashMap<>();
-    private final Map<UUID, String> linkedAccounts = new ConcurrentHashMap<>();
-    private final Map<String, UUID> discordToMc = new ConcurrentHashMap<>();
+    private final AccountLinks links;
     private volatile boolean running = true;
+    private dev.demonz.zdiscord.platform.PlatformAdapter.TaskHandle timer;
 
     public LinkModule(ZDiscord plugin) {
         this.plugin = plugin;
+        this.links = new AccountLinks(plugin.getStorageManager());
     }
 
     public void init() {
-        loadData();
+        running = true;
+        plugin.getLogger().info("Loaded " + links.size() + " linked accounts from "
+                + plugin.getStorageManager().getTypeName());
 
-        plugin.getPlatformAdapter().runAsyncTimer(() -> {
+        timer = plugin.getPlatformAdapter().scheduleAsyncTimer(() -> {
             if (!running) return;
-            long now = System.currentTimeMillis();
-            pendingLinks.entrySet().removeIf(
-                    e -> now - e.getValue().createdAt > LINK_EXPIRY_MS);
+            links.expire();
         }, 600L, 600L);
     }
 
     public void reload() {
-        loadData();
-    }
-
-    private void loadData() {
-        linkedAccounts.clear();
-        discordToMc.clear();
-        for (Map.Entry<UUID, String> entry : plugin.getStorageManager().loadLinks().entrySet()) {
-            linkedAccounts.put(entry.getKey(), entry.getValue());
-            discordToMc.put(entry.getValue(), entry.getKey());
-        }
-        plugin.getLogger().info("Loaded " + linkedAccounts.size()
-                + " linked accounts from " + plugin.getStorageManager().getTypeName());
+        links.expire();
     }
 
     public String generateCode(Player player) {
-        if (linkedAccounts.containsKey(player.getUniqueId())) {
+        String code = running ? links.code(player.getUniqueId(), false) : null;
+        if (code == null) {
             player.sendMessage(plugin.getMessageManager().get("link-already-linked"));
             return null;
         }
 
-        String code = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
-        pendingLinks.put(code, new PendingLink(player.getUniqueId(), System.currentTimeMillis()));
         return code;
     }
 
-    public boolean processLink(String discordId, String discordName, String code) {
-        if (code == null) {
-            return false;
-        }
-        PendingLink pending = pendingLinks.remove(code.trim().toUpperCase());
-        if (pending == null) {
-            return false;
-        }
-        if (System.currentTimeMillis() - pending.createdAt > LINK_EXPIRY_MS) {
-            return false;
-        }
+    public String getLoginCode(UUID playerUUID) {
+        return running ? links.code(playerUUID, true) : null;
+    }
 
-        UUID playerUUID = pending.playerUUID;
-        UUID previousPlayer = discordToMc.put(discordId, playerUUID);
+    public boolean processLink(String discordId, String discordName, String code) {
+        if (!running) return false;
+        AccountLinks.Change change = links.redeem(discordId, code);
+        if (change == null) return false;
+        UUID playerUUID = change.player();
+        UUID previousPlayer = change.previousPlayer();
         if (previousPlayer != null && !previousPlayer.equals(playerUUID)) {
-            linkedAccounts.remove(previousPlayer);
-            plugin.getStorageManager().removeLink(previousPlayer);
             plugin.getLogger().info("Discord account " + discordId
                     + " was relinked from " + previousPlayer + " to " + playerUUID);
         }
-        linkedAccounts.put(playerUUID, discordId);
-        plugin.getStorageManager().saveLink(playerUUID, discordId);
         plugin.getLogger().info("Linked account: " + playerUUID + " <-> Discord "
                 + discordId + " (" + discordName + ")");
 
@@ -135,23 +111,19 @@ public class LinkModule {
     }
 
     public String getDiscordId(UUID playerUUID) {
-        return linkedAccounts.get(playerUUID);
+        return links.discord(playerUUID);
     }
 
     public UUID getPlayerUUID(String discordId) {
-        return discordToMc.get(discordId);
+        return links.player(discordId);
     }
 
     public boolean isLinked(UUID playerUUID) {
-        return linkedAccounts.containsKey(playerUUID);
+        return links.discord(playerUUID) != null;
     }
 
     public void unlink(UUID playerUUID) {
-        String discordId = linkedAccounts.remove(playerUUID);
-        if (discordId != null) {
-            discordToMc.remove(discordId, playerUUID);
-        }
-        plugin.getStorageManager().removeLink(playerUUID);
+        String discordId = links.unlink(playerUUID);
         plugin.getLogger().info("Unlinked account: " + playerUUID
                 + (discordId != null ? " (Discord " + discordId + ")" : ""));
         if (discordId != null) {
@@ -162,15 +134,7 @@ public class LinkModule {
 
     public void shutdown() {
         running = false;
+        if (timer != null) timer.cancel();
     }
 
-    private static final class PendingLink {
-        final UUID playerUUID;
-        final long createdAt;
-
-        PendingLink(UUID playerUUID, long createdAt) {
-            this.playerUUID = playerUUID;
-            this.createdAt = createdAt;
-        }
-    }
 }

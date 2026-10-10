@@ -38,6 +38,11 @@ public class PaperAdapter implements PlatformAdapter {
     }
 
     @Override
+    public TaskHandle scheduleLater(Runnable task, long delayTicks) {
+        return Bukkit.getScheduler().runTaskLater(plugin, task, delayTicks)::cancel;
+    }
+
+    @Override
     public void runTimer(Runnable task, long delayTicks, long periodTicks) {
         Bukkit.getScheduler().runTaskTimer(plugin, task, delayTicks, periodTicks);
     }
@@ -45,6 +50,16 @@ public class PaperAdapter implements PlatformAdapter {
     @Override
     public void runAsyncTimer(Runnable task, long delayTicks, long periodTicks) {
         Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, task, delayTicks, periodTicks);
+    }
+
+    @Override
+    public TaskHandle scheduleTimer(Runnable task, long delayTicks, long periodTicks) {
+        return Bukkit.getScheduler().runTaskTimer(plugin, task, delayTicks, Math.max(1, periodTicks))::cancel;
+    }
+
+    @Override
+    public TaskHandle scheduleAsyncTimer(Runnable task, long delayTicks, long periodTicks) {
+        return Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, task, delayTicks, Math.max(1, periodTicks))::cancel;
     }
 
     @Override

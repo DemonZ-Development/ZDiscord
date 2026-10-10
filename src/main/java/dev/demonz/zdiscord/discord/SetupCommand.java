@@ -4,7 +4,6 @@ import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.modules.TicketModule;
 import dev.demonz.zdiscord.util.ColorUtil;
 import dev.demonz.zdiscord.util.EmbedUtil;
-import dev.demonz.zdiscord.util.StatusEmbedBuilder;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
@@ -37,6 +36,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 
 /**
  * /setup wizard — channel linking for every module plus a full ticket
@@ -61,6 +61,7 @@ public class SetupCommand extends ListenerAdapter {
     private static final String BTN_UP = "zdiscord_setup_ticket_up";
     private static final String BTN_DOWN = "zdiscord_setup_ticket_down";
     private static final String BTN_DONE = "zdiscord_setup_ticket_done";
+    private static final String BTN_CANCEL = "zdiscord_setup_ticket_cancel";
     private static final String BTN_CONFIRM_REMOVE = "zdiscord_setup_ticket_confirm_remove:";
 
     private static final String LABEL_ADD = "\u2795 Add";
@@ -132,32 +133,32 @@ public class SetupCommand extends ListenerAdapter {
         for (Map.Entry<String, ModuleInfo> entry : MODULES.entrySet()) {
             String val = plugin.getConfigManager().getString(entry.getValue().configPath, "");
             if (isSet(val)) {
-                statusLines.append("✅ **").append(entry.getKey())
+                statusLines.append("**").append(entry.getKey())
                         .append("** -> <#").append(val).append(">\n");
             } else {
-                statusLines.append("🔲 ").append(entry.getKey()).append("\n");
+                statusLines.append(entry.getKey()).append(" (not configured)\n");
             }
         }
 
         int catCount = getCategoriesFromConfig().size();
         String catLine = catCount == 0
-                ? "🔲 ticket categories (none yet)"
-                : "✅ " + catCount + " ticket categor"
+                ? "Ticket categories: none yet"
+                : catCount + " ticket categor"
                         + (catCount == 1 ? "y" : "ies") + " configured";
 
         EmbedBuilder panel = new EmbedBuilder()
                 .setAuthor("ZDiscord Setup Wizard", null, guildIcon)
-                .setTitle("⚙️ Configure your server integration")
+                .setTitle("Configure your server integration")
                 .setDescription("Pick a module from the dropdown below to configure it.\n"
                         + "Each module has a guided flow with sensible defaults.")
                 .setColor(ColorUtil.parseHex("#5865F2"))
                 .setThumbnail(guildIcon)
-                .addField("📡 Connection",
-                        (botReady ? "✅ Bot online" : "❌ Bot not connected")
+                .addField("Connection",
+                        (botReady ? "Bot online" : "Bot not connected")
                                 + "\n" + online + "/" + max + " players", true)
-                .addField("📊 Progress",
+                .addField("Progress",
                         configured + "/" + MODULES.size() + " modules\n" + catLine, true)
-                .addField("📋 Module status", statusLines.toString(), false)
+                .addField("Module status", statusLines.toString(), false)
                 .setFooter("ZDiscord v" + plugin.getDescription().getVersion()
                         + "  \u2022  /setup for this wizard")
                 .setTimestamp(Instant.now());
@@ -184,6 +185,12 @@ public class SetupCommand extends ListenerAdapter {
 
     @Override
     public void onStringSelectInteraction(StringSelectInteractionEvent event) {
+        if (!MODULE_MENU_ID.equals(event.getComponentId())
+                && !TICKET_CATEGORY_MENU_ID.equals(event.getComponentId())) return;
+        if (!isAdmin(event.getMember()) || event.getValues().isEmpty()) {
+            event.reply("Only administrators can configure modules.").setEphemeral(true).queue();
+            return;
+        }
         if (MODULE_MENU_ID.equals(event.getComponentId())) {
             handleModuleSelect(event);
         } else if (TICKET_CATEGORY_MENU_ID.equals(event.getComponentId())) {
@@ -211,7 +218,7 @@ public class SetupCommand extends ListenerAdapter {
         }
 
         EmbedBuilder prompt = new EmbedBuilder()
-                .setTitle("⚙️ Configure " + capitalize(module))
+                .setTitle("Configure " + capitalize(module))
                 .setDescription(info.description
                         + "\n\nSelect a channel to link this module to. The dropdown only shows channels the bot can see.")
                 .setColor(ColorUtil.parseHex("#5865F2"))
@@ -234,6 +241,11 @@ public class SetupCommand extends ListenerAdapter {
     @Override
     public void onEntitySelectInteraction(EntitySelectInteractionEvent event) {
         String componentId = event.getComponentId();
+        if (!componentId.startsWith(CHANNEL_MENU_PREFIX) && !SUPPORT_ROLE_MENU_ID.equals(componentId)) return;
+        if (!isAdmin(event.getMember())) {
+            event.reply("Only administrators can configure modules.").setEphemeral(true).queue();
+            return;
+        }
         if (componentId.startsWith(CHANNEL_MENU_PREFIX)) {
             handleChannelSelect(event);
         } else if (SUPPORT_ROLE_MENU_ID.equals(componentId)) {
@@ -246,6 +258,10 @@ public class SetupCommand extends ListenerAdapter {
         ModuleInfo info = MODULES.get(module);
         if (info == null) return;
 
+        if (event.getMentions().getChannels().isEmpty()) {
+            event.reply("Please select a text channel.").setEphemeral(true).queue();
+            return;
+        }
         var selectedChannel = event.getMentions().getChannels().get(0);
         if (!(selectedChannel instanceof TextChannel channel)) {
             event.reply("Please select a **text channel**.").setEphemeral(true).queue();
@@ -271,7 +287,7 @@ public class SetupCommand extends ListenerAdapter {
 
     private void showTicketChannelPrompt(StringSelectInteractionEvent event) {
         EmbedBuilder prompt = new EmbedBuilder()
-                .setTitle("🎫 Ticket Setup  \u2014  Step 1 of 3")
+                .setTitle("Ticket Setup  \u2014  Step 1 of 3")
                 .setDescription("Select the text channel where ZDiscord should post the public ticket panel.\n\n"
                         + "Private tickets will be created in that channel's category. "
                         + "If the channel is not inside a category, tickets will be created at the server root.")
@@ -293,31 +309,10 @@ public class SetupCommand extends ListenerAdapter {
     }
 
     private void handleStatusSetup(EntitySelectInteractionEvent event, TextChannel channel) {
-        StatusEmbedBuilder.StatusContext ctx = StatusEmbedBuilder.StatusContext.capture(
-                plugin.getBotManager()::getGuild,
-                plugin.getConfigManager().getString("status.embed.title", "Server Status"),
-                plugin.getConfigManager().getString("status.embed.color", "#5865F2"),
-                plugin.getConfigManager().getString("status.embed.server-ip", "play.yourserver.com"),
-                plugin.getConfigManager().getInt("status.update-interval", 30),
-                plugin.getConfigManager().getBoolean("status.embed.show-players", true),
-                plugin.getConfigManager().getBoolean("status.embed.show-tps", true),
-                plugin.getConfigManager().getBoolean("status.embed.show-memory", true),
-                plugin.getConfigManager().getDouble("performance.tps-warning", 18.0),
-                plugin.getConfigManager().getDouble("performance.tps-critical", 15.0));
-
-        channel.sendMessageEmbeds(StatusEmbedBuilder.build(ctx)).queue(
-                msg -> {
-                    saveToConfig("channels.status-message", msg.getId());
-                    int interval = plugin.getConfigManager().getInt("status.update-interval", 30);
-                    event.replyEmbeds(EmbedUtil.success(
-                            "Status panel posted in " + channel.getAsMention()
-                                    + ". It will auto-update every " + interval + " seconds.")
-                            .build())
-                            .setEphemeral(true).queue();
-                },
-                err -> event.replyEmbeds(EmbedUtil.error(
-                        "Failed to send status panel: " + err.getMessage()).build())
-                        .setEphemeral(true).queue());
+        event.replyEmbeds(EmbedUtil.success(
+                "Status channel configured as " + channel.getAsMention()
+                        + ". The status module will create or update its panel shortly.").build())
+                .setEphemeral(true).queue();
     }
 
     private void handleTicketSetup(EntitySelectInteractionEvent event, TextChannel channel) {
@@ -326,7 +321,7 @@ public class SetupCommand extends ListenerAdapter {
                 channel.getParentCategory() != null ? channel.getParentCategory().getId() : "");
 
         EmbedBuilder rolePrompt = new EmbedBuilder()
-                .setTitle("🎫 Ticket Setup  \u2014  Step 2 of 3")
+                .setTitle("Ticket Setup  \u2014  Step 2 of 3")
                 .setDescription("Tickets will be created in **"
                         + (channel.getParentCategory() != null
                                 ? channel.getParentCategory().getAsMention()
@@ -352,6 +347,10 @@ public class SetupCommand extends ListenerAdapter {
     }
 
     private void handleSupportRoleSelect(EntitySelectInteractionEvent event) {
+        if (event.getMentions().getRoles().isEmpty()) {
+            event.reply("Please select a support role.").setEphemeral(true).queue();
+            return;
+        }
         var role = event.getMentions().getRoles().get(0);
         saveToConfig("tickets.support-roles", Collections.singletonList(role.getId()));
         showTicketCategoryManager(event, role.getAsMention());
@@ -360,7 +359,7 @@ public class SetupCommand extends ListenerAdapter {
     private void showTicketCategoryManager(GenericInteractionCreateEvent event, String supportRoleMention) {
         Map<String, CategoryDraft> cats = getCategoriesFromConfig();
         EmbedBuilder embed = new EmbedBuilder()
-                .setTitle("🎫 Ticket Categories  \u2014  Step 3 of 3")
+                .setTitle("Ticket Categories  \u2014  Step 3 of 3")
                 .setDescription(buildCategoryListText(cats)
                         + "\n\nUse the buttons below to manage your categories. "
                         + "At least one category is required to post a panel.")
@@ -422,9 +421,9 @@ public class SetupCommand extends ListenerAdapter {
         }
 
         EmbedBuilder embed = new EmbedBuilder()
-                .setTitle("🎫 Ticket Categories  \u2014  Step 3 of 3")
+                .setTitle("Ticket Categories  \u2014  Step 3 of 3")
                 .setDescription(buildCategoryListText(cats)
-                        + "\n\n👉 **Selected: **" + pickedCat.emoji + " " + pickedCat.label
+                        + "\n\n**Selected: **" + pickedCat.emoji + " " + pickedCat.label
                         + " (`" + picked + "`)\n"
                         + "Now press an action button: **Edit**, **Remove**, "
                         + "**Move up**, or **Move down**.")
@@ -474,6 +473,7 @@ public class SetupCommand extends ListenerAdapter {
         }
 
         switch (id) {
+            case BTN_CANCEL -> showTicketCategoryManager(event, supportRoleMention(event));
             case BTN_ADD -> showCategoryModal(event, null);
             case BTN_EDIT -> {
                 String picked = lastSelectedCategory(event.getMessage().getEmbeds());
@@ -506,6 +506,8 @@ public class SetupCommand extends ListenerAdapter {
             default -> {
                 if (id.startsWith(BTN_CONFIRM_REMOVE)) {
                     removeCategory(event, id.substring(BTN_CONFIRM_REMOVE.length()));
+                } else {
+                    event.reply("This setup control is no longer available.").setEphemeral(true).queue();
                 }
             }
         }
@@ -530,7 +532,7 @@ public class SetupCommand extends ListenerAdapter {
                 ? "Add a ticket category" : "Edit category  \u2014  " + existing.label;
         String modalId = TICKET_CATEGORY_MODAL_PREFIX + (existingId == null ? "_new" : existingId);
 
-        Modal.Builder modal = Modal.create(modalId, title);
+        Modal.Builder modal = Modal.create(modalId, title.substring(0, Math.min(45, title.length())));
         modal.addComponents(Label.of("ID (lowercase, no spaces)", TextInput.create("id", TextInputStyle.SHORT)
                 .setValue(existingId != null ? existingId : "")
                 .setPlaceholder("e.g. general, bug, billing")
@@ -551,7 +553,7 @@ public class SetupCommand extends ListenerAdapter {
                 .build()));
         modal.addComponents(Label.of("Emoji (optional)", TextInput.create("emoji", TextInputStyle.SHORT)
                 .setValue(existing == null || existing.emoji == null ? "" : existing.emoji)
-                .setPlaceholder("❓  ⚡  🐛  (single emoji)")
+                .setPlaceholder("Single emoji, or leave blank")
                 .setRequired(false)
                 .setMaxLength(8)
                 .build()));
@@ -569,6 +571,10 @@ public class SetupCommand extends ListenerAdapter {
     public void onModalInteraction(ModalInteractionEvent event) {
         String id = event.getModalId();
         if (!id.startsWith(TICKET_CATEGORY_MODAL_PREFIX)) return;
+        if (!isAdmin(event.getMember())) {
+            event.reply("Only administrators can manage categories.").setEphemeral(true).queue();
+            return;
+        }
 
         String existingId = id.substring(TICKET_CATEGORY_MODAL_PREFIX.length());
         if ("_new".equals(existingId)) {
@@ -576,8 +582,8 @@ public class SetupCommand extends ListenerAdapter {
         }
 
         Map<String, CategoryDraft> cats = getCategoriesFromConfig();
-        String newId = event.getValue("id").getAsString().trim().toLowerCase();
-        String label = event.getValue("label").getAsString().trim();
+        String newId = optionalValue(event, "id").trim().toLowerCase(Locale.ROOT);
+        String label = optionalValue(event, "label").trim();
         String description = optionalValue(event, "description");
         String emoji = optionalValue(event, "emoji").trim();
         String color = optionalValue(event, "color").trim();
@@ -587,8 +593,20 @@ public class SetupCommand extends ListenerAdapter {
         if (!color.startsWith("#")) {
             color = "#" + color;
         }
-        if (newId.isEmpty() || label.isEmpty()) {
-            event.reply("Category ID and Label are required.").setEphemeral(true).queue();
+        if (!validCategoryId(newId) || label.isEmpty()) {
+            event.reply("Use a category ID of 1–32 lowercase letters, numbers, underscores or hyphens, and a nonempty label.").setEphemeral(true).queue();
+            return;
+        }
+        if (existingId != null && !cats.containsKey(existingId)) {
+            event.reply("That category no longer exists. Open the category manager again.").setEphemeral(true).queue();
+            return;
+        }
+        if (existingId == null && cats.size() >= 25) {
+            event.reply("Discord supports up to 25 ticket categories per dropdown.").setEphemeral(true).queue();
+            return;
+        }
+        if (!color.matches("#[0-9a-fA-F]{6}")) {
+            event.reply("Use a six-digit hex color, such as #5865F2.").setEphemeral(true).queue();
             return;
         }
         if (cats.containsKey(newId) && !newId.equals(existingId)) {
@@ -600,7 +618,7 @@ public class SetupCommand extends ListenerAdapter {
         if (existingId != null) {
             cats.remove(existingId);
         }
-        cats.put(newId, new CategoryDraft(newId, label, description, emoji, color));
+        cats.put(newId, new CategoryDraft(label, description, emoji, color));
         saveCategoriesToConfig(cats);
 
         showTicketCategoryManager(event, supportRoleMention(event));
@@ -633,7 +651,7 @@ public class SetupCommand extends ListenerAdapter {
                 .build())
                 .addComponents(ActionRow.of(
                         Button.danger(BTN_CONFIRM_REMOVE + categoryId, "\ud83d\uddd1\ufe0f Yes, remove"),
-                        Button.secondary(BTN_DONE, LABEL_CANCEL)))
+                        Button.secondary(BTN_CANCEL, LABEL_CANCEL)))
                 .setEphemeral(true)
                 .queue();
     }
@@ -674,13 +692,10 @@ public class SetupCommand extends ListenerAdapter {
         }
 
         TextChannel panelChannel = null;
-        String ticketCategoryId = plugin.getConfigManager().getString("channels.ticket-category", "");
+        String panelChannelId = plugin.getConfigManager().getString("tickets.panel-channel", "");
         Guild guild = event.getGuild();
-        if (guild != null && !ticketCategoryId.isEmpty()) {
-            var category = guild.getCategoryById(ticketCategoryId);
-            if (category != null && !category.getTextChannels().isEmpty()) {
-                panelChannel = category.getTextChannels().get(0);
-            }
+        if (guild != null && TicketModule.isUsableSnowflake(panelChannelId)) {
+            panelChannel = guild.getTextChannelById(panelChannelId);
         }
         if (panelChannel == null && event.getChannel() instanceof TextChannel) {
             panelChannel = (TextChannel) event.getChannel();
@@ -690,11 +705,15 @@ public class SetupCommand extends ListenerAdapter {
                     .setEphemeral(true).queue();
             return;
         }
+        if (plugin.getTicketModule() == null) {
+            event.reply("The ticket system is disabled. Enable tickets before posting the panel.").setEphemeral(true).queue();
+            return;
+        }
 
         postTicketPanel(panelChannel);
         event.replyEmbeds(EmbedUtil.success(
-                "🎫 Ticket panel posted in " + panelChannel.getAsMention() + ".\n"
-                        + "✅ Categories: " + cats.size() + "\n"
+                "Ticket panel posted in " + panelChannel.getAsMention() + ".\n"
+                        + "Categories: " + cats.size() + "\n"
                         + "Users can now click the dropdown to open a support ticket.")
                 .build())
                 .setEphemeral(true)
@@ -722,11 +741,13 @@ public class SetupCommand extends ListenerAdapter {
     private void saveToConfig(String path, String value) {
         plugin.getConfigManager().getConfig().set(path, value);
         plugin.getConfigManager().save();
+        plugin.refreshModules();
     }
 
     private void saveToConfig(String path, List<String> values) {
         plugin.getConfigManager().getConfig().set(path, values);
         plugin.getConfigManager().save();
+        plugin.refreshModules();
     }
 
     private Map<String, CategoryDraft> getCategoriesFromConfig() {
@@ -739,7 +760,6 @@ public class SetupCommand extends ListenerAdapter {
                 ConfigurationSection c = sec.getConfigurationSection(id);
                 if (c == null) continue;
                 out.put(id, new CategoryDraft(
-                        id,
                         c.getString("label", id),
                         c.getString("description", ""),
                         c.getString("emoji", ""),
@@ -759,7 +779,6 @@ public class SetupCommand extends ListenerAdapter {
             Object emoji = entry.get("emoji");
             Object color = entry.get("color");
             out.put(id, new CategoryDraft(
-                    id,
                     label != null ? label.toString() : id,
                     description != null ? description.toString() : "",
                     emoji != null ? emoji.toString() : "",
@@ -780,11 +799,12 @@ public class SetupCommand extends ListenerAdapter {
             cfg.set(base + ".color", c.color);
         }
         plugin.getConfigManager().save();
+        plugin.refreshModules();
     }
 
     private String buildCategoryListText(Map<String, CategoryDraft> cats) {
         if (cats.isEmpty()) {
-            return "⚠️ No categories yet. Press **Add** to create one.";
+            return "No categories yet. Press **Add** to create one.";
         }
 
         StringBuilder sb = new StringBuilder();
@@ -814,7 +834,16 @@ public class SetupCommand extends ListenerAdapter {
     }
 
     private boolean isAdmin(Member member) {
-        return member != null && member.hasPermission(Permission.ADMINISTRATOR);
+        return canConfigure(member, plugin.getConfigManager().getString("bot.guild-id"));
+    }
+
+    static boolean canConfigure(Member member, String guildId) {
+        return member != null && member.getGuild().getId().equals(guildId)
+                && member.hasPermission(Permission.ADMINISTRATOR);
+    }
+
+    static boolean validCategoryId(String value) {
+        return value != null && value.matches("[a-z0-9_-]{1,32}");
     }
 
     private String capitalize(String s) {
@@ -835,15 +864,12 @@ public class SetupCommand extends ListenerAdapter {
     }
 
     private static final class CategoryDraft {
-        @SuppressWarnings("unused")
-        final String id;
         final String label;
         final String description;
         final String emoji;
         final String color;
 
-        CategoryDraft(String id, String label, String description, String emoji, String color) {
-            this.id = id;
+        CategoryDraft(String label, String description, String emoji, String color) {
             this.label = label;
             this.description = description;
             this.emoji = emoji == null ? "" : emoji;

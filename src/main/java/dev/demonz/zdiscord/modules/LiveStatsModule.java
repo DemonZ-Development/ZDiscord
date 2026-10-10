@@ -28,7 +28,8 @@ public class LiveStatsModule {
     private static final int NAME_LIST_MAX = 15;
 
     private final ZDiscord plugin;
-    private String messageId;
+    private dev.demonz.zdiscord.discord.PanelMessage panel;
+    private dev.demonz.zdiscord.platform.PlatformAdapter.TaskHandle timer;
     private volatile boolean running = true;
 
     public LiveStatsModule(ZDiscord plugin) {
@@ -36,17 +37,25 @@ public class LiveStatsModule {
     }
 
     public void init() {
-        messageId = loadMessageId();
-        int interval = plugin.getConfigManager().getInt("live-stats.update-interval", 60);
-        plugin.getPlatformAdapter().runTimer(this::update, 200L, Math.max(2, interval) * 20L);
+        panel = new dev.demonz.zdiscord.discord.PanelMessage(loadMessageId(), this::persistMessageId, plugin::debug);
+        schedule();
+    }
+
+    private void schedule() {
+        if (timer != null) timer.cancel();
+        running = true;
+        long interval = Math.max(2, plugin.getConfigManager().getInt("live-stats.update-interval", 60));
+        timer = plugin.getPlatformAdapter().scheduleTimer(this::update, 200L, interval * 20L);
     }
 
     public void reload() {
-        messageId = loadMessageId();
+        schedule();
     }
 
     public void shutdown() {
         running = false;
+        if (timer != null) timer.cancel();
+        if (panel != null) panel.stop();
     }
 
     private void update() {
@@ -60,27 +69,7 @@ public class LiveStatsModule {
         }
 
         EmbedBuilder embed = buildEmbed();
-        if (messageId != null && !messageId.isEmpty()) {
-            channel.editMessageEmbedsById(messageId, embed.build()).queue(
-                    success -> { },
-                    error -> {
-                        plugin.debug("Live stats message " + messageId
-                                + " is gone, creating a new one.");
-                        messageId = null;
-                        sendNew(channel, embed);
-                    });
-        } else {
-            sendNew(channel, embed);
-        }
-    }
-
-    private void sendNew(TextChannel channel, EmbedBuilder embed) {
-        channel.sendMessageEmbeds(embed.build()).queue(
-                msg -> {
-                    messageId = msg.getId();
-                    persistMessageId(messageId);
-                },
-                error -> plugin.debug("Failed to send live stats embed: " + error.getMessage()));
+        panel.update(channel, java.util.List.of(embed.build()));
     }
 
     private EmbedBuilder buildEmbed() {
@@ -105,8 +94,7 @@ public class LiveStatsModule {
 
         EmbedBuilder embed = new EmbedBuilder()
                 .setAuthor(online ? serverIp : serverIp + " (restarting)", null, guildIcon())
-                .setTitle(online ? "📈 Live Server Stats"
-                        : "🔴 Live Server Stats")
+                .setTitle("Live Server Stats")
                 .setColor(color)
                 .setTimestamp(Instant.now());
 
@@ -115,25 +103,25 @@ public class LiveStatsModule {
             return embed.setFooter("Auto-updates \u2022 ZDiscord");
         }
 
-        embed.addField("👥 Players",
+        embed.addField("Players",
                 "**" + onlineCount + "** / " + maxCount, true);
-        embed.addField("🌡️ TPS",
+        embed.addField("TPS",
                 String.format(Locale.ROOT, "`%.1f`", tps)
-                        + (tps >= tpsWarning ? " ✅"
-                        : tps >= tpsCritical ? " ⚠️" : " ⛔️"), true);
-        embed.addField("🧠 Memory",
+                        + (tps >= tpsWarning ? " (healthy)"
+                        : tps >= tpsCritical ? " (warning)" : " (critical)"), true);
+        embed.addField("Memory",
                 usedMb + "/" + maxMb + "MB (" + memPercent + "%)", true);
 
         String names = playerNames();
         if (!names.isEmpty()) {
-            embed.addField("📜 Online Now", names, false);
+            embed.addField("Online Now", names, false);
         }
 
         LeaderboardModule boards = plugin.getLeaderboardModule();
         if (boards != null) {
-            embed.addField("⚔️ Top Kills",
+            embed.addField("Top Kills",
                     rankedLines(boards, "kills", 5), true);
-            embed.addField("🕐 Most Playtime",
+            embed.addField("Most Playtime",
                     rankedLines(boards, "playtime", 5), true);
         }
 
@@ -150,7 +138,7 @@ public class LiveStatsModule {
                         .append(entry.getValue()).append(" follower")
                         .append(entry.getValue() == 1 ? "" : "s");
             }
-            embed.addField("🔔 Most Followed", sb.toString(), true);
+            embed.addField("Most Followed", sb.toString(), true);
         }
 
         int interval = plugin.getConfigManager().getInt("live-stats.update-interval", 60);

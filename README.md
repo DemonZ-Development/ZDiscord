@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="images/banner.png" alt="ZDiscord" width="100%">
+<img src="images/banner.png" alt="ZDiscord — Minecraft and Discord, connected" width="100%">
 
 # ZDiscord
 
@@ -27,7 +27,7 @@ ZDiscord connects your Minecraft server to Discord. Chat flows both ways, player
 | **Ticket system** | Built-in dropdown panel with categories | Requires separate plugin |
 | **Config migration** | Automatic schema upgrades | Manual editing |
 | **Webhook handling** | Rate-limited queue with retry | Rate limit issues under load |
-| **Message delivery** | Async with guaranteed delivery | Can drop messages |
+| **Message delivery** | Async with a bounded relay queue | Can drop messages |
 
 ## Features
 
@@ -52,7 +52,13 @@ ZDiscord connects your Minecraft server to Discord. Chat flows both ways, player
 - **Setup wizard** — `/setup` configures channels from Discord with dropdowns and buttons.
 - **DemonZ integrations** — Optional Onlysleep sleep/night messages and RedstoneReboot restart alerts share the events channel (or dedicated channels).
 - **SkinsRestorer avatars** — Player cards and chat webhooks use the active restored skin when available, with safe Java/Bedrock fallbacks.
-- **Halloween event** — A configurable seasonal mob hunt. Kills during the date window are tallied separately, teased by a daily countdown, tracked on a self-refreshing standings panel, and rewarded at the finale. Survives restarts mid-event. Disable with `halloween.enabled: false`.
+- **Halloween event** — A configurable seasonal mob hunt with personal points, standings, milestones, and finale rewards. Choose eligible worlds, mob types, game modes, and timezone. Optional titles, particles, and ambient sounds are disabled by default. Scores survive restarts; disable the entire event with `halloween.enabled: false`.
+
+Tickets close automatically after `tickets.auto-close-hours` without a message, including time spent offline. The check runs every minute; set the value to `0` to disable it. Staff claims are saved in the selected storage backend and survive restarts; another staff member cannot replace an existing claim. Closing or externally deleting a ticket clears its claim. Transcript exports include the latest message and page through all available history in chronological order, including attachment links and embed content. Large exports are split into upload-sized Markdown files. Deleted messages and expired attachment downloads cannot be recovered.
+
+Configure reaction roles in `reaction-roles.mappings` using `message-id`, `emoji`, `role-id`, and optional `minecraft-permission` (`permission` is also accepted). Unicode and Discord custom emoji notation are supported. Minecraft permission changes require a linked account and LuckPerms. These entries override matching legacy `reaction_roles.yml` entries; configuration reloads apply additions and removals without copying config entries into that legacy file.
+
+Discord attachments appear as individual clickable Minecraft links. `chat.attachment-text` can include `%filename%`. Status panels use `status.embed.title` and the configured color while healthy, with warning/critical/offline colors taking precedence. Join and quit embeds use their configured message templates, including `%player%`, `%online%`, `%previous_online%`, and `%max_players%`.
 
 ## Requirements
 
@@ -63,7 +69,7 @@ ZDiscord connects your Minecraft server to Discord. Chat flows both ways, player
 
 ## Installation
 
-1. Download `ZDiscord-1.4.3.jar` from the [Releases](https://github.com/DemonZ-Development/ZDiscord/releases) page.
+1. Download `ZDiscord-1.5.0.jar` from the [Releases](https://github.com/DemonZ-Development/ZDiscord/releases) page.
 2. Place the JAR in your server's `plugins/` directory.
 3. Start the server to generate the default `config.yml` and `messages.yml`.
 4. Open `plugins/ZDiscord/config.yml` and set:
@@ -91,14 +97,30 @@ All configuration lives in `plugins/ZDiscord/config.yml`. Summary of major secti
 | `performance` | TPS and memory alert thresholds |
 | `tickets` | Categories, panel appearance, support roles |
 | `confessions` | Confession channel, cooldown, and color |
-| `halloween` | Seasonal event window, channel, styling, and standings size |
+| `halloween` | Seasonal calendar, hunting rules, cosmetics, broadcasts, standings, and rewards |
 | `follow` | Enable/disable follow features |
 | `command-logger` | Watched and critical commands |
 | `staff-chat`, `voice-status` | Staff chat bridge and voice status indicator |
-| `misc` | Update checks, invite link, console role, debug |
+| `misc` | Update checks, invite link, console role |
 | `integrations` | Optional Onlysleep and RedstoneReboot message bridges |
 
 User-facing strings live in `messages.yml`. They accept `&` colour codes and the `%prefix%` placeholder.
+
+### Halloween event
+
+Set `halloween.enabled: false` to disable the entire seasonal module, then run `/zdiscord reload`. Existing scores are retained while disabled. When enabled, the event runs only between `window-start` and `window-end` (`MM-DD`, both inclusive). A date range can span New Year. Set `timezone` to `server` or an IANA name such as `Europe/London` so the calendar follows your community's timezone.
+
+The default hunt counts hostile mobs and bosses killed by players outside Creative and Spectator mode. PvP never awards points. Use `hunting.worlds` to restrict worlds and `hunting.mob-types` to choose exact Bukkit entity types; empty lists use the defaults. Spawner mobs are excluded unless `hunting.count-spawner-mobs` is enabled. Normal eligible mobs award one point, while bosses award `boss-multiplier` points. Scores and milestone thresholds are measured in points.
+
+The default style uses an orange Discord accent (`halloween.color: "#E67E22"`), concise headings, and numbered standings. Customize Minecraft greetings, titles, broadcasts, command replies, and Discord templates through the `halloween-*` entries in `messages.yml`. Set `cosmetics.enabled: true` to opt into a join title, ambient sound, and milestone particles. Titles and milestone effects have independent switches; sound, volume, pitch, particle type, and particle count are configurable.
+
+Discord announcements use `halloween.channel`, falling back to `channels.events`. The Discord connection is optional for the Minecraft hunt. `announce-open`, `announce-finale`, `countdown.enabled`, and `live-panel.enabled` control those features separately. `countdown.days: 0` disables the countdown. `broadcasts.enabled: false` silences public Minecraft announcements while keeping Discord announcements and private join greetings available. `greet-players: false` disables greeting text; opted-in cosmetics are controlled separately. Standings use `top-n`, capped at 25 entries.
+
+At the end of the window, `rewards.winner` console commands apply to first place, and `rewards.participant` commands apply to every player with a positive score, including the winner. Both support `%player%` and `%uuid%`. Empty command lists disable payouts.
+
+Finale markers prevent repeated payouts after ordinary reloads and graceful restarts, including recovery after the server was offline at the end of the hunt. Storage writes are buffered, so an abrupt process crash cannot guarantee atomic persistence of both the claim marker and external reward commands.
+
+Players can use `/zdiscord halloween` to see the event's state, date, and their own score, or `/zdiscord halloween top` for standings. `zdiscord.halloween` is granted to players by default. The commands also work from the server console, which omits a personal score.
 
 ## Commands
 
@@ -112,6 +134,7 @@ User-facing strings live in `messages.yml`. They accept `&` colour codes and the
 | `/zdiscord link` / `/link` | `zdiscord.link` | Generate a link code |
 | `/zdiscord embed <title> <description>` | `zdiscord.embed` | Send a custom embed |
 | `/zdiscord ticket <subject>` | `zdiscord.ticket` | Open a support ticket |
+| `/zdiscord halloween [status\|top]` | `zdiscord.halloween` | Show the event state, personal points, or standings |
 | `/zdiscord panel` | `zdiscord.admin` | (Re)post the ticket panel |
 | `/zdiscord lockdown` | `zdiscord.admin` | Toggle anti-raid lockdown |
 | `/zdiscord update [check\|dismiss]` | `zdiscord.admin` | Manual update check / dismiss banner |
@@ -148,7 +171,7 @@ cd ZDiscord
 mvn clean package
 ```
 
-The shaded JAR is written to `target/ZDiscord-1.4.3.jar`.
+The shaded JAR is written to `target/ZDiscord-1.5.0.jar`.
 
 ## Developer API
 

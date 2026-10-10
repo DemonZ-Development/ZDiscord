@@ -64,39 +64,67 @@ public class FoliaAdapter implements PlatformAdapter {
 
     @Override
     public void runLater(Runnable task, long delayTicks) {
+        scheduleLater(task, delayTicks);
+    }
+
+    @Override
+    public TaskHandle scheduleLater(Runnable task, long delayTicks) {
         try {
             Object scheduler = Bukkit.class.getMethod("getGlobalRegionScheduler").invoke(null);
-            scheduler.getClass().getMethod("runDelayed", Plugin.class, Consumer.class, long.class)
-                    .invoke(scheduler, plugin, (Consumer<Object>) t -> task.run(), delayTicks);
+            Object scheduled = scheduler.getClass().getMethod("runDelayed", Plugin.class, Consumer.class, long.class)
+                    .invoke(scheduler, plugin, (Consumer<Object>) t -> task.run(), Math.max(1, delayTicks));
+            return handle(scheduled);
         } catch (Exception e) {
             throw schedulerFailure("delayed global run", e);
         }
     }
 
     @Override
-    public void runTimer(Runnable task, long delayTicks, long periodTicks) {
+    public TaskHandle scheduleTimer(Runnable task, long delayTicks, long periodTicks) {
         try {
             Object scheduler = Bukkit.class.getMethod("getGlobalRegionScheduler").invoke(null);
-            scheduler.getClass().getMethod("runAtFixedRate",
+            Object scheduled = scheduler.getClass().getMethod("runAtFixedRate",
                             Plugin.class, Consumer.class, long.class, long.class)
                     .invoke(scheduler, plugin, (Consumer<Object>) t -> task.run(),
-                            Math.max(1, delayTicks), periodTicks);
+                            Math.max(1, delayTicks), Math.max(1, periodTicks));
+            return handle(scheduled);
         } catch (Exception e) {
             throw schedulerFailure("global timer", e);
         }
     }
 
     @Override
-    public void runAsyncTimer(Runnable task, long delayTicks, long periodTicks) {
+    public TaskHandle scheduleAsyncTimer(Runnable task, long delayTicks, long periodTicks) {
         try {
             Object scheduler = Bukkit.class.getMethod("getAsyncScheduler").invoke(null);
-            scheduler.getClass().getMethod("runAtFixedRate",
+            Object scheduled = scheduler.getClass().getMethod("runAtFixedRate",
                             Plugin.class, Consumer.class, long.class, long.class, TimeUnit.class)
                     .invoke(scheduler, plugin, (Consumer<Object>) t -> task.run(),
-                            Math.max(1, delayTicks * 50), periodTicks * 50, TimeUnit.MILLISECONDS);
+                            Math.max(1, delayTicks * 50), Math.max(1, periodTicks) * 50, TimeUnit.MILLISECONDS);
+            return handle(scheduled);
         } catch (Exception e) {
             throw schedulerFailure("async timer", e);
         }
+    }
+
+    @Override
+    public void runTimer(Runnable task, long delayTicks, long periodTicks) {
+        scheduleTimer(task, delayTicks, periodTicks);
+    }
+
+    @Override
+    public void runAsyncTimer(Runnable task, long delayTicks, long periodTicks) {
+        scheduleAsyncTimer(task, delayTicks, periodTicks);
+    }
+
+    private TaskHandle handle(Object scheduled) {
+        return () -> {
+            try {
+                scheduled.getClass().getMethod("cancel").invoke(scheduled);
+            } catch (Exception e) {
+                throw schedulerFailure("cancel task", e);
+            }
+        };
     }
 
     @Override

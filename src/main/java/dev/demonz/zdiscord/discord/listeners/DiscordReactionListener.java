@@ -15,7 +15,7 @@ public class DiscordReactionListener extends ListenerAdapter {
 
     @Override
     public void onMessageReactionAdd(MessageReactionAddEvent event) {
-        if (event.getUser() == null || event.getUser().isBot()) return;
+        if (!event.isFromGuild() || (event.getUser() != null && event.getUser().isBot())) return;
         if (plugin.getReactionRoleModule() != null) {
             plugin.getReactionRoleModule().onReactionAdd(event);
         }
@@ -23,7 +23,7 @@ public class DiscordReactionListener extends ListenerAdapter {
 
     @Override
     public void onMessageReactionRemove(MessageReactionRemoveEvent event) {
-        if (event.getUser() == null || event.getUser().isBot()) return;
+        if (!event.isFromGuild() || (event.getUser() != null && event.getUser().isBot())) return;
         if (plugin.getReactionRoleModule() != null) {
             plugin.getReactionRoleModule().onReactionRemove(event);
         }

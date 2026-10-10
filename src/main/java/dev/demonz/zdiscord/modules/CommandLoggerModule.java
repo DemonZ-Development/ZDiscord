@@ -5,12 +5,14 @@ import net.dv8tion.jda.api.EmbedBuilder;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.HandlerList;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 public class CommandLoggerModule implements Listener {
@@ -20,9 +22,9 @@ public class CommandLoggerModule implements Listener {
             "authme", "premium", "license", "token", "secret"));
 
     private final ZDiscord plugin;
-    private List<String> watchedCommands;
-    private List<String> criticalCommands;
-    private String channelId;
+    private volatile List<String> watchedCommands;
+    private volatile List<String> criticalCommands;
+    private volatile String channelId;
 
     public CommandLoggerModule(ZDiscord plugin) {
         this.plugin = plugin;
@@ -52,12 +54,13 @@ public class CommandLoggerModule implements Listener {
         String fullCommand = message.substring(1);
         int space = fullCommand.indexOf(' ');
         String baseCommand = (space == -1 ? fullCommand : fullCommand.substring(0, space))
-                .toLowerCase();
+                .toLowerCase(Locale.ROOT);
+        String commandName = baseCommand.substring(baseCommand.lastIndexOf(':') + 1);
 
         boolean isCritical = criticalCommands.stream()
-                .anyMatch(c -> baseCommand.equals(c.toLowerCase()));
+                .anyMatch(c -> matchesCommand(c, baseCommand, commandName));
         boolean isWatched = isCritical
-                || watchedCommands.stream().anyMatch(c -> baseCommand.equals(c.toLowerCase()));
+                || watchedCommands.stream().anyMatch(c -> matchesCommand(c, baseCommand, commandName));
         if (!isWatched) {
             return;
         }
@@ -67,7 +70,7 @@ public class CommandLoggerModule implements Listener {
         String severity = isCritical ? "CRITICAL" : "WATCHED";
 
         String display = fullCommand;
-        if (space != -1 && SENSITIVE_COMMANDS.contains(baseCommand)) {
+        if (space != -1 && SENSITIVE_COMMANDS.contains(commandName)) {
             display = baseCommand + " <redacted>";
         }
 
@@ -91,5 +94,11 @@ public class CommandLoggerModule implements Listener {
     }
 
     public void shutdown() {
+        HandlerList.unregisterAll(this);
+    }
+
+    private static boolean matchesCommand(String configured, String fullName, String commandName) {
+        String name = configured.toLowerCase(Locale.ROOT);
+        return name.equals(fullName) || name.equals(commandName);
     }
 }

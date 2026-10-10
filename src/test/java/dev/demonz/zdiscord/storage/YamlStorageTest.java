@@ -16,6 +16,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class YamlStorageTest {
 
+    @Test
+    void advancementRecordedAfterShutdownIsPersistedImmediately(@TempDir Path tmp) {
+        YamlStorage storage = newStorage(tmp.toFile());
+        UUID player = UUID.randomUUID();
+        storage.shutdown();
+        assertTrue(storage.recordAdvancementUnlockIfNew(player, "story/root"));
+        YamlStorage reopened = newStorage(tmp.toFile());
+        assertEquals(1, reopened.getPlayerAdvancementCount(player));
+        assertFalse(reopened.recordAdvancementUnlockIfNew(player, "story/root"));
+        reopened.shutdown();
+    }
+
     private static YamlStorage newStorage(File dataFolder) {
         YamlStorage storage = new YamlStorage(
                 dataFolder,

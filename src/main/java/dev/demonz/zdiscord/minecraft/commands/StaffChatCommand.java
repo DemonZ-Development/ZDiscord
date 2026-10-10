@@ -16,7 +16,10 @@ public class StaffChatCommand implements CommandExecutor, Listener {
 
     public StaffChatCommand(ZDiscord plugin) {
         this.plugin = plugin;
-        plugin.getServer().getPluginManager().registerEvents(this, plugin);
+        if (!(plugin.getPlatformAdapter() instanceof dev.demonz.zdiscord.platform.PaperAdapter)
+                && !(plugin.getPlatformAdapter() instanceof dev.demonz.zdiscord.platform.FoliaAdapter)) {
+            plugin.getServer().getPluginManager().registerEvents(this, plugin);
+        }
     }
 
     @Override

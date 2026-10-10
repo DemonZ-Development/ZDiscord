@@ -14,7 +14,7 @@ public class ZDiscordFollowEvent extends Event {
     private final boolean followed;
 
     public ZDiscordFollowEvent(UUID targetPlayerUUID, String followerDiscordId, boolean followed) {
-        super(true);
+        super(org.bukkit.Bukkit.getServer() != null && !org.bukkit.Bukkit.isPrimaryThread());
         this.targetPlayerUUID = targetPlayerUUID;
         this.followerDiscordId = followerDiscordId;
         this.followed = followed;

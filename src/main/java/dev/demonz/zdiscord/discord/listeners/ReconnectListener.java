@@ -15,6 +15,7 @@ public class ReconnectListener extends ListenerAdapter {
     @Override
     public void onSessionRecreate(SessionRecreateEvent event) {
         plugin.getLogger().info("Discord session reconnected; re-validating modules.");
+        plugin.refreshModules();
 
         plugin.getPlatformAdapter().runAsync(() -> {
             try {

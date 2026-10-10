@@ -13,7 +13,8 @@ import java.util.logging.Level;
 public class StatusModule {
 
     private final ZDiscord plugin;
-    private String statusMessageId;
+    private dev.demonz.zdiscord.discord.PanelMessage panel;
+    private dev.demonz.zdiscord.platform.PlatformAdapter.TaskHandle timer;
     private volatile boolean running = true;
 
     public StatusModule(ZDiscord plugin) {
@@ -21,10 +22,15 @@ public class StatusModule {
     }
 
     public void init() {
-        statusMessageId = loadMessageId();
+        panel = new dev.demonz.zdiscord.discord.PanelMessage(loadMessageId(), this::persistMessageId, plugin::debug);
+        schedule();
+    }
 
-        int interval = plugin.getConfigManager().getInt("status.update-interval", 30);
-        plugin.getPlatformAdapter().runTimer(this::updateStatus, 100L, interval * 20L);
+    private void schedule() {
+        if (timer != null) timer.cancel();
+        running = true;
+        long interval = Math.max(2, plugin.getConfigManager().getInt("status.update-interval", 60));
+        timer = plugin.getPlatformAdapter().scheduleTimer(this::updateStatus, 100L, interval * 20L);
     }
 
     private void updateStatus() {
@@ -40,27 +46,7 @@ public class StatusModule {
 
         StatusEmbedBuilder.StatusContext ctx = captureContext(
                 plugin.getConfigManager().getString("status.embed.color", "#5865F2"));
-        if (statusMessageId != null && !statusMessageId.isEmpty()) {
-            channel.editMessageEmbedsById(statusMessageId, StatusEmbedBuilder.build(ctx)).queue(
-                    success -> { },
-                    error -> {
-                        plugin.debug("Status message " + statusMessageId
-                                + " is missing, creating a new one.");
-                        statusMessageId = null;
-                        sendNewStatus(channel, ctx);
-                    });
-        } else {
-            sendNewStatus(channel, ctx);
-        }
-    }
-
-    private void sendNewStatus(TextChannel channel, StatusEmbedBuilder.StatusContext ctx) {
-        channel.sendMessageEmbeds(StatusEmbedBuilder.build(ctx)).queue(
-                message -> {
-                    statusMessageId = message.getId();
-                    persistMessageId(statusMessageId);
-                },
-                error -> plugin.debug("Failed to send status embed: " + error.getMessage()));
+        panel.update(channel, java.util.List.of(StatusEmbedBuilder.build(ctx)));
     }
 
     private StatusEmbedBuilder.StatusContext captureContext(String color) {
@@ -112,11 +98,14 @@ public class StatusModule {
     }
 
     public void reload() {
-        statusMessageId = loadMessageId();
+        schedule();
     }
 
     public void shutdown() {
         running = false;
+        if (timer != null) timer.cancel();
+        if (panel != null) panel.stop();
+        String statusMessageId = panel == null ? null : panel.messageId();
         if (statusMessageId == null || statusMessageId.isEmpty()) {
             return;
         }

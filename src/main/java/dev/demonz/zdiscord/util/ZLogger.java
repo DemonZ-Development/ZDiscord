@@ -6,6 +6,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Locale;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 
@@ -25,18 +26,19 @@ public final class ZLogger {
         }
     }
 
-    private static Logger bukkit;
-    private static Level globalLevel = Level.INFO;
+    private static volatile Logger bukkit;
+    private static volatile Level globalLevel = Level.INFO;
     private static final Map<Category, Level> categoryLevels = new EnumMap<>(Category.class);
-    private static boolean compact = true;
+    private static volatile boolean compact = true;
 
     private ZLogger() {
     }
 
-    public static void init(Logger bukkitLogger, FileConfiguration config) {
+    public static synchronized void init(Logger bukkitLogger, FileConfiguration config) {
         bukkit = bukkitLogger;
 
-        boolean debugMode = config != null && config.getBoolean("logging.debug", false);
+        boolean debugMode = config != null && (config.getBoolean("logging.debug", false)
+                || config.getBoolean("misc.debug", false)); // Legacy configurations.
 
         String g = config != null ? config.getString("logging.level", "INFO") : "INFO";
         globalLevel = debugMode ? Level.DEBUG : parseLevel(g);
@@ -46,7 +48,7 @@ public final class ZLogger {
         categoryLevels.clear();
         if (config != null && !debugMode && config.isConfigurationSection("logging.categories")) {
             for (Category cat : Category.values()) {
-                String val = config.getString("logging.categories." + cat.name().toLowerCase(), null);
+                String val = config.getString("logging.categories." + cat.name().toLowerCase(Locale.ROOT), null);
                 if (val != null) {
                     categoryLevels.put(cat, parseLevel(val));
                 }
@@ -55,12 +57,12 @@ public final class ZLogger {
 
         if (config == null || (config.getBoolean("logging.suppress-jda", true) && !debugMode)) {
             setJavaLogLevel("net.dv8tion.jda", java.util.logging.Level.WARNING);
-        } else if (debugMode) {
+        } else {
             setJavaLogLevel("net.dv8tion.jda", java.util.logging.Level.INFO);
         }
         if (config == null || (config.getBoolean("logging.suppress-hikari", true) && !debugMode)) {
             setJavaLogLevel("com.zaxxer.hikari", java.util.logging.Level.WARNING);
-        } else if (debugMode) {
+        } else {
             setJavaLogLevel("com.zaxxer.hikari", java.util.logging.Level.INFO);
         }
     }
@@ -129,7 +131,7 @@ public final class ZLogger {
         error(Category.SYSTEM, message);
     }
 
-    public static boolean isEnabled(Category cat, Level level) {
+    public static synchronized boolean isEnabled(Category cat, Level level) {
         if (bukkit == null) return true;
         Level effective = categoryLevels.getOrDefault(cat, globalLevel);
         return level.priority <= effective.priority;
@@ -147,7 +149,7 @@ public final class ZLogger {
         return globalLevel == Level.DEBUG;
     }
 
-    public static void setLevel(Category cat, Level level) {
+    public static synchronized void setLevel(Category cat, Level level) {
         categoryLevels.put(cat, level);
     }
 
@@ -162,7 +164,7 @@ public final class ZLogger {
     private static Level parseLevel(String value) {
         if (value == null) return Level.INFO;
         try {
-            return Level.valueOf(value.toUpperCase().trim());
+            return Level.valueOf(value.toUpperCase(Locale.ROOT).trim());
         } catch (IllegalArgumentException e) {
             return Level.INFO;
         }

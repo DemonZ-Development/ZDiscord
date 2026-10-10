@@ -13,8 +13,7 @@ import java.io.InputStreamReader;
 public class MessageManager {
 
     private final ZDiscord plugin;
-    private FileConfiguration messages;
-    private File messagesFile;
+    private volatile FileConfiguration messages;
 
     public MessageManager(ZDiscord plugin) {
         this.plugin = plugin;
@@ -22,7 +21,7 @@ public class MessageManager {
     }
 
     private void loadMessages() {
-        messagesFile = new File(plugin.getDataFolder(), "messages.yml");
+        File messagesFile = new File(plugin.getDataFolder(), "messages.yml");
         if (!messagesFile.exists()) {
             plugin.saveResource("messages.yml", false);
         }

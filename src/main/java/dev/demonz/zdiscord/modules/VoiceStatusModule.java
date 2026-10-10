@@ -16,7 +16,7 @@ public class VoiceStatusModule extends ListenerAdapter {
 
     private final ZDiscord plugin;
     private final Set<UUID> inVoice = ConcurrentHashMap.newKeySet();
-    private String voiceChannelId;
+    private volatile String voiceChannelId;
 
     public VoiceStatusModule(ZDiscord plugin) {
         this.plugin = plugin;
@@ -88,14 +88,17 @@ public class VoiceStatusModule extends ListenerAdapter {
     }
 
     public void reload() {
-        voiceChannelId = plugin.getConfigManager().getString("voice-status.channel", "");
+        shutdown();
+        init();
     }
 
     public void shutdown() {
         for (UUID uuid : inVoice) {
             Player p = Bukkit.getPlayer(uuid);
-            if (p != null && p.isOnline()) {
-                p.setPlayerListName(p.getName());
+            if (p != null && plugin.isEnabled()) {
+                plugin.getPlatformAdapter().runForEntity(p, () -> {
+                    if (p.isOnline()) p.setPlayerListName(p.getName());
+                });
             }
         }
         inVoice.clear();

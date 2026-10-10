@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class ConfessionModule {
 
-    private static final String CONFESSION_TITLE = "\uD83D\uDC8C A new confession";
+    private static final String CONFESSION_TITLE = "A new confession";
     private static final int MAX_MESSAGE_LENGTH = 1500;
 
     private final ZDiscord plugin;

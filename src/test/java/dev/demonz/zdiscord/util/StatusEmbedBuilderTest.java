@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.function.Supplier;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -57,15 +58,33 @@ class StatusEmbedBuilderTest {
     }
 
     @Test
-    void titleIsSetFromContext() {
+    void configuredTitleAndColorAreUsedWhileStatusRemainsReadable() {
         StatusEmbedBuilder.StatusContext ctx = StatusEmbedBuilder.StatusContext.capture(
                 () -> null, "My Cool Server", "#2ECC71", "test.local", 30,
                 true, true, true, 18.0, 15.0);
 
         MessageEmbed embed = StatusEmbedBuilder.build(ctx);
         assertNotNull(embed);
-        assertNotNull(embed.getTitle());
-        assertTrue(embed.getTitle().contains("Online"));
+        assertEquals("My Cool Server", embed.getTitle());
+        assertEquals(new java.awt.Color(0x2ECC71), embed.getColor());
+        assertEquals("Online", embed.getFields().stream()
+                .filter(field -> "Status".equals(field.getName()))
+                .findFirst().orElseThrow().getValue());
+    }
+
+    @Test
+    void offlineAndCriticalStatesRemainVisibleWithCustomAppearance() {
+        var ctx = new StatusEmbedBuilder.StatusContext();
+        ctx.title = "Custom Server";
+        ctx.color = new java.awt.Color(0x123456);
+        ctx.online = false;
+        assertEquals("Custom Server — Offline", StatusEmbedBuilder.build(ctx).getTitle());
+        assertEquals(new java.awt.Color(0xE74C3C), StatusEmbedBuilder.build(ctx).getColor());
+        ctx.online = true;
+        ctx.tps = 10;
+        ctx.tpsCritical = 15;
+        assertEquals("Custom Server", StatusEmbedBuilder.build(ctx).getTitle());
+        assertEquals(new java.awt.Color(0xE74C3C), StatusEmbedBuilder.build(ctx).getColor());
     }
 
     @Test

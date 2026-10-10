@@ -63,7 +63,7 @@ public final class ZDiscordAPIImpl implements ZDiscordAPI {
     public Set<String> getFollowers(UUID playerUUID) {
         FollowModule fm = plugin.getFollowModule();
         if (fm == null) return Collections.emptySet();
-        return plugin.getStorageManager().getFollowers(playerUUID);
+        return fm.getFollowers(playerUUID);
     }
 
     @Override

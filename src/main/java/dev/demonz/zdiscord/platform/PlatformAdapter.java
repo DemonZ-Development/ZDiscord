@@ -45,6 +45,31 @@ public interface PlatformAdapter {
 
     void runForEntity(Entity entity, Runnable task);
 
+    default void runForEntityLater(Entity entity, Runnable task, long delayTicks) {
+        runLater(() -> runForEntity(entity, task), delayTicks);
+    }
+
+    @FunctionalInterface
+    interface TaskHandle { void cancel(); }
+
+    default TaskHandle scheduleLater(Runnable task, long delayTicks) {
+        java.util.concurrent.atomic.AtomicBoolean cancelled = new java.util.concurrent.atomic.AtomicBoolean();
+        runLater(() -> { if (!cancelled.get()) task.run(); }, delayTicks);
+        return () -> cancelled.set(true);
+    }
+
+    default TaskHandle scheduleTimer(Runnable task, long delayTicks, long periodTicks) {
+        java.util.concurrent.atomic.AtomicBoolean cancelled = new java.util.concurrent.atomic.AtomicBoolean();
+        runTimer(() -> { if (!cancelled.get()) task.run(); }, delayTicks, periodTicks);
+        return () -> cancelled.set(true);
+    }
+
+    default TaskHandle scheduleAsyncTimer(Runnable task, long delayTicks, long periodTicks) {
+        java.util.concurrent.atomic.AtomicBoolean cancelled = new java.util.concurrent.atomic.AtomicBoolean();
+        runAsyncTimer(() -> { if (!cancelled.get()) task.run(); }, delayTicks, periodTicks);
+        return () -> cancelled.set(true);
+    }
+
     void runLater(Runnable task, long delayTicks);
 
     void runTimer(Runnable task, long delayTicks, long periodTicks);

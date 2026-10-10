@@ -27,11 +27,13 @@ public final class StatusEmbedBuilder {
         EmbedBuilder embed = new EmbedBuilder()
                 .setAuthor(ctx.serverIp == null || ctx.serverIp.isEmpty()
                                 ? "Minecraft Server" : ctx.serverIp, null, ctx.guildIconUrl)
-                .setTitle(ctx.online ? "🟢 Server Online" : "🔴 Server Offline")
+                .setTitle(ctx.title == null || ctx.title.isBlank()
+                        ? (ctx.online ? "Server Online" : "Server Offline")
+                        : ctx.title + (ctx.online ? "" : " — Offline"))
                 .setColor(ctx.online ? healthyColor(ctx) : new Color(0xE74C3C))
                 .setThumbnail(ctx.guildIconUrl);
 
-        embed.addField("Status", ctx.online ? "✅ Online" : "❌ Offline", true);
+        embed.addField("Status", ctx.online ? "Online" : "Offline", true);
 
         if (ctx.online) {
             int memPercent = ctx.maxMemoryMb > 0
@@ -46,8 +48,8 @@ public final class StatusEmbedBuilder {
             if (ctx.showTps) {
                 embed.addField("TPS",
                         "`" + String.format(Locale.ROOT, "%.1f", ctx.tps) + "` / 20.0"
-                                + (ctx.tps >= ctx.tpsWarning ? "  ✅"
-                                : ctx.tps >= ctx.tpsCritical ? "  ⚠️" : "  ⛔️"), true);
+                                + (ctx.tps >= ctx.tpsWarning ? " (healthy)"
+                                : ctx.tps >= ctx.tpsCritical ? " (warning)" : " (critical)"), true);
             }
 
             if (ctx.showMemory) {
@@ -58,7 +60,7 @@ public final class StatusEmbedBuilder {
             }
 
             if (ctx.showPlayers && ctx.onlineCount > 0 && ctx.playerList != null) {
-                embed.addField("👥 Online Players", ctx.playerList, false);
+                embed.addField("Online Players", ctx.playerList, false);
             }
         }
 
@@ -92,7 +94,7 @@ public final class StatusEmbedBuilder {
             if (memPercent >= 90) return new Color(0xE74C3C);
             if (memPercent >= 75) return new Color(0xF39C12);
         }
-        return new Color(0x2ECC71);
+        return ctx.color != null ? ctx.color : new Color(0x2ECC71);
     }
 
     public static final class StatusContext {
@@ -113,7 +115,6 @@ public final class StatusEmbedBuilder {
         public long maxMemoryMb;
         public int updateIntervalSeconds;
         public String guildIconUrl;
-        public String botAvatarUrl;
 
         public static StatusContext capture(Supplier<Guild> guildSupplier,
                                             String title, String colorHex, String serverIp,

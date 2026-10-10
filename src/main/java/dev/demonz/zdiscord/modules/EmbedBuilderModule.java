@@ -77,6 +77,4 @@ public class EmbedBuilderModule {
         return plugin.getBotManager().getTextChannel("channels.chat");
     }
 
-    public void reload() {
-    }
 }

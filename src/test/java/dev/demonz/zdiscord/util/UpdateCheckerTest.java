@@ -8,6 +8,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class UpdateCheckerTest {
 
     @Test
+    void overflowingVersionNumbersReturnFalse() {
+        assertFalse(UpdateChecker.isNewer("999999999999999.0.0", "1.0.0"));
+        assertFalse(UpdateChecker.isNewer("1.0.0", "999999999999999.0.0"));
+    }
+
+    @Test
     void equalVersionsAreNotNewer() {
         assertFalse(UpdateChecker.isNewer("1.0.0", "1.0.0"));
         assertFalse(UpdateChecker.isNewer("1.2.3", "1.2.3"));

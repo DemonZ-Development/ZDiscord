@@ -9,10 +9,7 @@ website: https://demonz.org
 folia-supported: true
 
 softdepend:
-  - PlaceholderAPI
   - LuckPerms
-  - Vault
-  - Essentials
   - SkinsRestorer
   - Floodgate
   - Geyser-Spigot
@@ -22,7 +19,7 @@ softdepend:
 commands:
   zdiscord:
     description: ZDiscord command
-    usage: /<command> [reload|status|diagnostics|link|embed|ticket|panel|lockdown|update|dump]
+    usage: /<command> [reload|status|diagnostics|link|embed|ticket|halloween|panel|lockdown|update|dump]
     aliases: [zd]
   link:
     description: Link your Minecraft account to Discord
@@ -58,6 +55,9 @@ permissions:
   zdiscord.ticket:
     description: Allows creating support tickets
     default: true
+  zdiscord.halloween:
+    description: Allows viewing Halloween event status, personal points, and standings
+    default: true
   zdiscord.embed:
     description: Allows sending custom Discord embeds
     default: op
@@ -66,9 +66,6 @@ permissions:
     default: op
   zdiscord.bypass.link:
     description: Bypass link-to-join enforcement
-    default: op
-  zdiscord.bypass.console:
-    description: Bypass console command role requirement (admin only)
     default: op
   zdiscord.staffchat:
     description: Access to staff chat

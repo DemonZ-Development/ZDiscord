@@ -9,6 +9,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ColorUtilTest {
 
     @Test
+    void retainsLiteralAmpersandsAndUnknownFormatting() {
+        assertEquals("bread & butter &Z!", ColorUtil.toDiscordMarkdown("bread & butter &Z!"));
+    }
+
+    @Test
+    void stripsHexColorsFromDiscordAndPlainText() {
+        assertEquals("Gold", ColorUtil.stripColor("&#ffaa00Gold"));
+        assertEquals("Gold", ColorUtil.toDiscordMarkdown("&#ffaa00Gold"));
+        assertEquals("Gold", ColorUtil.stripColor(ColorUtil.colorize("&#ffaa00Gold")));
+    }
+
+    @Test
     void parsesHashHex() {
         assertEquals(0x2ECC71, ColorUtil.parseHex("#2ECC71").getRGB() & 0xFFFFFF);
     }

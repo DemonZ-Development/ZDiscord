@@ -112,7 +112,14 @@ public class SlashCommandManager extends ListenerAdapter {
             event.reply("The Halloween event is disabled in config.yml.").setEphemeral(true).queue();
             return;
         }
-        event.replyEmbeds(halloween.buildStandingsEmbed().build()).queue();
+        event.deferReply().queue(hook -> plugin.getPlatformAdapter().runSync(() -> {
+            var current = plugin.getHalloweenModule();
+            if (current == null) {
+                hook.sendMessage("The Halloween event is disabled in config.yml.").queue();
+            } else {
+                hook.sendMessageEmbeds(current.buildStandingsEmbed().build()).queue();
+            }
+        }));
     }
 
     private void handleStatus(SlashCommandInteractionEvent event) {
@@ -224,8 +231,7 @@ public class SlashCommandManager extends ListenerAdapter {
         }
         User user = event.getUser();
         String subject = event.getOption("subject").getAsString();
-        plugin.getPlatformAdapter().runAsync(() ->
-                plugin.getTicketModule().createTicket(user, subject, event));
+        plugin.getTicketModule().createTicket(user, subject, event);
     }
 
     private void handlePanel(SlashCommandInteractionEvent event) {
@@ -333,6 +339,7 @@ public class SlashCommandManager extends ListenerAdapter {
                     ? plugin.getLeaderboardModule().getStat(uuid, "playtime") : 0L;
 
             EmbedBuilder embed = new EmbedBuilder()
+                    .setTitle(plugin.getMessageManager().getRaw("slash-seen-title"))
                     .setAuthor(name + "  \u00B7  Last seen",
                             "https://namemc.com/profile/" + uuid,
                             SkinUtil.avatar(plugin, uuid, name, HeadUtil.SIZE_SMALL))
@@ -340,7 +347,7 @@ public class SlashCommandManager extends ListenerAdapter {
                     .setTimestamp(Instant.now());
 
             if (target.isOnline()) {
-                embed.setDescription("🟢 **" + name + "** is online right now.");
+                embed.setDescription("**" + name + "** is online right now.");
             } else if (lastSeen > 0) {
                 embed.setDescription("Last seen: <t:" + (lastSeen / 1000L) + ":R>.")
                         .addField("Last seen", "<t:" + (lastSeen / 1000L) + ":F>", false)
@@ -378,11 +385,12 @@ public class SlashCommandManager extends ListenerAdapter {
             for (UUID uuid : followed) {
                 OfflinePlayer op = Bukkit.getOfflinePlayer(uuid);
                 String name = op.getName() != null ? op.getName() : uuid.toString();
-                sb.append("🔹 **").append(name).append("**")
+                sb.append("- **").append(name).append("**")
                         .append("  (`").append(uuid).append("`)\n");
             }
             EmbedBuilder embed = new EmbedBuilder()
-                    .setTitle("Following " + followed.size() + " player"
+                    .setTitle(plugin.getMessageManager().getRaw("slash-following-title")
+                            + " " + followed.size() + " player"
                             + (followed.size() == 1 ? "" : "s"))
                     .setDescription(sb.toString())
                     .setColor(ColorUtil.parseHex("#9B59B6"))
@@ -441,7 +449,7 @@ public class SlashCommandManager extends ListenerAdapter {
             }
 
             plugin.getFollowModule().unfollow(target.getUniqueId(), discordId);
-            event.getHook().sendMessage("🔕 You are no longer following **"
+            event.getHook().sendMessage("You are no longer following **"
                     + queryName + "**.").setEphemeral(true).queue();
         });
     }

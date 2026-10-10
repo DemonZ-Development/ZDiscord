@@ -20,7 +20,7 @@ cd ZDiscord
 mvn clean package
 ```
 
-The shaded JAR is written to `target/ZDiscord-1.4.3.jar`. The build runs
+The shaded JAR is written to `target/ZDiscord-1.5.0.jar`. The build runs
 tests automatically during the `test` phase.
 
 ## Running tests
@@ -29,7 +29,7 @@ tests automatically during the `test` phase.
 mvn test
 ```
 
-The test suite uses JUnit Jupiter 5.10.2. Tests cover:
+The test suite uses JUnit Jupiter 6.1.3. Tests cover:
 
 - **ConfigManager** — schema migration, key merging, defaults
 - **YamlStorage** — CRUD operations for links, stats, activity, follows
@@ -75,10 +75,11 @@ src/main/java/dev/demonz/zdiscord/
 
 ## Adding a new module
 
-1. Create a class in `modules/` implementing `init()`, `shutdown()`, and
-   `reload()`.
+1. Create a class in `modules/` with the lifecycle methods it needs. Add
+   `reload()` only when existing instances must refresh retained settings.
 2. Add a config toggle in `config.yml` (e.g. `my-module.enabled`).
-3. Register the module in `ZDiscord.initModules()`.
+3. Reconcile the module in `ZDiscord.initModules()` with its toggle, factory,
+   initializer, optional reload callback, and shutdown callback.
 4. Add a shutdown call in `ZDiscord.onDisable()`.
 5. Add tests for any non-trivial logic.
 

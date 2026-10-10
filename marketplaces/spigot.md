@@ -10,7 +10,7 @@ Commands use native Discord slash commands, buttons, and selection menus. One JA
 - **Console streaming**: Forwards server console logs to a Discord channel.
 - **Account linking**: One-time codes link Discord and Minecraft accounts, with optional link-to-join enforcement.
 - **Staff chat**: `/sc` toggles a staff-only channel bridged to Discord.
-- **Tickets**: Players open private support channels from Discord buttons or `/ticket`.
+- **Tickets**: Players open private support channels from Discord buttons or `/ticket`, with inactivity auto-close, staff claims, and full chronological transcripts.
 - **Leaderboards**: Track kills, deaths, and playtime with paging, stat switching, and timed refreshes.
 - **Event messages**: Posts joins, quits, deaths, and advancements to Discord.
 - **Performance monitor**: Tracks TPS and memory over time with configurable alerts.
@@ -22,7 +22,7 @@ Commands use native Discord slash commands, buttons, and selection menus. One JA
 - **Follow system**: Get DM notifications when followed players join. Manage subscriptions with `/following` and `/unfollow`.
 - **Anonymous confessions**: `/confess` posts to a designated channel with cooldowns and customizable embeds.
 - **Setup wizard**: `/setup` configures channels and roles directly from Discord.
-- **Halloween event**: A configurable seasonal mob hunt with a daily countdown, live standings panel, milestone callouts, and a boss bonus. Rewards are dispatched at the finale. Disable with `halloween.enabled: false`.
+- **Halloween event**: A configurable seasonal mob hunt with points, standings, milestones, and finale rewards. Check progress with `/zdiscord halloween` in-game or `/halloween` in Discord. Disable with `halloween.enabled: false`.
 - **Plugin bridges**: Forwards Onlysleep and RedstoneReboot messages through your existing bot connection.
 
 ### Requirements
@@ -34,7 +34,7 @@ Commands use native Discord slash commands, buttons, and selection menus. One JA
 
 ### Installation
 
-1. Download `ZDiscord-1.4.3.jar` from the downloads section.
+1. Download `ZDiscord-1.5.0.jar` from the downloads section.
 2. Place the JAR in your server's `plugins/` directory.
 3. Start the server to generate the default `config.yml` and `messages.yml`.
 4. Open `plugins/ZDiscord/config.yml` and set your bot token and Discord server ID.
@@ -58,8 +58,9 @@ Apache License 2.0
 - `zdiscord.link` (true): generate a link code
 - `zdiscord.chat` (true): have chat forwarded to Discord
 - `zdiscord.ticket` (true): open a support ticket
+- `zdiscord.halloween` (true): view Halloween event dates, personal score, and standings
 - `zdiscord.embed` (op): send a custom embed
 - `zdiscord.staffchat` (op): use the staff chat
+- `zdiscord.confess` (true): post anonymous confessions
 - `zdiscord.bypass.antiraid` (op): bypass anti-raid checks
 - `zdiscord.bypass.link` (op): bypass link-to-join enforcement
-- `zdiscord.bypass.console` (op): reserved (currently unused)

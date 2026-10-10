@@ -2,6 +2,7 @@ package dev.demonz.zdiscord.modules;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.util.EmbedUtil;
+import dev.demonz.zdiscord.util.ColorUtil;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
@@ -19,13 +20,15 @@ public class AntiRaidModule {
     private final Deque<Long> recentJoins = new ArrayDeque<>();
     private final AtomicBoolean lockdownActive = new AtomicBoolean(false);
     private volatile boolean running = true;
+    private dev.demonz.zdiscord.platform.PlatformAdapter.TaskHandle timer;
+    private dev.demonz.zdiscord.platform.PlatformAdapter.TaskHandle autoLiftTask;
 
     public AntiRaidModule(ZDiscord plugin) {
         this.plugin = plugin;
     }
 
     public void init() {
-        plugin.getPlatformAdapter().runAsyncTimer(() -> {
+        timer = plugin.getPlatformAdapter().scheduleAsyncTimer(() -> {
             if (!running) return;
             long windowMs = plugin.getConfigManager().getInt("anti-raid.time-window", 30) * 1000L;
             long cutoff = System.currentTimeMillis() - windowMs;
@@ -38,13 +41,15 @@ public class AntiRaidModule {
     }
 
     public void onPlayerJoin(Player player) {
+        if (!running) return;
         if (player.hasPermission("zdiscord.bypass.antiraid")) {
             return;
         }
 
         if (lockdownActive.get()
                 && plugin.getConfigManager().getBoolean("anti-raid.lockdown.kick-new-joins", true)) {
-            String kickMsg = plugin.getMessageManager().get("lockdown-kick");
+            String kickMsg = ColorUtil.colorize(plugin.getConfigManager().getString(
+                    "anti-raid.lockdown.kick-message", plugin.getMessageManager().get("lockdown-kick")));
             plugin.getPlatformAdapter().runForEntity(player, () -> player.kickPlayer(kickMsg));
             return;
         }
@@ -53,17 +58,18 @@ public class AntiRaidModule {
         int maxJoins = plugin.getConfigManager().getInt("anti-raid.max-joins", 10);
         int timeWindow = plugin.getConfigManager().getInt("anti-raid.time-window", 30);
 
+        boolean raidDetected;
         synchronized (recentJoins) {
             recentJoins.addLast(now);
             long cutoff = now - (timeWindow * 1000L);
             long recent = recentJoins.stream().filter(t -> t >= cutoff).count();
-            if (recent >= maxJoins) {
-                enableLockdown();
-            }
+            raidDetected = recent >= maxJoins;
         }
+        if (raidDetected) enableLockdown();
     }
 
-    private void enableLockdown() {
+    private synchronized void enableLockdown() {
+        if (!running) return;
         if (!lockdownActive.compareAndSet(false, true)) {
             return;
         }
@@ -75,7 +81,8 @@ public class AntiRaidModule {
         if (plugin.getConfigManager().getBoolean("anti-raid.lockdown.notify-staff", true)) {
             TextChannel channel = resolveEventChannel();
             if (channel != null) {
-                int recent = recentJoins.size();
+                int recent;
+                synchronized (recentJoins) { recent = recentJoins.size(); }
                 channel.sendMessageEmbeds(EmbedUtil.simple(
                         "Raid detected - server lockdown",
                         "A possible raid has been detected. The server is now in lockdown. "
@@ -89,11 +96,13 @@ public class AntiRaidModule {
 
         int autoLift = plugin.getConfigManager().getInt("anti-raid.lockdown.auto-lift", 300);
         if (autoLift > 0) {
-            plugin.getPlatformAdapter().runLater(this::disableLockdown, autoLift * 20L);
+            autoLiftTask = plugin.getPlatformAdapter().scheduleLater(this::disableLockdown, autoLift * 20L);
         }
     }
 
-    private void disableLockdown() {
+    private synchronized void disableLockdown() {
+        if (!running) return;
+        cancelAutoLift();
         if (!lockdownActive.compareAndSet(true, false)) {
             return;
         }
@@ -129,11 +138,17 @@ public class AntiRaidModule {
         return lockdownActive.get();
     }
 
-    public void reload() {
+    public synchronized void shutdown() {
+        running = false;
+        if (timer != null) timer.cancel();
+        cancelAutoLift();
     }
 
-    public void shutdown() {
-        running = false;
+    private void cancelAutoLift() {
+        if (autoLiftTask != null) {
+            autoLiftTask.cancel();
+            autoLiftTask = null;
+        }
     }
 
     private TextChannel resolveEventChannel() {

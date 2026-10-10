@@ -47,6 +47,42 @@ class HalloweenWindowTest {
     }
 
     @Test
+    void decemberWindowStaysActiveIntoJanuaryOfTheFollowingYear() {
+        HalloweenWindow window = HalloweenWindow.parse("12-29", "01-03");
+        assertEquals(LocalDate.of(2027, 1, 3), window.endIn(2026));
+        assertTrue(window.isActive(LocalDate.of(2026, 12, 29)));
+        assertTrue(window.isActive(LocalDate.of(2027, 1, 3)));
+        assertFalse(window.isActive(LocalDate.of(2027, 1, 4)));
+        assertEquals(LocalDate.of(2026, 12, 29), window.windowStartOn(LocalDate.of(2027, 1, 1)));
+        assertEquals(LocalDate.of(2026, 12, 29), window.finaleOn(LocalDate.of(2027, 1, 4)));
+    }
+
+    @Test
+    void leapDayWindowUsesFebruary28InNonLeapYears() {
+        HalloweenWindow window = HalloweenWindow.parse("02-29", "03-01");
+        assertEquals(LocalDate.of(2027, 2, 28), window.startIn(2027));
+        assertEquals(LocalDate.of(2028, 2, 29), window.startIn(2028));
+        assertTrue(window.isActive(LocalDate.of(2027, 2, 28)));
+        assertFalse(window.isActive(LocalDate.of(2028, 2, 28)));
+        assertTrue(window.isActive(LocalDate.of(2028, 2, 29)));
+        assertEquals(LocalDate.of(2028, 2, 29), window.finaleOn(LocalDate.of(2028, 3, 2)));
+    }
+
+    @Test
+    void latestClosedWindowSupportsLateAndYearWrappingRecovery() {
+        assertEquals(LocalDate.of(2026, 10, 31),
+                SINGLE_DAY.mostRecentClosedStart(LocalDate.of(2026, 11, 8)));
+        assertEquals(LocalDate.of(2025, 10, 31),
+                SINGLE_DAY.mostRecentClosedStart(LocalDate.of(2026, 10, 31)));
+
+        HalloweenWindow window = HalloweenWindow.parse("12-29", "01-03");
+        assertEquals(LocalDate.of(2025, 12, 29),
+                window.mostRecentClosedStart(LocalDate.of(2027, 1, 1)));
+        assertEquals(LocalDate.of(2026, 12, 29),
+                window.mostRecentClosedStart(LocalDate.of(2027, 1, 4)));
+    }
+
+    @Test
     void finaleLandsTheDayAfterTheWindowCloses() {
         assertEquals(LocalDate.of(2026, 10, 31), SINGLE_DAY.finaleOn(LocalDate.of(2026, 11, 1)));
         assertNull(SINGLE_DAY.finaleOn(LocalDate.of(2026, 10, 31)));

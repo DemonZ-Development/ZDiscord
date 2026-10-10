@@ -7,7 +7,6 @@ import java.time.temporal.ChronoUnit;
 /**
  * A recurring seasonal window described by two month/day boundaries.
  * When {@code end} sorts before {@code start} the window wraps into the
- * following year, so {@code 10-28} to {@code 11-02} spans five days.
  */
 public record HalloweenWindow(MonthDay start, MonthDay end) {
 
@@ -76,6 +75,15 @@ public record HalloweenWindow(MonthDay start, MonthDay end) {
             }
         }
         return null;
+    }
+
+    public LocalDate mostRecentClosedStart(LocalDate today) {
+        for (int year = today.getYear(); year >= today.getYear() - 2; year--) {
+            if (endIn(year).isBefore(today)) {
+                return startIn(year);
+            }
+        }
+        throw new IllegalStateException("No previous seasonal window for " + today);
     }
 
     public LocalDate nextStartOnOrAfter(LocalDate today) {

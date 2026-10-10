@@ -24,7 +24,8 @@ public class PerformanceModule {
     private final ZDiscord plugin;
     private final Deque<Double> tpsHistory = new ArrayDeque<>(HISTORY_SIZE);
     private final Deque<Integer> memoryHistory = new ArrayDeque<>(HISTORY_SIZE);
-    private String perfMessageId;
+    private dev.demonz.zdiscord.discord.PanelMessage panel;
+    private dev.demonz.zdiscord.platform.PlatformAdapter.TaskHandle timer;
     private volatile boolean running = true;
 
     public PerformanceModule(ZDiscord plugin) {
@@ -32,9 +33,15 @@ public class PerformanceModule {
     }
 
     public void init() {
-        perfMessageId = loadMessageId();
-        int interval = plugin.getConfigManager().getInt("performance.update-interval", 60);
-        plugin.getPlatformAdapter().runTimer(this::updatePerformance, 200L, interval * 20L);
+        panel = new dev.demonz.zdiscord.discord.PanelMessage(loadMessageId(), this::persistMessageId, plugin::debug);
+        schedule();
+    }
+
+    private void schedule() {
+        if (timer != null) timer.cancel();
+        running = true;
+        long interval = Math.max(2, plugin.getConfigManager().getInt("performance.update-interval", 60));
+        timer = plugin.getPlatformAdapter().scheduleTimer(this::updatePerformance, 200L, interval * 20L);
     }
 
     private void updatePerformance() {
@@ -61,19 +68,15 @@ public class PerformanceModule {
 
         int color;
         String health;
-        String healthEmoji;
         if (tps[0] >= tpsWarning && memPercent < memWarning) {
             color = 0x2ECC71;
             health = "Healthy";
-            healthEmoji = "✅";
         } else if (tps[0] >= tpsCritical && memPercent < 90) {
             color = 0xF1C40F;
             health = "Warning";
-            healthEmoji = "⚠️";
         } else {
             color = 0xE74C3C;
             health = "Critical";
-            healthEmoji = "⛔️";
         }
 
         String tpsSpark = buildSparkline(toDoubleArray(tpsHistory), 20.0);
@@ -83,7 +86,7 @@ public class PerformanceModule {
                 .setAuthor("Server Performance", null, plugin.getBotManager().getJda() != null
                         ? plugin.getBotManager().getJda().getSelfUser().getEffectiveAvatarUrl()
                         : null)
-                .setTitle(healthEmoji + " " + health)
+                .setTitle(health)
                 .setColor(color)
                 .addField("TPS (1m / 5m / 15m)",
                         String.format(Locale.ROOT, "`%.2f` / `%.2f` / `%.2f`",
@@ -103,28 +106,13 @@ public class PerformanceModule {
                 .setTimestamp(Instant.now());
 
         if (tps[0] < tpsCritical) {
-            embed.addField("🚨 Alert", "TPS is critically low.", false);
+            embed.addField("Alert", "TPS is critically low.", false);
         }
         if (memPercent >= 90) {
-            embed.addField("🚨 Alert", "Memory usage is critically high.", false);
+            embed.addField("Alert", "Memory usage is critically high.", false);
         }
 
-        if (perfMessageId != null) {
-            channel.editMessageEmbedsById(perfMessageId, embed.build()).queue(
-                    success -> { },
-                    error -> {
-                        perfMessageId = null;
-                        channel.sendMessageEmbeds(embed.build()).queue(msg -> {
-                            perfMessageId = msg.getId();
-                            persistMessageId(perfMessageId);
-                        });
-                    });
-        } else {
-            channel.sendMessageEmbeds(embed.build()).queue(msg -> {
-                perfMessageId = msg.getId();
-                persistMessageId(perfMessageId);
-            });
-        }
+        panel.update(channel, java.util.List.of(embed.build()));
     }
 
     private File dataFile() {
@@ -192,10 +180,12 @@ public class PerformanceModule {
     }
 
     public void reload() {
-        perfMessageId = loadMessageId();
+        schedule();
     }
 
     public void shutdown() {
         running = false;
+        if (timer != null) timer.cancel();
+        if (panel != null) panel.stop();
     }
 }

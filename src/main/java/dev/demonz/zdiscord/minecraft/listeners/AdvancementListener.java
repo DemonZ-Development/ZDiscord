@@ -33,7 +33,7 @@ public class AdvancementListener implements Listener {
         if (key.startsWith("recipes/")) return;
 
         Player player = event.getPlayer();
-        String advancementName = formatAdvancementName(key);
+        String advancementName = displayName(advancement, key);
 
         plugin.getPlatformAdapter().runAsync(() -> {
             boolean genuinelyNew = plugin.getStorageManager()
@@ -74,17 +74,17 @@ public class AdvancementListener implements Listener {
 
         EmbedBuilder embed = new EmbedBuilder()
                 .setAuthor(player.getName() + " earned an advancement", null, avatarUrl)
-                .setTitle("🏆 " + advancementName)
+                .setTitle(advancementName)
                 .setColor(colorInt)
                 .setTimestamp(Instant.now());
 
         if (serverFirst) {
-            embed.addField("🥇 Server First",
+            embed.addField("Server First",
                     "**" + player.getName() + "** is the first player "
                             + "to unlock this advancement on the server.", false);
         } else if (rare && active > 0) {
             int pct = (int) Math.round((unlockers * 100.0) / active);
-            embed.addField("✨ Rare achievement",
+            embed.addField("Rare achievement",
                     "Only **" + pct + "%** of players who've logged "
                             + "an advancement on this server have unlocked this one "
                             + "(" + unlockers + " out of " + active + ").", false);
@@ -114,5 +114,25 @@ public class AdvancementListener implements Listener {
             if (word.length() > 1) sb.append(word.substring(1));
         }
         return sb.toString();
+    }
+
+    private String displayName(Advancement advancement, String key) {
+        if (plugin.getPlatformAdapter() instanceof dev.demonz.zdiscord.platform.PaperAdapter
+                || plugin.getPlatformAdapter() instanceof dev.demonz.zdiscord.platform.FoliaAdapter) {
+            String title = dev.demonz.zdiscord.util.PaperAdvancementTitle.get(advancement);
+            if (title != null && !title.isBlank()) return title;
+        }
+        try {
+            Object display = advancement.getClass().getMethod("getDisplay").invoke(advancement);
+            if (display != null) {
+                Object titleObj = display.getClass().getMethod("getTitle").invoke(display);
+                if (titleObj instanceof String titleStr) {
+                    String title = ColorUtil.stripColor(titleStr);
+                    if (title != null && !title.isBlank()) return title;
+                }
+            }
+        } catch (ReflectiveOperationException ignored) {
+        }
+        return formatAdvancementName(key);
     }
 }

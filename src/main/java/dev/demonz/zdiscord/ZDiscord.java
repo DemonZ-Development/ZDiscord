@@ -17,6 +17,7 @@ import dev.demonz.zdiscord.minecraft.commands.ZDiscordCommand;
 import dev.demonz.zdiscord.minecraft.listeners.AdvancementListener;
 import dev.demonz.zdiscord.minecraft.listeners.ChatListener;
 import dev.demonz.zdiscord.minecraft.listeners.DeathListener;
+import dev.demonz.zdiscord.minecraft.listeners.HalloweenHuntListener;
 import dev.demonz.zdiscord.minecraft.listeners.JoinQuitListener;
 import dev.demonz.zdiscord.minecraft.listeners.LinkEnforcementListener;
 import dev.demonz.zdiscord.minecraft.listeners.PaperChatListener;
@@ -27,6 +28,7 @@ import dev.demonz.zdiscord.modules.ConfessionModule;
 import dev.demonz.zdiscord.modules.ConsoleModule;
 import dev.demonz.zdiscord.modules.EmbedBuilderModule;
 import dev.demonz.zdiscord.modules.FollowModule;
+import dev.demonz.zdiscord.modules.HalloweenHunt;
 import dev.demonz.zdiscord.modules.HalloweenModule;
 import dev.demonz.zdiscord.modules.LeaderboardModule;
 import dev.demonz.zdiscord.modules.LinkModule;
@@ -46,7 +48,6 @@ import dev.demonz.zdiscord.storage.MySQLStorage;
 import dev.demonz.zdiscord.storage.StorageManager;
 import dev.demonz.zdiscord.storage.YamlStorage;
 import dev.demonz.zdiscord.util.StartupBanner;
-import dev.demonz.zdiscord.util.ColorUtil;
 import dev.demonz.zdiscord.util.SkinUtil;
 import dev.demonz.zdiscord.util.UpdateChecker;
 import dev.demonz.zdiscord.util.ZLogger;
@@ -56,12 +57,12 @@ import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class ZDiscord extends JavaPlugin {
-    private dev.demonz.zdiscord.modules.CraftyAIModule craftyAIModule;
+    private volatile dev.demonz.zdiscord.modules.CraftyAIModule craftyAIModule;
     public dev.demonz.zdiscord.modules.CraftyAIModule getCraftyAIModule() { return craftyAIModule; }
 
     private static final String ASYNC_CHAT_EVENT = "io.papermc.paper.event.player.AsyncChatEvent";
 
-    private static ZDiscord instance;
+    private static volatile ZDiscord instance;
 
     private PlatformAdapter platformAdapter;
     private ConfigManager configManager;
@@ -73,24 +74,28 @@ public class ZDiscord extends JavaPlugin {
     private StorageManager storageManager;
     private boolean paperModern;
 
-    private StatusModule statusModule;
-    private LiveStatsModule liveStatsModule;
-    private LeaderboardModule leaderboardModule;
-    private TicketModule ticketModule;
-    private LinkModule linkModule;
-    private AntiRaidModule antiRaidModule;
-    private PerformanceModule performanceModule;
-    private ReactionRoleModule reactionRoleModule;
-    private EmbedBuilderModule embedBuilderModule;
-    private CommandLoggerModule commandLoggerModule;
-    private StaffChatModule staffChatModule;
-    private VoiceStatusModule voiceStatusModule;
-    private ConsoleModule consoleModule;
-    private FollowModule followModule;
-    private ConfessionModule confessionModule;
-    private IntegrationModule integrationModule;
-    private HalloweenModule halloweenModule;
+    private volatile StatusModule statusModule;
+    private volatile LiveStatsModule liveStatsModule;
+    private volatile LeaderboardModule leaderboardModule;
+    private volatile TicketModule ticketModule;
+    private volatile LinkModule linkModule;
+    private volatile LinkModule retainedLinkModule;
+    private volatile LeaderboardModule retainedLeaderboardModule;
+    private volatile AntiRaidModule antiRaidModule;
+    private volatile PerformanceModule performanceModule;
+    private volatile ReactionRoleModule reactionRoleModule;
+    private volatile EmbedBuilderModule embedBuilderModule;
+    private volatile CommandLoggerModule commandLoggerModule;
+    private volatile StaffChatModule staffChatModule;
+    private volatile VoiceStatusModule voiceStatusModule;
+    private volatile ConsoleModule consoleModule;
+    private volatile FollowModule followModule;
+    private volatile ConfessionModule confessionModule;
+    private volatile IntegrationModule integrationModule;
+    private volatile HalloweenModule halloweenModule;
+    private HalloweenHunt halloweenHunt;
     private JoinQuitListener joinQuitListener;
+    private UpdateChecker updateChecker;
 
     @Override
     @SuppressWarnings("deprecation")
@@ -116,8 +121,8 @@ public class ZDiscord extends JavaPlugin {
         botManager = new BotManager(this);
         confessionModule = new ConfessionModule(this);
         if (configManager.getBoolean("halloween.enabled", true)) {
-            halloweenModule = new HalloweenModule(this);
-            halloweenModule.init();
+            halloweenHunt = new HalloweenHunt(storageManager);
+            halloweenModule = new HalloweenModule(this, halloweenHunt);
         }
         craftyAIModule = new dev.demonz.zdiscord.modules.CraftyAIModule(this);
         slashCommandManager = new SlashCommandManager(this);
@@ -130,23 +135,17 @@ public class ZDiscord extends JavaPlugin {
         } else {
             webhookManager = new WebhookManager(this);
             slashCommandManager.registerCommands();
-            initModules();
             integrationModule = new IntegrationModule(this);
             integrationModule.init();
         }
 
+        initModules();
+        if (halloweenModule != null) halloweenModule.init();
         registerListeners();
         registerCommands();
 
-        if (configManager.getBoolean("api.enabled", true)) {
-            ZDiscordProvider.register(new ZDiscordAPIImpl(this));
-            getServer().getServicesManager().register(
-                    ZDiscordAPI.class, ZDiscordProvider.get(), this, ServicePriority.Normal);
-        }
-
-        if (configManager.getBoolean("misc.update-checker", true)) {
-            new UpdateChecker(this);
-        }
+        refreshApi();
+        updateChecker = new UpdateChecker(this);
 
         long elapsed = System.currentTimeMillis() - start;
         StartupBanner.print(this, elapsed);
@@ -161,6 +160,7 @@ public class ZDiscord extends JavaPlugin {
     public void onDisable() {
         if (halloweenModule != null) halloweenModule.shutdown();
         if (craftyAIModule != null) craftyAIModule.close();
+        if (updateChecker != null) updateChecker.shutdown();
         ZLogger.info(ZLogger.Category.SYSTEM, "Shutting down ZDiscord...");
 
         ZDiscordProvider.unregister();
@@ -184,14 +184,13 @@ public class ZDiscord extends JavaPlugin {
         if (staffChatModule != null) staffChatModule.shutdown();
         if (voiceStatusModule != null) voiceStatusModule.shutdown();
         if (consoleModule != null) consoleModule.shutdown();
-        if (followModule != null) followModule.shutdown();
-
+        if (webhookManager != null) webhookManager.shutdown();
+        if (botManager != null) botManager.shutdown();
+        if (platformAdapter != null) platformAdapter.cancelAllTasks();
         if (storageManager != null) {
             storageManager.shutdown();
             ZLogger.info(ZLogger.Category.SYSTEM, "Storage flushed.");
         }
-        if (webhookManager != null) webhookManager.shutdown();
-        if (botManager != null) botManager.shutdown();
 
         ZLogger.info(ZLogger.Category.SYSTEM, "ZDiscord shut down.");
         instance = null;
@@ -246,68 +245,62 @@ public class ZDiscord extends JavaPlugin {
         storageManager.init();
     }
 
+    private <T> T reconcile(T current, boolean enabled, java.util.function.Supplier<T> factory,
+                            java.util.function.Consumer<T> init, java.util.function.Consumer<T> reload,
+                            java.util.function.Consumer<T> shutdown) {
+        if (!enabled) {
+            if (current != null) shutdown.accept(current);
+            return null;
+        }
+        if (current == null) {
+            current = factory.get();
+            init.accept(current);
+        } else if (reload != null) {
+            reload.accept(current);
+        }
+        return current;
+    }
+
+    private boolean usableChannel(String path) {
+        String id = configManager.getString(path, "");
+        return !id.isBlank() && !id.startsWith("YOUR_");
+    }
+
     private void initModules() {
-        if (configManager.getBoolean("status.enabled", true)) {
-            statusModule = new StatusModule(this);
-            statusModule.init();
-        }
-        String liveStatsChannel = configManager.getString("live-stats.channel", "");
-        if (configManager.getBoolean("live-stats.enabled", true)
-                && !liveStatsChannel.isEmpty() && !liveStatsChannel.startsWith("YOUR_")) {
-            liveStatsModule = new LiveStatsModule(this);
-            liveStatsModule.init();
-        }
-        if (configManager.getBoolean("leaderboard.enabled", true)) {
-            leaderboardModule = new LeaderboardModule(this);
-            leaderboardModule.init();
-        }
-        if (configManager.getBoolean("tickets.enabled", true)) {
-            ticketModule = new TicketModule(this);
-            ticketModule.init();
-        }
-        if (configManager.getBoolean("linking.enabled", true)) {
-            linkModule = new LinkModule(this);
-            linkModule.init();
-        }
-        if (configManager.getBoolean("anti-raid.enabled", true)) {
-            antiRaidModule = new AntiRaidModule(this);
-            antiRaidModule.init();
-        }
-        if (configManager.getBoolean("performance.enabled", true)) {
-            performanceModule = new PerformanceModule(this);
-            performanceModule.init();
-        }
-        if (configManager.getBoolean("reaction-roles.enabled", true)) {
-            reactionRoleModule = new ReactionRoleModule(this);
-            reactionRoleModule.init();
-        }
+        boolean online = botManager.isConnected();
+        linkModule = reconcile(linkModule, configManager.getBoolean("linking.enabled", true),
+                () -> retainedLinkModule == null ? (retainedLinkModule = new LinkModule(this)) : retainedLinkModule,
+                LinkModule::init, LinkModule::reload, LinkModule::shutdown);
+        leaderboardModule = reconcile(leaderboardModule, configManager.getBoolean("leaderboard.enabled", true),
+                () -> retainedLeaderboardModule == null ? (retainedLeaderboardModule = new LeaderboardModule(this)) : retainedLeaderboardModule,
+                LeaderboardModule::init, LeaderboardModule::reload, LeaderboardModule::shutdown);
+        antiRaidModule = reconcile(antiRaidModule, configManager.getBoolean("anti-raid.enabled", true),
+                () -> new AntiRaidModule(this), AntiRaidModule::init, null, AntiRaidModule::shutdown);
+        statusModule = reconcile(statusModule, online && configManager.getBoolean("status.enabled", true),
+                () -> new StatusModule(this), StatusModule::init, StatusModule::reload, StatusModule::shutdown);
+        liveStatsModule = reconcile(liveStatsModule, online && configManager.getBoolean("live-stats.enabled", true) && usableChannel("live-stats.channel"),
+                () -> new LiveStatsModule(this), LiveStatsModule::init, LiveStatsModule::reload, LiveStatsModule::shutdown);
+        ticketModule = reconcile(ticketModule, online && configManager.getBoolean("tickets.enabled", true),
+                () -> new TicketModule(this), TicketModule::init, null, TicketModule::shutdown);
+        performanceModule = reconcile(performanceModule, online && configManager.getBoolean("performance.enabled", true),
+                () -> new PerformanceModule(this), PerformanceModule::init, PerformanceModule::reload, PerformanceModule::shutdown);
+        reactionRoleModule = reconcile(reactionRoleModule, online && configManager.getBoolean("reaction-roles.enabled", true),
+                () -> new ReactionRoleModule(this), ReactionRoleModule::init, ReactionRoleModule::reload, ReactionRoleModule::shutdown);
+        commandLoggerModule = reconcile(commandLoggerModule, online && configManager.getBoolean("command-logger.enabled", true),
+                () -> new CommandLoggerModule(this), CommandLoggerModule::init, CommandLoggerModule::reload, CommandLoggerModule::shutdown);
+        consoleModule = reconcile(consoleModule, online && usableChannel("channels.console"),
+                () -> new ConsoleModule(this), ConsoleModule::init, null, ConsoleModule::shutdown);
+        staffChatModule = reconcile(staffChatModule, online && configManager.getBoolean("staff-chat.enabled", true),
+                () -> new StaffChatModule(this), StaffChatModule::init, StaffChatModule::reload, StaffChatModule::shutdown);
+        voiceStatusModule = reconcile(voiceStatusModule, online && configManager.getBoolean("voice-status.enabled", true),
+                () -> new VoiceStatusModule(this), VoiceStatusModule::init, VoiceStatusModule::reload, VoiceStatusModule::shutdown);
+        if (followModule == null) followModule = new FollowModule(this);
+        if (embedBuilderModule == null) embedBuilderModule = new EmbedBuilderModule(this);
+        ZLogger.info(ZLogger.Category.MODULES, "Modules reconciled with configuration.");
+    }
 
-        embedBuilderModule = new EmbedBuilderModule(this);
-
-        if (configManager.getBoolean("command-logger.enabled", true)) {
-            commandLoggerModule = new CommandLoggerModule(this);
-            commandLoggerModule.init();
-        }
-
-        String consoleChannelId = configManager.getString("channels.console", "");
-        if (!consoleChannelId.isEmpty() && !consoleChannelId.startsWith("YOUR_")) {
-            consoleModule = new ConsoleModule(this);
-            consoleModule.init();
-        }
-
-        if (configManager.getBoolean("staff-chat.enabled", true)) {
-            staffChatModule = new StaffChatModule(this);
-            staffChatModule.init();
-        }
-        if (configManager.getBoolean("voice-status.enabled", true)) {
-            voiceStatusModule = new VoiceStatusModule(this);
-            voiceStatusModule.init();
-        }
-
-        followModule = new FollowModule(this);
-        followModule.init();
-
-        ZLogger.info(ZLogger.Category.MODULES, "Modules initialised.");
+    public void refreshModules() {
+        platformAdapter.runSync(this::initModules);
     }
 
     private void registerListeners() {
@@ -318,6 +311,7 @@ public class ZDiscord extends JavaPlugin {
         joinQuitListener.initOnlinePlayers();
         getServer().getPluginManager().registerEvents(joinQuitListener, this);
         getServer().getPluginManager().registerEvents(new DeathListener(this), this);
+        getServer().getPluginManager().registerEvents(new HalloweenHuntListener(this), this);
         getServer().getPluginManager().registerEvents(new AdvancementListener(this), this);
 
         if (paperModern) {
@@ -326,9 +320,7 @@ public class ZDiscord extends JavaPlugin {
                     new PaperStaffChatListener(this), this);
         }
 
-        if (configManager.getBoolean("linking.required", false) && linkModule != null) {
-            getServer().getPluginManager().registerEvents(new LinkEnforcementListener(this), this);
-        }
+        getServer().getPluginManager().registerEvents(new LinkEnforcementListener(this), this);
     }
 
     private void registerCommands() {
@@ -360,6 +352,7 @@ public class ZDiscord extends JavaPlugin {
         configManager.reload();
         if (craftyAIModule != null) craftyAIModule.reload();
         messageManager.reload();
+        refreshApi();
         ZLogger.init(getLogger(), configManager.getConfig());
         if (ZLogger.isDebugMode()) {
             ZLogger.info(ZLogger.Category.SYSTEM,
@@ -370,25 +363,31 @@ public class ZDiscord extends JavaPlugin {
             joinQuitListener.flushPlaytime();
         }
 
-        if (statusModule != null) statusModule.reload();
-        if (liveStatsModule != null) liveStatsModule.reload();
-        if (leaderboardModule != null) leaderboardModule.reload();
-        if (ticketModule != null) ticketModule.reload();
-        if (linkModule != null) linkModule.reload();
-        if (antiRaidModule != null) antiRaidModule.reload();
-        if (performanceModule != null) performanceModule.reload();
-        if (commandLoggerModule != null) commandLoggerModule.reload();
-        if (staffChatModule != null) staffChatModule.reload();
-        if (voiceStatusModule != null) voiceStatusModule.reload();
-        if (followModule != null) followModule.reload();
+        initModules();
+        if (!botManager.isConnected()) {
+            platformAdapter.runAsync(() -> {
+                if (botManager.connect()) platformAdapter.runSync(() -> {
+                    if (!isEnabled()) return;
+                    if (webhookManager == null) webhookManager = new WebhookManager(this);
+                    slashCommandManager.registerCommands();
+                    initModules();
+                    if (integrationModule == null) {
+                        integrationModule = new IntegrationModule(this);
+                        integrationModule.init();
+                    }
+                });
+            });
+        }
         if (integrationModule != null) integrationModule.reload();
 
         if (configManager.getBoolean("halloween.enabled", true)) {
             if (halloweenModule == null) {
-                halloweenModule = new HalloweenModule(this);
+                if (halloweenHunt == null) halloweenHunt = new HalloweenHunt(storageManager);
+                halloweenModule = new HalloweenModule(this, halloweenHunt);
             }
             halloweenModule.reload();
         } else {
+            if (halloweenModule != null) halloweenModule.shutdown();
             halloweenModule = null;
         }
 
@@ -396,6 +395,17 @@ public class ZDiscord extends JavaPlugin {
             botManager.updateActivity();
         }
         ZLogger.info(ZLogger.Category.SYSTEM, "Configuration reloaded.");
+    }
+
+    private void refreshApi() {
+        if (!configManager.getBoolean("api.enabled", true)) {
+            ZDiscordProvider.unregister();
+            getServer().getServicesManager().unregisterAll(this);
+        } else if (!ZDiscordProvider.isAvailable()) {
+            ZDiscordProvider.register(new ZDiscordAPIImpl(this));
+            getServer().getServicesManager().register(
+                    ZDiscordAPI.class, ZDiscordProvider.get(), this, ServicePriority.Normal);
+        }
     }
 
     public static ZDiscord getInstance() {

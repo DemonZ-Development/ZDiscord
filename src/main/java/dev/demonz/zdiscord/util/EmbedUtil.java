@@ -21,11 +21,11 @@ public final class EmbedUtil {
     }
 
     public static EmbedBuilder error(String message) {
-        return branded().setTitle("❌ Error").setDescription(message).setColor(ERROR);
+        return branded().setTitle("Error").setDescription(message).setColor(ERROR);
     }
 
     public static EmbedBuilder success(String message) {
-        return branded().setTitle("✅ Success").setDescription(message).setColor(SUCCESS);
+        return branded().setTitle("Success").setDescription(message).setColor(SUCCESS);
     }
 
     public static EmbedBuilder info(String title, String message) {
@@ -33,7 +33,7 @@ public final class EmbedUtil {
     }
 
     public static EmbedBuilder warn(String title, String message) {
-        return branded().setTitle("⚠️ " + title).setDescription(message).setColor(WARN);
+        return branded().setTitle(title).setDescription(message).setColor(WARN);
     }
 
     public static EmbedBuilder branded() {

@@ -5,7 +5,6 @@ prefix: "&bZDiscord &8> &r"
 
 # ── General ───────────────────────────────────────────────
 reload-success: "%prefix%&aConfiguration reloaded."
-reload-fail: "%prefix%&cFailed to reload configuration."
 no-permission: "%prefix%&cYou don't have permission to do that."
 player-only: "%prefix%&cThis command can only be used by players."
 discord-link: "%prefix%&fJoin our Discord: &b&n%link%"
@@ -14,40 +13,57 @@ discord-link: "%prefix%&fJoin our Discord: &b&n%link%"
 link-code-generated: "%prefix%&fYour link code: &b&l%code%\n%prefix%&7Use &e/link %code% &7in Discord."
 link-success: "%prefix%&aAccount linked to &b%discord_name%&a."
 link-already-linked: "%prefix%&eYour account is already linked."
-link-invalid-code: "%prefix%&cInvalid or expired link code."
 link-required: "%prefix%&cYou must link your Discord account to play!\n%prefix%&7Use &e/zdiscord link"
-unlink-success: "%prefix%&aYour account has been unlinked."
+link-login-required: "&cLink your Discord account to join.\n&7In Discord, run &e/link %code%&7, then reconnect.\n&7This code expires in five minutes."
 
 # ── Tickets ───────────────────────────────────────────────
 ticket-created: "%prefix%&aTicket created. See &b#%channel%"
-ticket-closed: "%prefix%&eTicket &b#%id% &ehas been closed."
+ticket-create-failed: "%prefix%&cCould not create your ticket. Please contact an administrator."
 ticket-max-reached: "%prefix%&cYou have reached the maximum number of open tickets (%max%)."
-ticket-not-found: "%prefix%&cTicket not found."
-ticket-category-unknown: "%prefix%&cThat ticket category is no longer available."
-ticket-no-default: "%prefix%&cNo default ticket category is configured."
 
 # ── Anti-raid ─────────────────────────────────────────────
 lockdown-enabled: "%prefix%&c&lSERVER LOCKDOWN &8> &cPossible raid detected."
 lockdown-disabled: "%prefix%&aServer lockdown has been lifted."
 lockdown-kick: "&c&lZDiscord Lockdown\n\n&7The server is currently in lockdown mode.\n&7Please try again later."
 
-# ── Status indicators (Discord embeds) ────────────────────
-status-online: "Online"
-status-offline: "Offline"
-status-tps-good: "%tps%"
-status-tps-warn: "%tps%"
-status-tps-bad: "%tps%"
-
 # ── Embed builder ─────────────────────────────────────────
 embed-created: "%prefix%&aEmbed sent to &b#%channel%"
-embed-no-title: "%prefix%&cPlease provide a title for your embed."
 
 # ── Halloween event ──────────────────────────────────────
-halloween-in-game-open: "%prefix%&6🎃 &eThe Halloween hunt is open! &7Mob kills now count toward the crown."
-halloween-in-game-greeting: "%prefix%&6🎃 &eHappy Halloween! &7The hunt is open - go claim the crown."
-halloween-in-game-finale: "%prefix%&6🎃 &eThe hunt has ended. &7Check the standings for the winner."
-halloween-in-game-countdown: "%prefix%&6🎃 &e%days% &7day(s) until the Halloween hunt opens. &7Get your shovel ready."
-halloween-in-game-milestone: "%prefix%&6🎃 &e%player% &7has downed &e%kills% &7mobs this hunt!"
+halloween-in-game-open: "%prefix%&6The Halloween hunt is open. &7Hunt hostile mobs and earn your place in the standings."
+halloween-in-game-greeting: "%prefix%&6Welcome to the Halloween hunt. &7View your score with &e/zdiscord halloween&7."
+halloween-in-game-finale: "%prefix%&6The hunt has ended. &7View the final standings with &e/zdiscord halloween top&7."
+halloween-in-game-countdown: "%prefix%&6The hunt opens in %days% %unit%. &7Prepare for the night."
+halloween-in-game-milestone: "%prefix%&e%player% &7has passed &6%milestone% points &7in the Halloween hunt."
+
+# Local commands and optional titles. Legacy & color codes are supported.
+halloween-usage: "%prefix%&7Usage: &e/zdiscord halloween [status|top]"
+halloween-disabled: "%prefix%&7The Halloween hunt is disabled."
+halloween-state-active: "Active until"
+halloween-state-upcoming: "Next hunt starts"
+halloween-status: "%prefix%&6Halloween Hunt &8| &7%state% &e%date%"
+halloween-score: "%prefix%&7Your hunt score: &6%points% points"
+halloween-top-header: "%prefix%&6Halloween Hunt Standings"
+halloween-top-entry: "&6%rank%. &e%player% &8- &7%points% points"
+halloween-empty: "%prefix%&7No points recorded yet."
+halloween-join-title: "&6Halloween Hunt"
+halloween-join-subtitle: "&7The night is yours. Make it count."
+
+# Discord templates use Markdown. Keep the common footer and color for a
+# consistent style; configure the accent in halloween.color in config.yml.
+halloween-discord-footer: "Halloween Hunt | ZDiscord"
+halloween-discord-active: "**Hunt active** | Ends on **%date%**"
+halloween-discord-upcoming: "**Next hunt** | **%date%** (%days% days away)"
+halloween-discord-empty: "No points recorded yet. Hunt hostile mobs during the event to join the standings."
+halloween-discord-ranking: "**%rank%. %player%** - %points% points"
+halloween-discord-open-title: "The Halloween Hunt Begins"
+halloween-discord-open: "The gates are open. Hunt hostile mobs between **%start%** and **%end%** to earn points. Bosses count toward the same standings."
+halloween-discord-finale-title: "The Hunt Has Ended"
+halloween-discord-finale: "**%player%** takes the crown with **%points% points**. Thank you to every hunter who took part."
+halloween-discord-countdown-title: "The Halloween Hunt Nears"
+halloween-discord-countdown: "The gates open in **%days% %unit%**, on **%date%**. Prepare for the night."
+halloween-discord-milestone-title: "Hunt Milestone Reached"
+halloween-discord-milestone: "**%player%** has passed **%milestone% points** and now stands at **%points% points**."
 
 # ── Slash command responses ───────────────────────────────
 slash-status-title: "Server Status"

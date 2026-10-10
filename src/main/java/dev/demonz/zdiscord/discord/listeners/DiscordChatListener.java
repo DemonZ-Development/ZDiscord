@@ -1,6 +1,7 @@
 package dev.demonz.zdiscord.discord.listeners;
 
 import dev.demonz.zdiscord.ZDiscord;
+import dev.demonz.zdiscord.util.DiscordAttachmentRenderer;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Message;
@@ -38,13 +39,12 @@ public class DiscordChatListener extends ListenerAdapter {
 
         if (chatChannelId == null || chatChannelId.isEmpty()) {
             plugin.debug("Discord chat listener fired but channels.chat is not set in config.yml");
-            return;
         }
 
-        if (event.getChannel().getId().equals(chatChannelId)) {
-            handleChatMessage(event);
-        } else if (consoleChannelId != null && event.getChannel().getId().equals(consoleChannelId)) {
+        if (event.getChannel().getId().equals(consoleChannelId)) {
             handleConsoleCommand(event);
+        } else if (event.getChannel().getId().equals(chatChannelId)) {
+            handleChatMessage(event);
         } else {
             plugin.debug("Discord message in non-bridge channel #"
                     + event.getChannel().getName() + " (id=" + event.getChannel().getId() + "); ignoring");
@@ -71,15 +71,23 @@ public class DiscordChatListener extends ListenerAdapter {
             }
         }
 
-        if (plugin.getConfigManager().getBoolean("chat.show-attachments", true)
-                && !event.getMessage().getAttachments().isEmpty()) {
-            String attachText = plugin.getConfigManager().getString("chat.attachment-text",
-                    "&e[Attachment] &7(Click to open)");
-            formatted += " " + ChatColor.translateAlternateColorCodes('&', attachText);
-        }
-
-        String finalMessage = formatted;
-        plugin.getPlatformAdapter().runSync(() -> Bukkit.broadcastMessage(finalMessage));
+        var attachments = plugin.getConfigManager().getBoolean("chat.show-attachments", true)
+                ? event.getMessage().getAttachments().stream()
+                    .map(a -> new DiscordAttachmentRenderer.Attachment(a.getFileName(), a.getUrl())).toList()
+                : List.<DiscordAttachmentRenderer.Attachment>of();
+        String label = plugin.getConfigManager().getString("chat.attachment-text",
+                "&e[Attachment] &7(Click to open)");
+        var components = DiscordAttachmentRenderer.render(formatted, label, attachments);
+        String consoleMessage = ChatColor.stripColor(formatted)
+                + attachments.stream().map(a -> " " + a.url()).collect(java.util.stream.Collectors.joining());
+        plugin.getPlatformAdapter().runSync(() -> {
+            for (var player : Bukkit.getOnlinePlayers()) {
+                plugin.getPlatformAdapter().runForEntity(player, () -> {
+                    if (player.isOnline()) player.spigot().sendMessage(components);
+                });
+            }
+            Bukkit.getConsoleSender().sendMessage(consoleMessage);
+        });
     }
 
     private String buildReplyLine(Message message) {

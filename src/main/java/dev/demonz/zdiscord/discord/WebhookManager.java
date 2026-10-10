@@ -48,6 +48,7 @@ public class WebhookManager {
         if (existing != null) return existing;
 
         synchronized (createLock) {
+            if (!running) return null;
             WebhookClient cached = webhookClients.get(channel.getId());
             if (cached != null) return cached;
 
@@ -124,7 +125,7 @@ public class WebhookManager {
         } catch (Exception e) {
             String errorMsg = e.getMessage() != null ? e.getMessage() : "";
             if (errorMsg.contains("404") || errorMsg.contains("Unknown Webhook")) {
-                webhookClients.remove(channel.getId());
+                if (webhookClients.remove(channel.getId(), client)) client.close();
                 plugin.debug("Webhook invalidated for #" + channel.getName()
                          + " - will be re-created on next message.");
             } else {
@@ -153,12 +154,14 @@ public class WebhookManager {
     public void shutdown() {
         running = false;
         scheduler.shutdownNow();
-        for (WebhookClient client : webhookClients.values()) {
-            try {
-                client.close();
-            } catch (Exception ignored) {
+        synchronized (createLock) {
+            for (WebhookClient client : webhookClients.values()) {
+                try {
+                    client.close();
+                } catch (Exception ignored) {
+                }
             }
+            webhookClients.clear();
         }
-        webhookClients.clear();
     }
 }

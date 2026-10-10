@@ -3,6 +3,7 @@ package dev.demonz.zdiscord.util;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -30,9 +31,6 @@ public final class HalloweenEasterEgg implements AutoCloseable {
         default void onFinale(LocalDate windowStart, LocalDate windowEnd) { }
 
         /**
-         * Fired on every check during the month the window opens in, including
-         * days far outside any announcement range. Consumers decide how many
-         * days out they actually want to say something.
          */
         default void onCountdown(int daysRemaining, LocalDate windowStart) { }
     }
@@ -45,12 +43,14 @@ public final class HalloweenEasterEgg implements AutoCloseable {
     private final Runnable notifyOperators;
     private final PhaseListener phases;
     private final Set<UUID> greetedPlayers = new HashSet<>();
+    private final Set<LocalDate> openedWindows = new HashSet<>();
+    private final Set<LocalDate> finalisedWindows = new HashSet<>();
     private volatile HalloweenWindow window = HalloweenWindow.DEFAULT;
     private ScheduledFuture<?> midnightTask;
+    private ScheduledFuture<?> periodicTask;
     private boolean running;
     private boolean closed;
     private LocalDate openedWindowStart;
-    private LocalDate finalisedWindowStart;
     private LocalDate greetedWindowStart;
 
     public HalloweenEasterEgg(String name, Consumer<String> console, Runnable notifyOperators) {
@@ -64,7 +64,13 @@ public final class HalloweenEasterEgg implements AutoCloseable {
 
     public HalloweenEasterEgg(String name, Consumer<String> console, Runnable notifyOperators,
                               HalloweenWindow window, PhaseListener phases) {
-        this(Clock.systemDefaultZone(), newDaemonExecutor(name), console, notifyOperators, window, phases);
+        this(name, console, notifyOperators, window, phases, ZoneId.systemDefault());
+    }
+
+    public HalloweenEasterEgg(String name, Consumer<String> console, Runnable notifyOperators,
+                              HalloweenWindow window, PhaseListener phases, ZoneId zone) {
+        this(Clock.system(zone == null ? ZoneId.systemDefault() : zone),
+                newDaemonExecutor(name), console, notifyOperators, window, phases);
     }
 
     HalloweenEasterEgg(Clock clock, ScheduledExecutorService executor,
@@ -95,11 +101,20 @@ public final class HalloweenEasterEgg implements AutoCloseable {
         if (running || closed) return;
         running = true;
         checkDate(true);
-        executor.scheduleWithFixedDelay(() -> checkDate(false), 7, 7, TimeUnit.HOURS);
+        if (running) {
+            periodicTask = executor.scheduleWithFixedDelay(() -> checkDate(false), 7, 7, TimeUnit.HOURS);
+        }
     }
 
     public synchronized void setWindow(HalloweenWindow window) {
-        if (window != null) this.window = window;
+        if (window == null || this.window.equals(window)) return;
+        this.window = window;
+        openedWindowStart = null;
+        greetedWindowStart = null;
+        openedWindows.clear();
+        finalisedWindows.clear();
+        greetedPlayers.clear();
+        if (running) checkDate(true);
     }
 
     public HalloweenWindow getWindow() {
@@ -119,38 +134,52 @@ public final class HalloweenEasterEgg implements AutoCloseable {
         LocalDate today = LocalDate.now(clock);
         HalloweenWindow current = window;
 
-        LocalDate finaleFor = current.finaleOn(today);
-        if (finaleFor != null && !finaleFor.equals(finalisedWindowStart)) {
-            finalisedWindowStart = finaleFor;
-            LocalDate lastDay = today.minusDays(1);
-            fire(() -> phases.onFinale(finaleFor, lastDay));
+        if (openedWindowStart != null && current.endIn(openedWindowStart.getYear()).isBefore(today)) {
+            finalise(current, openedWindowStart);
         }
+        if (!running) return;
+        if (startup) {
+            finalise(current, current.mostRecentClosedStart(today));
+        } else {
+            LocalDate finaleFor = current.finaleOn(today);
+            if (finaleFor != null) finalise(current, finaleFor);
+        }
+        if (!running) return;
 
         if (current.isActive(today)) {
             LocalDate startFor = current.windowStartOn(today);
-            if (startFor != null && !startFor.equals(openedWindowStart)) {
+            if (startFor != null && openedWindows.add(startFor)) {
                 openedWindowStart = startFor;
-                greetedWindowStart = null;
-                greetedPlayers.clear();
+                if (!startFor.equals(greetedWindowStart)) {
+                    greetedWindowStart = startFor;
+                    greetedPlayers.clear();
+                }
                 LocalDate announced = startFor;
                 console.accept("Happy Halloween!");
                 fire(() -> phases.onWindowOpen(announced));
             }
+            if (!running) return;
             try {
                 notifyOperators.run();
             } catch (RuntimeException failure) {
                 console.accept("Could not deliver Halloween greeting: " + failure.getMessage());
             }
-        } else if (current.isCountdownMonth(today)) {
+        } else {
             long days = current.daysUntilStart(today);
             LocalDate upcoming = current.nextStartOnOrAfter(today);
-            if (startup) {
+            if (startup && current.isCountdownMonth(today)) {
                 console.accept("Halloween in " + days + (days == 1 ? " day!" : " days!"));
             }
             fire(() -> phases.onCountdown((int) days, upcoming));
         }
 
-        scheduleNextBoundary();
+        if (running) scheduleNextBoundary();
+    }
+
+    private void finalise(HalloweenWindow current, LocalDate windowStart) {
+        if (!finalisedWindows.add(windowStart)) return;
+        LocalDate windowEnd = current.endIn(windowStart.getYear());
+        fire(() -> phases.onFinale(windowStart, windowEnd));
     }
 
     private void fire(Runnable action) {
@@ -207,7 +236,10 @@ public final class HalloweenEasterEgg implements AutoCloseable {
         running = false;
         closed = true;
         if (midnightTask != null) midnightTask.cancel(false);
+        if (periodicTask != null) periodicTask.cancel(false);
         executor.shutdownNow();
         greetedPlayers.clear();
+        openedWindows.clear();
+        finalisedWindows.clear();
     }
 }

@@ -2,24 +2,52 @@
 
 All notable changes to ZDiscord are documented here.
 
-## [1.4.3] - 2026-10-07
+## [1.5.0] - 2026-10-11
 
 ### Added
-- **Halloween event** — A configurable seasonal mob hunt, promoted from the old secret Oct 31 easter egg. The date window is set with `halloween.window-start` / `halloween.window-end` (`MM-DD`; an end that sorts before the start wraps into the next year, so `10-28` to `11-02` is a five-day hunt). Mob kills during the window are tallied under a separate `halloween_kills` stat, ranked with a winner crowned in a finale embed once it closes. PvP kills do not count.
-- **Countdown announcements** — Enabled by default. Posts once a day in Discord and broadcasts in-game during the final `halloween.countdown.days` days before the window opens, with the top milestone shown so there is something to chase. Set `halloween.countdown.days: 0` to silence it.
-- **Live standings panel** — A self-refreshing embed of the current rankings, shown for the duration of the window so the channel reacts to kills on its own. Configure with `halloween.live-panel`.
-- **Milestone announcements** — The channel reacts the first time a player crosses each kill count in `halloween.milestones` (25/50/100/250/500 by default), including how far the player is from the next one.
-- **Boss bonus** — The ender dragon, wither and elder guardian count for `halloween.boss-multiplier` kills (5 by default) instead of 1.
-- **Rewards** — `halloween.rewards.winner` and `halloween.rewards.participant` dispatch console commands when the window closes, with `%player%` and `%uuid%` placeholders. Only players with at least one kill are paid.
-- New Discord slash command `/halloween` shows the current event state, standings, and countdown.
-- The countdown, opening announcement, closing winner, and join-time greeting are all sent to regular players, not just operators.
+- **Halloween seasonal event** — A configurable seasonal mob hunt with customizable date window (`halloween.window-start` / `halloween.window-end`), mob kill tracking, point scoring, and finale rewards. PvP kills are excluded.
+- In-game `/zdiscord halloween [status|top]` displays event dates, personal points, and standings with the default player permission `zdiscord.halloween`.
+- Discord `/halloween` slash command displays event state, standings, and countdown.
+- Daily countdown announcements in Discord and Minecraft broadcasts leading up to the event opening.
+- Live standings embed panel auto-updating during the event window.
+- Milestone announcements when players reach configured point thresholds, with boss multiplier bonuses for dragons, withers, and elder guardians.
+- Configurable event timezone, eligible worlds and mob types, excluded game modes, and spawner-mob filtering.
+- Optional Halloween join titles, ambient sounds, and milestone particles with separate appearance controls (cosmetics require explicit opt-in).
+- Independent switches for opening announcements and public Minecraft broadcasts.
+- Automatic ticket inactivity closure, persistent exclusive staff claims, and complete paginated transcripts with chronological attachments and embed records.
 
 ### Changed
-- Configuration schema version bumped to 15.
-- The startup banner now counts 17 modules, including the Halloween event.
+- Configuration schema version bumped to 16; existing settings are preserved while new defaults are materialized.
+- Startup banner counts 17 modules, including the seasonal event.
+- Halloween messages and displays use concise text, orange accents, and numbered standings; all in-game text customizable via `messages.yml`.
+- Seasonal progress is described as points to reflect boss bonuses; Discord standings capped at 25 entries.
+- Removed empty internal lifecycle hooks, unused message templates and status fields, obsolete ticket-count writes, and decorative emoji.
 
 ### Fixed
-- The event tally is keyed to the window it belongs to, so restarting the server mid-event no longer wipes the standings.
+- Setup dropdowns and modals check administrator permissions in the configured guild; category IDs, colors, and limits are validated.
+- Reloads unregister command-log listeners, cancel console and lockdown timers, and reconcile public API settings.
+- Shutdown drains Discord callbacks before closing storage and prevents late bot reconnects.
+- Paper staff-chat toggles relay each message once, namespaced sensitive commands redact arguments, and Discord console works when the chat channel is unset.
+- Shaded SLF4J providers are discovered through the plugin classloader, and turning off log suppression restores normal library logging.
+- Text conversion preserves literal ampersands and strips hex colors correctly. Slash profile, seen, and following titles honor message settings; update checks avoid duplicate notices and tolerate oversized version numbers.
+- Ticket controls validate the configured guild and tracked channel; failed interaction acknowledgements or deletion requests release the closing guard for retry.
+- Required account linking supplies a code in the rejected login message. Each Minecraft account has one pending code, and relinking keeps both account directions consistent.
+- Concurrent playtime flushes claim each interval once, preserving fractional seconds. Leaderboard updates persist in the same order as accepted changes.
+- Stored follows are available before a player joins; reloads and the public follower API preserve accepted buffered writes.
+- Configuration reloads and Discord setup reconcile enabled modules, refresh channel settings, and replace repeating panel timers. Local linking and statistics also initialize without Discord.
+- Discord panels serialize creation, ignore stale callbacks, and replace messages only when Discord confirms deletion.
+- Ticket interactions defer before channel creation. Atomic reservations enforce linked-account limits, private channels explicitly grant bot access, and slots are released only after confirmed deletion.
+- MySQL schema failures close the connection pool and select YAML fallback instead of reporting a working database.
+- Discord REST/callback workers drain before Paper closes the plugin classloader. Disabled-plugin database cleanup avoids rejected scheduler tasks, and concurrent ticket welcomes display their own ticket number.
+- Link/follow event threading matches the caller. Join/follower database lookups run off the game thread, and delayed welcome messages use the player scheduler.
+- Update notifications use Spigot-compatible clickable components. Advancement embeds use display titles, and quit embeds show the correct online-player count.
+- Discord attachments carry clickable Minecraft URLs using the Spigot component API.
+- Minecraft seasonal scoring and commands remain available without a connected Discord bot.
+- Creative, Spectator, passive-mob, and spawner kills are excluded from the default hunt.
+- Actual mob deaths and boss bonuses contribute to the hunt, including milestones crossed by a multi-point kill.
+- Event reloads retire old panel loops, preserve in-flight panel creation, and retain scores and reward claims across the master switch.
+- Late and offline finale checks recover the recorded event, and winner rewards apply to first place only.
+- MySQL write ordering prevents stale score writes from replacing newer values; shutdown drains pending writes before closing the pool.
 
 ## [1.4.2] - 2026-10-05
 

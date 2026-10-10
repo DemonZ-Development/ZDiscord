@@ -6,6 +6,7 @@ import dev.demonz.zdiscord.util.ColorUtil;
 import dev.demonz.zdiscord.util.HeadUtil;
 import dev.demonz.zdiscord.util.SkinUtil;
 import dev.demonz.zdiscord.util.ZLogger;
+import dev.demonz.zdiscord.storage.StorageManager;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
@@ -36,18 +37,20 @@ public class LeaderboardModule {
     public static final String BTN_REFRESH_PREFIX = "zdiscord_lb_refresh:";
     public static final String STAT_SELECT_ID = "zdiscord_lb_stat_select";
 
-    private static final String[] MEDALS = {"\uD83E\uDD47", "\uD83E\uDD48", "\uD83E\uDD49"};
     private static final int BAR_LENGTH = 10;
     private static final String BAR_FILLED = "\u2588";
     private static final String BAR_EMPTY = "\u2591";
 
     private final ZDiscord plugin;
+    private final StorageManager storage;
     private final Map<UUID, Map<String, Long>> statsCache = new ConcurrentHashMap<>();
     private final Map<String, CachedLeaderboard> sortedCache = new ConcurrentHashMap<>();
     private final Map<String, LiveBoard> liveBoards = new ConcurrentHashMap<>();
     private static final long LIVE_BOARD_MAX_SECONDS = 30L * 60L;
-    private String panelMessageId;
+    private dev.demonz.zdiscord.discord.PanelMessage panel;
+    private dev.demonz.zdiscord.platform.PlatformAdapter.TaskHandle panelTimer;
     private volatile boolean running = true;
+    private boolean dataLoaded;
     private int perPage;
 
     private static class CachedLeaderboard {
@@ -76,21 +79,36 @@ public class LeaderboardModule {
 
     public LeaderboardModule(ZDiscord plugin) {
         this.plugin = plugin;
+        this.storage = plugin.getStorageManager();
+    }
+
+    LeaderboardModule(StorageManager storage) {
+        this.plugin = null;
+        this.storage = storage;
     }
 
     public void init() {
-        perPage = plugin.getConfigManager().getInt("leaderboard.per-page", 10);
-        loadData();
+        running = true;
+        perPage = Math.max(1, Math.min(25, plugin.getConfigManager().getInt("leaderboard.per-page", 10)));
+        if (!dataLoaded) {
+            loadData();
+            dataLoaded = true;
+        }
+        panel = new dev.demonz.zdiscord.discord.PanelMessage(loadPanelMessageId(), this::persistPanelMessageId, plugin::debug);
         initPanel();
     }
 
     public void reload() {
-        perPage = plugin.getConfigManager().getInt("leaderboard.per-page", 10);
-        loadData();
+        perPage = Math.max(1, Math.min(25, plugin.getConfigManager().getInt("leaderboard.per-page", 10)));
+        sortedCache.clear();
+        initPanel();
     }
 
     public void shutdown() {
         running = false;
+        if (panelTimer != null) panelTimer.cancel();
+        if (panel != null) panel.stop();
+        liveBoards.clear();
     }
 
     private void loadData() {
@@ -101,14 +119,14 @@ public class LeaderboardModule {
     }
 
     private void initPanel() {
+        if (panelTimer != null) panelTimer.cancel();
         String channelId = plugin.getConfigManager().getString("leaderboard.panel-channel", "");
         if (channelId.isEmpty() || channelId.startsWith("YOUR_")) {
             return;
         }
-        panelMessageId = loadPanelMessageId();
         int interval = plugin.getConfigManager().getInt("leaderboard.panel-update-interval", 120);
-        long ticks = interval * 20L;
-        plugin.getPlatformAdapter().runTimer(this::updatePanel, 200L, ticks);
+        long ticks = Math.max(2, interval) * 20L;
+        panelTimer = plugin.getPlatformAdapter().scheduleTimer(this::updatePanel, 200L, ticks);
         ZLogger.info(ZLogger.Category.MODULES,
                 "Leaderboard panel enabled (updates every " + interval + "s)");
     }
@@ -138,27 +156,7 @@ public class LeaderboardModule {
             embeds = embeds.subList(0, 10);
         }
 
-        List<MessageEmbed> finalEmbeds = embeds;
-        if (panelMessageId != null && !panelMessageId.isEmpty()) {
-            channel.editMessageEmbedsById(panelMessageId, finalEmbeds).queue(
-                    success -> { },
-                    error -> {
-                        panelMessageId = null;
-                        sendNewPanel(channel, finalEmbeds);
-                    });
-        } else {
-            sendNewPanel(channel, finalEmbeds);
-        }
-    }
-
-    private void sendNewPanel(TextChannel channel, List<MessageEmbed> embeds) {
-        channel.sendMessageEmbeds(embeds).queue(
-                msg -> {
-                    panelMessageId = msg.getId();
-                    persistPanelMessageId(panelMessageId);
-                },
-                err -> ZLogger.debug(ZLogger.Category.MODULES,
-                        "Failed to send leaderboard panel: " + err.getMessage()));
+        panel.update(channel, embeds);
     }
 
     public void incrementStat(UUID uuid, String stat) {
@@ -171,7 +169,7 @@ public class LeaderboardModule {
         }
         var playerStats = statsCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>());
 
-        while (true) {
+        synchronized (playerStats) {
             Long currentObj = playerStats.get(stat);
             long current = currentObj == null ? 0L : currentObj;
             long updated = current + amount;
@@ -183,42 +181,26 @@ public class LeaderboardModule {
                     return;
                 }
             }
-            if (currentObj == null) {
-                if (playerStats.putIfAbsent(stat, updated) == null) {
-                    if (plugin != null && plugin.getStorageManager() != null) {
-                        plugin.getStorageManager().saveStat(uuid, stat, updated);
-                    }
-                    sortedCache.remove(stat.toLowerCase(Locale.ROOT));
-                    return;
-                }
-            } else {
-                if (playerStats.replace(stat, current, updated)) {
-                    if (plugin != null && plugin.getStorageManager() != null) {
-                        plugin.getStorageManager().saveStat(uuid, stat, updated);
-                    }
-                    sortedCache.remove(stat.toLowerCase(Locale.ROOT));
-                    return;
-                }
-            }
+            playerStats.put(stat, updated);
+            if (storage != null) storage.saveStat(uuid, stat, updated);
+            sortedCache.remove(stat.toLowerCase(Locale.ROOT));
         }
     }
 
     public void setStat(UUID uuid, String stat, long value) {
         var playerStats = statsCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>());
-        long old = playerStats.getOrDefault(stat, 0L);
-        if (Bukkit.getServer() != null) {
-            ZDiscordStatUpdateEvent event = new ZDiscordStatUpdateEvent(
-                    uuid, stat, old, value, !Bukkit.isPrimaryThread());
-            Bukkit.getPluginManager().callEvent(event);
-            if (event.isCancelled()) {
-                return;
+        synchronized (playerStats) {
+            long old = playerStats.getOrDefault(stat, 0L);
+            if (Bukkit.getServer() != null) {
+                ZDiscordStatUpdateEvent event = new ZDiscordStatUpdateEvent(
+                        uuid, stat, old, value, !Bukkit.isPrimaryThread());
+                Bukkit.getPluginManager().callEvent(event);
+                if (event.isCancelled()) return;
             }
+            playerStats.put(stat, value);
+            if (storage != null) storage.saveStat(uuid, stat, value);
+            sortedCache.remove(stat.toLowerCase(Locale.ROOT));
         }
-        playerStats.put(stat, value);
-        if (plugin != null && plugin.getStorageManager() != null) {
-            plugin.getStorageManager().saveStat(uuid, stat, value);
-        }
-        sortedCache.remove(stat.toLowerCase(Locale.ROOT));
     }
 
     public long getStat(UUID uuid, String stat) {
@@ -231,6 +213,7 @@ public class LeaderboardModule {
     }
 
     public List<Map.Entry<UUID, Long>> getLeaderboard(String stat, int limit) {
+        if (limit <= 0) return List.of();
         long now = System.currentTimeMillis();
         CachedLeaderboard cached = sortedCache.get(stat);
         List<Map.Entry<UUID, Long>> list;
@@ -295,7 +278,8 @@ public class LeaderboardModule {
     }
 
     private void refreshLiveBoard(LiveBoard board) {
-        if (!running || liveBoards.get(board.messageId) != board) {
+        if (!running || plugin.getConfigManager().getInt("leaderboard.auto-refresh-seconds", 60) <= 0
+                || liveBoards.get(board.messageId) != board) {
             liveBoards.remove(board.messageId, board);
             return;
         }
@@ -338,7 +322,13 @@ public class LeaderboardModule {
             String[] parts = id.split(":");
             if (parts.length < 3) return false;
             String stat = parts[1];
-            int page = Integer.parseInt(parts[2]);
+            int page;
+            try { page = Integer.parseInt(parts[2]); }
+            catch (NumberFormatException invalid) {
+                event.reply("This leaderboard control is no longer valid.").setEphemeral(true).queue();
+                return true;
+            }
+            page = Math.max(0, Math.min(page, getTotalPages(stat) - 1));
             trackLiveBoardState(event.getMessage().getId(), stat, page);
             EmbedBuilder embed = buildLeaderboardEmbed(stat, page, perPage,
                     event.getUser().getName());
@@ -368,6 +358,10 @@ public class LeaderboardModule {
         if (!STAT_SELECT_ID.equals(event.getComponentId())) {
             return false;
         }
+        if (event.getValues().isEmpty()) {
+            event.reply("Choose a leaderboard category.").setEphemeral(true).queue();
+            return true;
+        }
         String stat = event.getValues().get(0);
         trackLiveBoardState(event.getMessage().getId(), stat, 0);
         EmbedBuilder embed = buildLeaderboardEmbed(stat, 0, perPage,
@@ -396,7 +390,7 @@ public class LeaderboardModule {
         int to = Math.min(from + pageSize, all.size());
 
         EmbedBuilder embed = new EmbedBuilder()
-                .setTitle(statEmoji(key) + " " + capitalize(key) + " Leaderboard")
+                .setTitle(capitalize(key) + " Leaderboard")
                 .setColor(statColor(key))
                 .setTimestamp(Instant.now());
 
@@ -419,7 +413,7 @@ public class LeaderboardModule {
                 playerName = "Unknown";
             }
 
-            String rank = i < 3 ? MEDALS[i] : "**" + (i + 1) + ".**";
+            String rank = "**" + (i + 1) + ".**";
             String bar = buildProgressBar(entry.getValue(), maxValue);
             String value = formatStatValue(key, entry.getValue());
 
@@ -447,20 +441,20 @@ public class LeaderboardModule {
         List<ActionRow> rows = new ArrayList<>();
         rows.add(ActionRow.of(
                 Button.secondary(BTN_PREV_PREFIX + stat + ":" + (currentPage - 1),
-                                "\u25C0\uFE0F Previous")
+                                "Previous")
                         .withDisabled(!hasPrev),
-                Button.primary(BTN_REFRESH_PREFIX + stat, "\uD83D\uDD04 Refresh"),
+                Button.primary(BTN_REFRESH_PREFIX + stat, "Refresh"),
                 Button.secondary(BTN_NEXT_PREFIX + stat + ":" + (currentPage + 1),
-                                "Next \u25B6\uFE0F")
+                                "Next")
                         .withDisabled(!hasNext)));
 
         StringSelectMenu.Builder menu = StringSelectMenu.create(STAT_SELECT_ID)
                 .setPlaceholder("Switch stat category")
                 .setMinValues(1)
                 .setMaxValues(1)
-                .addOption("\u2694\uFE0F Kills", "kills", "Player vs player kills")
-                .addOption("\uD83D\uDC80 Deaths", "deaths", "Total player deaths")
-                .addOption("\u23F1\uFE0F Playtime", "playtime", "Total time played");
+                .addOption("Kills", "kills", "Player vs player kills")
+                .addOption("Deaths", "deaths", "Total player deaths")
+                .addOption("Playtime", "playtime", "Total time played");
         rows.add(ActionRow.of(menu.build()));
 
         return rows;
@@ -468,7 +462,7 @@ public class LeaderboardModule {
 
     public EmbedBuilder buildFollowerLeaderboardEmbed() {
         EmbedBuilder embed = new EmbedBuilder()
-                .setTitle("\uD83D\uDC65 Most Followed Players")
+                .setTitle("Most Followed Players")
                 .setColor(ColorUtil.parseHex("#9B59B6"))
                 .setTimestamp(Instant.now());
 
@@ -493,7 +487,7 @@ public class LeaderboardModule {
             String name = plugin.getServer().getOfflinePlayer(entry.getKey()).getName();
             if (name == null) name = "Unknown";
 
-            String rank = i < 3 ? MEDALS[i] : "**" + (i + 1) + ".**";
+            String rank = "**" + (i + 1) + ".**";
             String bar = buildProgressBar(entry.getValue(), maxVal);
             sb.append(rank).append(" **").append(name).append("**")
                     .append("  —  `").append(entry.getValue()).append(" followers`\n")
@@ -525,16 +519,6 @@ public class LeaderboardModule {
             return hours + "h " + minutes + "m";
         }
         return String.valueOf(value);
-    }
-
-    private static String statEmoji(String stat) {
-        return switch (stat) {
-            case "kills" -> "\u2694\uFE0F";
-            case "deaths" -> "\uD83D\uDC80";
-            case "playtime" -> "\u23F1\uFE0F";
-            case "followers" -> "\uD83D\uDC65";
-            default -> "\uD83D\uDCCA";
-        };
     }
 
     private static Color statColor(String stat) {

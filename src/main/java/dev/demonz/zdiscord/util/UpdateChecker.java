@@ -2,17 +2,13 @@ package dev.demonz.zdiscord.util;
 
 import dev.demonz.zdiscord.ZDiscord;
 import dev.demonz.zdiscord.minecraft.commands.ZDiscordCommand;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.event.ClickEvent;
-import net.kyori.adventure.text.event.HoverEvent;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.HandlerList;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -23,8 +19,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -41,19 +35,20 @@ public class UpdateChecker implements Listener {
 
     private final ZDiscord plugin;
     private volatile String latestVersion;
-    private volatile String releaseDate;
     private volatile boolean updateAvailable;
-    private volatile int lastCheckErrorCount;
+    private volatile boolean running = true;
+    private final dev.demonz.zdiscord.platform.PlatformAdapter.TaskHandle timer;
 
     private final AtomicBoolean discordAnnouncedForCurrent = new AtomicBoolean(false);
 
     public UpdateChecker(ZDiscord plugin) {
         this.plugin = plugin;
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
-        plugin.getPlatformAdapter().runAsyncTimer(this::checkForUpdates, 200L, REPEAT_CHECK_TICKS);
+        timer = plugin.getPlatformAdapter().scheduleAsyncTimer(this::checkForUpdates, 200L, REPEAT_CHECK_TICKS);
     }
 
     private void checkForUpdates() {
+        if (!running || !plugin.getConfigManager().getBoolean("misc.update-checker", true)) return;
         HttpURLConnection connection = null;
         try {
             connection = (HttpURLConnection) new URL(API_URL).openConnection();
@@ -64,7 +59,6 @@ public class UpdateChecker implements Listener {
             connection.setReadTimeout(5_000);
 
             if (connection.getResponseCode() != 200) {
-                lastCheckErrorCount++;
                 return;
             }
 
@@ -76,15 +70,16 @@ public class UpdateChecker implements Listener {
             if (versions.isEmpty()) return;
 
             JSONObject latest = (JSONObject) versions.get(0);
+            if (!running || !plugin.getConfigManager().getBoolean("misc.update-checker", true)) return;
+            String previousVersion = latestVersion;
             latestVersion = (String) latest.get("version_number");
-            releaseDate = (String) latest.get("date_published");
 
             String currentVersion = plugin.getDescription().getVersion();
             updateAvailable = isNewer(latestVersion, currentVersion);
             plugin.debug("Update check: running v" + currentVersion
                     + ", latest is v" + latestVersion);
             if (updateAvailable) {
-                discordAnnouncedForCurrent.set(false);
+                if (!java.util.Objects.equals(previousVersion, latestVersion)) discordAnnouncedForCurrent.set(false);
                 plugin.getLogger().info("A new version of ZDiscord is available: v"
                         + latestVersion + " (" + PAGE_URL + ")");
             }
@@ -95,7 +90,6 @@ public class UpdateChecker implements Listener {
                 postSilentDiscordNotice(currentVersion);
             }
         } catch (Exception e) {
-            lastCheckErrorCount++;
             plugin.debug("Update check failed: " + e.getMessage());
         } finally {
             if (connection != null) connection.disconnect();
@@ -117,7 +111,7 @@ public class UpdateChecker implements Listener {
         }
 
         EmbedBuilder embed = new EmbedBuilder()
-                .setTitle("🔄 ZDiscord update available")
+                .setTitle("ZDiscord update available")
                 .setDescription("A new version of **ZDiscord** is available. "
                         + "No action is required — this is a quiet notice.\n\n"
                         + "Installed: `v" + currentVersion + "`\n"
@@ -152,11 +146,10 @@ public class UpdateChecker implements Listener {
     private static int[] parseVersion(String version) {
         Matcher m = VERSION_TOKEN.matcher(version);
         if (!m.find()) return null;
-        return new int[]{
-                Integer.parseInt(m.group(1)),
-                Integer.parseInt(m.group(2)),
-                m.group(3) != null ? Integer.parseInt(m.group(3)) : 0
-        };
+        try {
+            return new int[]{Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)),
+                    m.group(3) != null ? Integer.parseInt(m.group(3)) : 0};
+        } catch (NumberFormatException overflow) { return null; }
     }
 
     private static String preRelease(String version) {
@@ -167,6 +160,7 @@ public class UpdateChecker implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
+        if (!running || !plugin.getConfigManager().getBoolean("misc.update-checker", true)) return;
         if (!updateAvailable) return;
         if (plugin.getConfigManager().getBoolean("misc.update-silent", false)) return;
 
@@ -189,55 +183,23 @@ public class UpdateChecker implements Listener {
         if (Bukkit.getPluginManager().getPlugin("ZDiscord") == null) return;
 
         String current = plugin.getDescription().getVersion();
-        Component prefix = Component.text("[ZDiscord] ", NamedTextColor.AQUA)
-                .append(Component.text("Update available: ", NamedTextColor.WHITE))
-                .append(Component.text("v" + current, NamedTextColor.GRAY))
-                .append(Component.text(" \u2192 ", NamedTextColor.DARK_GRAY))
-                .append(Component.text("v" + latestVersion, NamedTextColor.GREEN)
-                        .decoration(TextDecoration.BOLD, true));
-
-        Component link = Component.text("[" + PAGE_URL + "]", NamedTextColor.YELLOW)
-                .clickEvent(ClickEvent.openUrl(PAGE_URL))
-                .hoverEvent(HoverEvent.showText(Component.text(
-                        "Click to open the ZDiscord download page in your browser.",
-                        NamedTextColor.GRAY)));
-
-        Component separator = Component.text("  ", NamedTextColor.DARK_GRAY);
-        Component dismiss = Component.text("[Dismiss]", NamedTextColor.DARK_GRAY)
-                .clickEvent(ClickEvent.runCommand("/zdiscord update dismiss"))
-                .hoverEvent(HoverEvent.showText(Component.text(
-                        "Stop showing this banner for the rest of the session.",
-                        NamedTextColor.GRAY)));
-
-        player.sendMessage(prefix.append(separator).append(link).append(separator).append(dismiss));
+        net.md_5.bungee.api.chat.TextComponent notice = new net.md_5.bungee.api.chat.TextComponent(
+                "§b[ZDiscord] §fUpdate available: §7v" + current + " §8→ §av" + latestVersion + "  ");
+        net.md_5.bungee.api.chat.TextComponent link = new net.md_5.bungee.api.chat.TextComponent("§e[Download]");
+        link.setClickEvent(new net.md_5.bungee.api.chat.ClickEvent(
+                net.md_5.bungee.api.chat.ClickEvent.Action.OPEN_URL, PAGE_URL));
+        net.md_5.bungee.api.chat.TextComponent dismiss = new net.md_5.bungee.api.chat.TextComponent("  §8[Dismiss]");
+        dismiss.setClickEvent(new net.md_5.bungee.api.chat.ClickEvent(
+                net.md_5.bungee.api.chat.ClickEvent.Action.RUN_COMMAND, "/zdiscord update dismiss"));
+        notice.addExtra(link);
+        notice.addExtra(dismiss);
+        player.spigot().sendMessage(notice);
     }
 
-    public boolean isUpdateAvailable() {
-        return updateAvailable;
-    }
-
-    public String getLatestVersion() {
-        return latestVersion;
-    }
-
-    public String getReleaseDate() {
-        return releaseDate;
-    }
-
-    public int getLastCheckErrorCount() {
-        return lastCheckErrorCount;
-    }
-
-    public CompletableFuture<String> fetchLatestVersion() {
-        CompletableFuture<String> future = new CompletableFuture<>();
-        plugin.getPlatformAdapter().runAsync(() -> {
-            try {
-                future.complete(fetchLatestSync());
-            } catch (Exception e) {
-                future.completeExceptionally(e);
-            }
-        });
-        return future.orTimeout(10, TimeUnit.SECONDS);
+    public void shutdown() {
+        running = false;
+        timer.cancel();
+        HandlerList.unregisterAll(this);
     }
 
     public static String fetchLatestSync() {

@@ -16,36 +16,27 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class MySQLStorage implements StorageManager {
 
     private final ZDiscord plugin;
     private HikariDataSource dataSource;
-    private final AtomicInteger pendingOps = new AtomicInteger(0);
+    private final SerialTaskQueue writeQueue;
     private volatile boolean shuttingDown = false;
 
     public MySQLStorage(ZDiscord plugin) {
         this.plugin = plugin;
+        writeQueue = new SerialTaskQueue(task -> {
+            if (shuttingDown || !plugin.isEnabled()) {
+                task.run();
+            } else {
+                plugin.getPlatformAdapter().runAsync(task);
+            }
+        }, failure -> plugin.getLogger().severe("MySQL write queue failed: " + failure.getMessage()));
     }
 
     private void runTrackedAsync(Runnable task) {
-        pendingOps.incrementAndGet();
-        if (shuttingDown) {
-            try {
-                task.run();
-            } finally {
-                pendingOps.decrementAndGet();
-            }
-            return;
-        }
-        plugin.getPlatformAdapter().runAsync(() -> {
-            try {
-                task.run();
-            } finally {
-                pendingOps.decrementAndGet();
-            }
-        });
+        writeQueue.execute(task);
     }
 
     @Override
@@ -85,11 +76,16 @@ public class MySQLStorage implements StorageManager {
 
         dataSource = new HikariDataSource(config);
 
-        createTables();
+        try {
+            createTables();
+        } catch (SQLException failure) {
+            closePool();
+            throw new IllegalStateException("Cannot initialize MySQL schema", failure);
+        }
         plugin.getLogger().info("Storage: Connected to MySQL at " + host + ":" + port + "/" + database);
     }
 
-    private void createTables() {
+    private void createTables() throws SQLException {
         try (Connection conn = dataSource.getConnection(); Statement stmt = conn.createStatement()) {
             stmt.executeUpdate("CREATE TABLE IF NOT EXISTS zdiscord_links (" +
                     "player_uuid VARCHAR(36) PRIMARY KEY, " +
@@ -129,29 +125,31 @@ public class MySQLStorage implements StorageManager {
                     "discord_id VARCHAR(20) NOT NULL, " +
                     "PRIMARY KEY (player_uuid, discord_id)" +
                     ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-        } catch (SQLException e) {
-            plugin.getLogger().severe("Failed to create MySQL tables: " + e.getMessage());
         }
     }
 
     @Override
     public void shutdown() {
         shuttingDown = true;
-        if (pendingOps.get() > 0) {
-            plugin.getLogger().info("Waiting for " + pendingOps.get() + " pending MySQL operations...");
-            long deadline = System.currentTimeMillis() + 5000;
-            while (pendingOps.get() > 0 && System.currentTimeMillis() < deadline) {
-                try {
-                    Thread.sleep(50);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
-            if (pendingOps.get() > 0) {
-                plugin.getLogger().warning(pendingOps.get() + " MySQL ops did not complete within 5s");
-            }
+        int pending = writeQueue.pendingCount();
+        if (pending > 0) {
+            plugin.getLogger().info("Waiting for " + pending + " pending MySQL operations...");
         }
+        writeQueue.execute(this::closePool);
+        writeQueue.drainSynchronously();
+        try {
+            if (!writeQueue.awaitIdle(5000L)) {
+                plugin.getLogger().warning(writeQueue.pendingCount()
+                        + " MySQL operations are still pending; the pool will close after they finish.");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            plugin.getLogger().warning("Interrupted while waiting for MySQL writes; "
+                    + "the pool will close after they finish.");
+        }
+    }
+
+    private void closePool() {
         if (dataSource != null && !dataSource.isClosed()) {
             dataSource.close();
             plugin.getLogger().info("MySQL connection pool closed.");
@@ -165,7 +163,7 @@ public class MySQLStorage implements StorageManager {
 
     @Override
     public int pendingWriteCount() {
-        return pendingOps.get();
+        return writeQueue.pendingCount();
     }
 
     @Override

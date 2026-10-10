@@ -19,6 +19,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -40,12 +41,13 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        switch (args[0].toLowerCase()) {
+        switch (args[0].toLowerCase(Locale.ROOT)) {
             case "reload" -> handleReload(sender);
             case "status" -> handleStatus(sender);
             case "link" -> handleLink(sender);
             case "embed" -> handleEmbed(sender, args);
             case "ticket" -> handleTicket(sender, args);
+            case "halloween" -> handleHalloween(sender, args);
             case "panel" -> handlePanel(sender);
             case "lockdown" -> handleLockdown(sender);
             case "update" -> handleUpdate(sender, args);
@@ -72,6 +74,9 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
         }
         if (sender.hasPermission("zdiscord.ticket")) {
             sender.sendMessage("  /zdiscord ticket <subject>");
+        }
+        if (sender.hasPermission("zdiscord.halloween")) {
+            sender.sendMessage("  /zdiscord halloween [status|top]");
         }
         if (sender.hasPermission("zdiscord.admin")) {
             sender.sendMessage("  /zdiscord panel");
@@ -175,6 +180,53 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
                 String.join(" ", Arrays.copyOfRange(args, 1, args.length)));
     }
 
+    private void handleHalloween(CommandSender sender, String[] args) {
+        var messages = plugin.getMessageManager();
+        if (!sender.hasPermission("zdiscord.halloween")) {
+            sender.sendMessage(messages.get("no-permission"));
+            return;
+        }
+        String action = args.length > 1 ? args[1].toLowerCase(Locale.ROOT) : "status";
+        if (args.length > 2 || !(action.equals("status") || action.equals("top"))) {
+            sender.sendMessage(messages.get("halloween-usage"));
+            return;
+        }
+
+        var halloween = plugin.getHalloweenModule();
+        if (halloween == null) {
+            sender.sendMessage(messages.get("halloween-disabled"));
+            return;
+        }
+
+        if (action.equals("top")) {
+            int limit = Math.max(1, Math.min(25, plugin.getConfigManager().getInt("halloween.top-n", 5)));
+            var standings = halloween.standings(limit);
+            sender.sendMessage(messages.get("halloween-top-header"));
+            if (standings.isEmpty()) {
+                sender.sendMessage(messages.get("halloween-empty"));
+                return;
+            }
+            for (int index = 0; index < standings.size(); index++) {
+                var row = standings.get(index);
+                sender.sendMessage(messages.get("halloween-top-entry",
+                        "%rank%", Integer.toString(index + 1),
+                        "%player%", halloween.displayName(row.getKey()),
+                        "%points%", Long.toString(row.getValue())));
+            }
+            return;
+        }
+
+        boolean active = halloween.isActive();
+        var date = active ? halloween.endDate() : halloween.startDate();
+        sender.sendMessage(messages.get("halloween-status",
+                "%state%", messages.get(active ? "halloween-state-active" : "halloween-state-upcoming"),
+                "%date%", date == null ? "unknown" : date.toString()));
+        if (sender instanceof Player player) {
+            sender.sendMessage(messages.get("halloween-score", "%points%",
+                    Long.toString(halloween.score(player.getUniqueId()))));
+        }
+    }
+
     private void handlePanel(CommandSender sender) {
         if (!sender.hasPermission("zdiscord.admin")) {
             sender.sendMessage(plugin.getMessageManager().get("no-permission"));
@@ -234,7 +286,7 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length >= 2) {
-            switch (args[1].toLowerCase()) {
+            switch (args[1].toLowerCase(Locale.ROOT)) {
                 case "dismiss" -> {
                     if (sender instanceof Player player) {
                         dismissedUpdates.add(player.getUniqueId());
@@ -279,10 +331,6 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
 
     public boolean isDismissed(UUID playerId) {
         return dismissedUpdates.contains(playerId);
-    }
-
-    public void clearDismissed() {
-        dismissedUpdates.clear();
     }
 
     private void reply(CommandSender sender, String message) {
@@ -341,7 +389,8 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
                 + " leaderboard=" + onOff(plugin.getLeaderboardModule() != null)
                 + " tickets=" + onOff(plugin.getTicketModule() != null)
                 + " link=" + onOff(plugin.getLinkModule() != null)
-                + " anti-raid=" + onOff(plugin.getAntiRaidModule() != null));
+                + " anti-raid=" + onOff(plugin.getAntiRaidModule() != null)
+                + " halloween=" + onOff(plugin.getHalloweenModule() != null));
         sender.sendMessage("");
     }
 
@@ -407,6 +456,7 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
             out.println("  Cmd logger:   " + (plugin.getCommandLoggerModule() != null ? "on" : "off"));
             out.println("  Staff chat:   " + (plugin.getStaffChatModule() != null ? "on" : "off"));
             out.println("  Voice status: " + (plugin.getVoiceStatusModule() != null ? "on" : "off"));
+            out.println("  Halloween:    " + (plugin.getHalloweenModule() != null ? "on" : "off"));
             out.println();
 
             out.println("Config");
@@ -440,11 +490,19 @@ public class ZDiscordCommand implements CommandExecutor, TabCompleter {
             if (sender.hasPermission("zdiscord.ticket")) {
                 subs.add("ticket");
             }
-            return subs.stream().filter(s -> s.startsWith(args[0].toLowerCase())).toList();
+            if (sender.hasPermission("zdiscord.halloween")) {
+                subs.add("halloween");
+            }
+            return subs.stream().filter(s -> s.startsWith(args[0].toLowerCase(Locale.ROOT))).toList();
         }
         if (args.length == 2 && "update".equalsIgnoreCase(args[0]) && sender.hasPermission("zdiscord.admin")) {
             return Arrays.asList("check", "dismiss").stream()
-                    .filter(s -> s.startsWith(args[1].toLowerCase())).toList();
+                    .filter(s -> s.startsWith(args[1].toLowerCase(Locale.ROOT))).toList();
+        }
+        if (args.length == 2 && "halloween".equalsIgnoreCase(args[0])
+                && sender.hasPermission("zdiscord.halloween")) {
+            return List.of("status", "top").stream()
+                    .filter(s -> s.startsWith(args[1].toLowerCase(Locale.ROOT))).toList();
         }
         return Collections.emptyList();
     }

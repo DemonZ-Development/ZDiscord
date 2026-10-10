@@ -5,6 +5,8 @@ import dev.demonz.zdiscord.util.ColorUtil;
 import dev.demonz.zdiscord.util.HeadUtil;
 import dev.demonz.zdiscord.util.SkinUtil;
 import dev.demonz.zdiscord.util.ZLogger;
+import dev.demonz.zdiscord.util.PlaytimeTracker;
+import dev.demonz.zdiscord.util.PlaceholderUtil;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import org.bukkit.entity.Player;
@@ -24,7 +26,7 @@ public class JoinQuitListener implements Listener {
 
     private final ZDiscord plugin;
     private final Map<UUID, Long> joinTimestamps = new ConcurrentHashMap<>();
-    private final Map<UUID, Long> lastFlushTimestamps = new ConcurrentHashMap<>();
+    private final PlaytimeTracker playtime = new PlaytimeTracker();
     private final Set<UUID> knownPlayers = ConcurrentHashMap.newKeySet();
 
     public JoinQuitListener(ZDiscord plugin) {
@@ -32,49 +34,24 @@ public class JoinQuitListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    @SuppressWarnings("deprecation")
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         plugin.greetHalloween(player);
         UUID uuid = player.getUniqueId();
         long now = System.currentTimeMillis();
 
-        boolean firstJoin;
-        if (knownPlayers.contains(uuid)) {
-            firstJoin = false;
-        } else {
-            firstJoin = plugin.getStorageManager().getFirstJoin(uuid) == 0;
-            knownPlayers.add(uuid);
-        }
-
-        plugin.getPlatformAdapter().runAsync(() -> {
-            plugin.getStorageManager().setLastSeen(uuid, now);
-            plugin.getStorageManager().incrementSessions(uuid);
-            if (firstJoin) {
-                plugin.getStorageManager().setFirstJoin(uuid, now);
-            }
-        });
-
+        boolean firstLookup = knownPlayers.add(uuid);
         joinTimestamps.put(uuid, now);
-        lastFlushTimestamps.put(uuid, now);
-
-        if (plugin.getBotManager() != null
-                && plugin.getBotManager().isConnected()
-                && plugin.getConfigManager().getBoolean("events.join.enabled", true)) {
-            sendEmbed(player, true, null, firstJoin);
-        }
-
-        if (firstJoin
-                && plugin.getConfigManager().getBoolean("events.join.show-first-join-indicator", true)) {
-            String welcome = plugin.getConfigManager().getString("events.join.first-join-message", "");
-            if (!welcome.isEmpty()) {
-                String resolved = ColorUtil.stripColor(welcome
-                        .replace("%player%", player.getName())
-                        .replace("%displayname%", ColorUtil.stripColor(player.getDisplayName()))
-                        .replace("%uuid%", player.getUniqueId().toString()));
-                plugin.getPlatformAdapter().runLater(() -> player.sendMessage(resolved), 20L);
-            }
-        }
+        playtime.join(uuid, now);
+        plugin.getStorageManager().setLastSeen(uuid, now);
+        plugin.getStorageManager().incrementSessions(uuid);
+        plugin.getPlatformAdapter().runAsync(() -> {
+            boolean firstJoin = firstLookup && plugin.getStorageManager().getFirstJoin(uuid) == 0;
+            if (firstJoin) plugin.getStorageManager().setFirstJoin(uuid, now);
+            if (plugin.isEnabled()) plugin.getPlatformAdapter().runForEntity(player, () -> {
+                if (player.isOnline()) announceJoin(player, firstJoin);
+            });
+        });
 
         if (plugin.getAntiRaidModule() != null) {
             plugin.getAntiRaidModule().onPlayerJoin(player);
@@ -86,6 +63,22 @@ public class JoinQuitListener implements Listener {
 
         if (plugin.getBotManager() != null) {
             plugin.getPlatformAdapter().runAsync(() -> plugin.getBotManager().updateActivity());
+        }
+    }
+
+    private void announceJoin(Player player, boolean firstJoin) {
+        if (plugin.getBotManager() != null && plugin.getBotManager().isConnected()
+                && plugin.getConfigManager().getBoolean("events.join.enabled", true)) {
+            sendEmbed(player, true, null, firstJoin);
+        }
+        if (firstJoin && plugin.getConfigManager().getBoolean("events.join.show-first-join-indicator", true)) {
+            String welcome = plugin.getConfigManager().getString("events.join.first-join-message", "");
+            if (!welcome.isEmpty()) {
+                String resolved = ColorUtil.colorize(PlaceholderUtil.resolve(welcome, player));
+                plugin.getPlatformAdapter().runForEntityLater(player, () -> {
+                    if (player.isOnline()) player.sendMessage(resolved);
+                }, 20L);
+            }
         }
     }
 
@@ -101,18 +94,14 @@ public class JoinQuitListener implements Listener {
         }
 
         Long joinTime = joinTimestamps.remove(uuid);
-        Long lastFlush = lastFlushTimestamps.remove(uuid);
-        if (lastFlush == null) {
-            lastFlush = joinTime;
-        }
-        if (lastFlush != null && plugin.getLeaderboardModule() != null) {
-            long sessionSeconds = (now - lastFlush) / 1000L;
+        long sessionSeconds = playtime.quit(uuid, now);
+        if (plugin.getLeaderboardModule() != null) {
             if (sessionSeconds > 0) {
                 plugin.getLeaderboardModule().incrementStatBy(uuid, "playtime", sessionSeconds);
             }
         }
 
-        plugin.getPlatformAdapter().runAsync(() -> plugin.getStorageManager().setLastSeen(uuid, now));
+        plugin.getStorageManager().setLastSeen(uuid, now);
 
         if (plugin.getBotManager() != null
                 && plugin.getBotManager().isConnected()
@@ -145,26 +134,34 @@ public class JoinQuitListener implements Listener {
             }
         }
 
-        int currentOnline = plugin.getServer().getOnlinePlayers().size();
+        int othersOnline = (int) plugin.getServer().getOnlinePlayers().stream()
+                .filter(online -> !online.getUniqueId().equals(player.getUniqueId())).count();
+        int currentOnline = othersOnline + (joined ? 1 : 0);
         int maxOnline = plugin.getServer().getMaxPlayers();
-        int prevOnline = currentOnline - (joined ? 1 : -1);
+        int prevOnline = othersOnline + (joined ? 0 : 1);
+        String description = plugin.getConfigManager().getString(
+                "events." + typeKey + ".message", "**%player%** " + verb + " the server")
+                .replace("%online%", String.valueOf(currentOnline))
+                .replace("%previous_online%", String.valueOf(prevOnline))
+                .replace("%max_players%", String.valueOf(maxOnline));
+        description = PlaceholderUtil.resolve(description, player);
 
         EmbedBuilder embed = new EmbedBuilder()
                 .setAuthor(player.getName(), "https://namemc.com/profile/" + player.getUniqueId(), avatarUrl)
-                .setTitle((joined ? "🟢 " : "🔴 ") + title)
-                .setDescription("**" + player.getName() + "** " + verb + " the server")
+                .setTitle(title)
+                .setDescription(ColorUtil.stripColor(description))
                 .setColor(ColorUtil.parseHex(colorHex))
                 .setThumbnail(avatarUrl)
                 .addField("Player", "`" + player.getName() + "`", true)
                 .addField("Online", currentOnline + "/" + maxOnline + " (was " + prevOnline + ")", true)
-                .addField("Status", joined ? "✅ Online" : "❌ Offline", true)
+                .addField("Status", joined ? "Online" : "Offline", true)
                 .setFooter("**" + player.getName() + "** " + verb + " the server",
                         footerIcon.isEmpty() ? null : footerIcon)
                 .setTimestamp(Instant.now());
 
         if (joined && firstJoin
                 && plugin.getConfigManager().getBoolean("events.join.show-first-join-indicator", true)) {
-            embed.addField("✨ New Player",
+            embed.addField("New Player",
                     "Welcome! This is **" + player.getName() + "**'s first join.", false);
         }
 
@@ -174,7 +171,7 @@ public class JoinQuitListener implements Listener {
                 seconds = (System.currentTimeMillis() - knownJoinTime) / 1000L;
             }
             if (seconds > 0) {
-                embed.addField("Session", "⌛ " + formatDuration(seconds), false);
+                embed.addField("Session", formatDuration(seconds), false);
             }
         }
 
@@ -208,7 +205,7 @@ public class JoinQuitListener implements Listener {
         long now = System.currentTimeMillis();
         for (Player player : plugin.getServer().getOnlinePlayers()) {
             joinTimestamps.putIfAbsent(player.getUniqueId(), now);
-            lastFlushTimestamps.putIfAbsent(player.getUniqueId(), now);
+            playtime.join(player.getUniqueId(), now);
         }
     }
 
@@ -219,19 +216,9 @@ public class JoinQuitListener implements Listener {
         long now = System.currentTimeMillis();
         for (Player player : plugin.getServer().getOnlinePlayers()) {
             UUID uuid = player.getUniqueId();
-            Long lastCheck = lastFlushTimestamps.get(uuid);
-            if (lastCheck == null) {
-                lastCheck = joinTimestamps.get(uuid);
-            }
-            if (lastCheck != null) {
-                long sessionSeconds = (now - lastCheck) / 1000L;
-                if (sessionSeconds > 0) {
-                    plugin.getLeaderboardModule().incrementStatBy(uuid, "playtime", sessionSeconds);
-                    lastFlushTimestamps.put(uuid, now);
-                }
-            } else {
-                joinTimestamps.put(uuid, now);
-                lastFlushTimestamps.put(uuid, now);
+            long sessionSeconds = playtime.claim(uuid, now);
+            if (sessionSeconds > 0) {
+                plugin.getLeaderboardModule().incrementStatBy(uuid, "playtime", sessionSeconds);
             }
         }
     }

@@ -103,7 +103,7 @@ public final class IntegrationModule {
             Player player = (Player) invoke(event, "getPlayer");
             int sleeping = ((Number) invoke(event, "getSleepingCount")).intValue();
             int required = ((Number) invoke(event, "getRequiredCount")).intValue();
-            return "\uD83D\uDECF\uFE0F **Onlysleep** · " + safePlayerName(player)
+            return "**Onlysleep** · " + safePlayerName(player)
                     + " is sleeping (`" + sleeping + "/" + required + "`).";
         }
         if ("SleepCancelEvent".equals(name)) {
@@ -111,7 +111,7 @@ public final class IntegrationModule {
             Object cause = invoke(event, "getCause");
             int sleeping = ((Number) invoke(event, "getSleepingCount")).intValue();
             int required = ((Number) invoke(event, "getRequiredCount")).intValue();
-            return "\u23F9\uFE0F **Onlysleep** · Sleep cancelled by " + safePlayerName(player)
+            return "**Onlysleep** · Sleep cancelled by " + safePlayerName(player)
                     + " (`" + sleeping + "/" + required + "`, "
                     + String.valueOf(cause).toLowerCase(Locale.ROOT).replace('_', ' ') + ").";
         }
@@ -120,7 +120,7 @@ public final class IntegrationModule {
             Player initiator = (Player) invoke(event, "getInitiator");
             int sleeping = ((Number) invoke(event, "getSleepingCount")).intValue();
             int required = ((Number) invoke(event, "getRequiredCount")).intValue();
-            return "\u2600\uFE0F **Onlysleep** · Night skipped in **"
+            return "**Onlysleep** · Night skipped in **"
                     + (world != null ? world.getName() : "unknown world") + "** by "
                     + safePlayerName(initiator) + " (`" + sleeping + "/" + required + "`).";
         }
@@ -183,7 +183,7 @@ public final class IntegrationModule {
                     ? "Alert"
                     : String.valueOf(type).toLowerCase(Locale.ROOT).replace('_', ' ');
             sendConfigured("integrations.redstone-reboot.channel",
-                    "\uD83D\uDD01 **RedstoneReboot · " + label + "**\n" + clean);
+                    "**RedstoneReboot · " + label + "**\n" + clean);
         } catch (ReflectiveOperationException e) {
             ZLogger.debug(ZLogger.Category.MODULES,
                     "Could not format RedstoneReboot message: " + e.getMessage());

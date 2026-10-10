@@ -89,7 +89,7 @@ public final class CraftyAIModule implements AutoCloseable {
             conn.setRequestMethod("POST"); conn.setDoOutput(true);
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Authorization", "Bearer " + key);
-            conn.setRequestProperty("User-Agent", "ZDiscord-CraftyAI/1.4.3");
+            conn.setRequestProperty("User-Agent", "ZDiscord-CraftyAI/1.5.0");
             JSONObject payload = new JSONObject(); payload.put("prompt", prompt);
             try (var out = conn.getOutputStream()) { out.write(payload.toJSONString().getBytes(StandardCharsets.UTF_8)); }
             int status = conn.getResponseCode();

@@ -25,6 +25,7 @@ public class ConsoleModule {
     private final AtomicInteger bufferedLines = new AtomicInteger();
     private ConsoleHandler handler;
     private Logger registeredLogger;
+    private dev.demonz.zdiscord.platform.PlatformAdapter.TaskHandle timer;
     private volatile boolean running = true;
 
     public ConsoleModule(ZDiscord plugin) {
@@ -48,7 +49,7 @@ public class ConsoleModule {
             registeredLogger.addHandler(handler);
         }
 
-        plugin.getPlatformAdapter().runAsyncTimer(
+        timer = plugin.getPlatformAdapter().scheduleAsyncTimer(
                 this::flushBuffer, FLUSH_INTERVAL_TICKS, FLUSH_INTERVAL_TICKS);
         plugin.debug("Console output streaming enabled.");
     }
@@ -90,10 +91,8 @@ public class ConsoleModule {
                 err -> plugin.debug("Console batch failed: " + err.getMessage()));
     }
 
-    public void reload() {
-    }
-
     public void shutdown() {
+        if (timer != null) timer.cancel();
         if (handler != null && registeredLogger != null) {
             registeredLogger.removeHandler(handler);
         }
@@ -104,7 +103,7 @@ public class ConsoleModule {
     private final class ConsoleHandler extends Handler {
         @Override
         public void publish(LogRecord record) {
-            if (record == null || record.getMessage() == null) {
+            if (!running || record == null || record.getMessage() == null) {
                 return;
             }
             String loggerName = record.getLoggerName();

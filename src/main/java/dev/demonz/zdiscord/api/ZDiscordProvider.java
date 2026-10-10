@@ -2,18 +2,19 @@ package dev.demonz.zdiscord.api;
 
 public final class ZDiscordProvider {
 
-    private static ZDiscordAPI instance;
+    private static volatile ZDiscordAPI instance;
 
     private ZDiscordProvider() {
     }
 
     public static ZDiscordAPI get() {
-        if (instance == null) {
+        ZDiscordAPI current = instance;
+        if (current == null) {
             throw new IllegalStateException(
                     "ZDiscord API is not available. "
                     + "Is the ZDiscord plugin loaded and enabled?");
         }
-        return instance;
+        return current;
     }
 
     public static boolean isAvailable() {

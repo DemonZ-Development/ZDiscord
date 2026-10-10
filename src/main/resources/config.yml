@@ -1,4 +1,4 @@
-config-version: 15
+config-version: 16
 
 # /crafty sends the supplied question to CraftyAI and replies privately.
 # Requires the CraftyAI Gateway version providing /v1/developer/chat.
@@ -67,11 +67,12 @@ chat:
   # Format for messages that appear in Minecraft. Use & color codes.
   minecraft-format: "&9[Discord] &b%name% &8> &f%message%"
   show-attachments: true
+  # Each attachment gets its own clickable link. Optional: %filename%.
   attachment-text: "&e[Attachment] &7(Click to open)"
   # When a Discord message is a reply, show a small quote line above it
   # in Minecraft chat. %reply_name% / %reply_message% placeholders.
   show-replies: true
-  reply-format: "&7┌ Replying to &b%reply_name%&7: &f%reply_message%"
+  reply-format: "&7Replying to &b%reply_name%&7: &f%reply_message%"
   reply-preview-length: 60
 
 events:
@@ -108,6 +109,7 @@ status:
   update-interval: 30
   embed:
     title: "Server Status"
+    # Used while healthy; warning/critical/offline states override this color.
     color: "#5865F2"
     show-players: true
     show-tps: true
@@ -146,6 +148,8 @@ tickets:
   support-roles: []
   max-per-user: 3
   # Tickets auto-close after this many hours of inactivity. 0 = never.
+  # Close after this many hours without a message (including time offline).
+  # Checked every minute. 0 disables automatic closing.
   auto-close-hours: 48
   panel-channel: ""
   panel:
@@ -215,7 +219,11 @@ performance:
 reaction-roles:
   enabled: true
   # Add mappings to the `mappings` list below.
-  # Each mapping: message-id, emoji, role-id, and (optional) minecraft permission.
+  # Each mapping: message-id, emoji, role-id, optional minecraft-permission.
+  # `permission` is also accepted. Minecraft grants require linking + LuckPerms.
+  # Unicode (✅) and custom (<:name:id>) emojis are accepted.
+  # Config entries override matching legacy reaction_roles.yml entries.
+  # Removed config entries are removed on /zdiscord reload.
   mappings: []
 
 misc:
@@ -227,7 +235,6 @@ misc:
   # defaults (read-only + moderate gameplay commands). Anything not on this list
   # is rejected. Note: op/deop/stop/restart/reload/perms are never allowed here.
   console-allowed-commands: []
-  debug: false
   update-checker: true
   update-silent: false
   update-channel: ""
@@ -235,7 +242,7 @@ misc:
 command-logger:
   enabled: true
   channel: ""
-  # Logged in yellow. These are matched as prefixes.
+  # Logged in yellow. Match command names, including namespaced forms.
   watched-commands:
     - "ban"
     - "kick"
@@ -291,28 +298,58 @@ confessions:
   cooldown: 300
 
 # Seasonal Halloween event. The window is expressed as MM-DD; a window whose
-# end sorts before its start wraps into the following year (10-28 to 11-02 is
-# a five-day hunt). Both default to a single day, 10-31.
+# end sorts before its start wraps into the following year. Both dates are
+# inclusive (10-28 to 11-02 is a six-day hunt). Default: a single day, 10-31.
 #
-# Mob kills during the window are tallied separately from normal kills and
-# ranked at the end. The tally resets when a new window opens and survives
-# server restarts within the same window.
+# Eligible mob kills award points separately from normal kills. The scores
+# reset when a new window opens and survive restarts within the same window.
 halloween:
+  # Master switch: false disables the entire event, commands show disabled.
   enabled: true
   window-start: "10-31"
   window-end: "10-31"
+  # "server" uses the server timezone; alternatively use an IANA timezone
+  # such as "Europe/London" or "Asia/Kolkata" for the event calendar.
+  timezone: "server"
   # Where the countdown, announcements and standings panel go. Blank uses
   # channels.events.
   channel: ""
   color: "#E67E22"
-  # Broadcast messages in-game as well as to Discord.
+  # Greet players when they join during the active window.
   greet-players: true
+  # Announce the start of each window.
+  announce-open: true
   # Post the winner embed when the window closes.
   announce-finale: true
+  # In-game countdown, opening, milestone, and finale broadcasts.
+  # Discord announcements and private player greetings are independent.
+  broadcasts:
+    enabled: true
   # Heading shown above the standings leaderboard.
   trophy-title: "Graveyard King"
-  # How many players to rank.
+  # How many players to rank; standings displays are capped at 25.
   top-n: 5
+  hunting:
+    # Empty = all worlds; otherwise use exact world names.
+    worlds: []
+    excluded-game-modes:
+      - CREATIVE
+      - SPECTATOR
+    # Empty = hostile mobs and bosses. Otherwise use Bukkit entity type
+    # names, e.g. [ZOMBIE, SKELETON, WITHER]. Players never award points.
+    mob-types: []
+    # Spawner-spawned mobs do not count by default.
+    count-spawner-mobs: false
+  cosmetics:
+    # Explicit opt-in for titles, sounds, and particles.
+    enabled: false
+    join-title: true
+    milestone-effects: true
+    sound: "AMBIENT_CAVE"
+    volume: 0.4
+    pitch: 0.8
+    particle: "SOUL"
+    particle-count: 12
   # Announce the countdown once a day during the days before the window
   # opens. Set days: 0 to silence it entirely.
   countdown:
@@ -323,18 +360,19 @@ halloween:
   live-panel:
     enabled: true
     update-interval: 60
-  # Announce the first time someone crosses each of these kill counts.
+  # Announce the first time someone crosses each of these point totals.
   milestones:
     - 25
     - 50
     - 100
     - 250
     - 500
-  # Bosses (ender dragon, wither, elder guardian) count for this many
+  # Bosses (ender dragon, wither, elder guardian) award this many points
   # instead of 1. Set to 1 to disable the bonus.
   boss-multiplier: 5
   # Console commands run when the window closes. %player% and %uuid% are
-  # replaced. Rewards are only paid for players with at least one kill.
+  # replaced. Winner commands go to first place only. Participant commands
+  # go to all players with a positive score, including first place.
   rewards:
     winner: []
     participant: []

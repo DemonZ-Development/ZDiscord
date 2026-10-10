@@ -26,7 +26,9 @@ public class LinkEnforcementListener implements Listener {
         }
 
         if (!plugin.getLinkModule().isLinked(event.getPlayer().getUniqueId())) {
-            String kickMsg = plugin.getMessageManager().get("link-required");
+            String code = plugin.getLinkModule().getLoginCode(event.getPlayer().getUniqueId());
+            if (code == null) return;
+            String kickMsg = plugin.getMessageManager().get("link-login-required", "%code%", code);
             event.disallow(PlayerLoginEvent.Result.KICK_OTHER, kickMsg);
         }
     }
